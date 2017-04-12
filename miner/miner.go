@@ -72,6 +72,21 @@ func New(eth Backend, config *params.ChainConfig, mux *event.TypeMux, engine con
 	return miner
 }
 
+func NewPBFT(eth Backend, config *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine) *Miner {
+	miner := &Miner{
+		eth:      eth,
+		mux:      mux,
+		engine:   engine,
+		worker:   newWorker(config, engine, common.Address{}, eth, mux),
+		canStart: 1,
+	}
+	miner.Register(NewPBFTAgent(eth.BlockChain(), engine, mux))
+	log.Info("New PBFT Agent")
+	go miner.update()
+
+	return miner
+}
+
 // update keeps track of the downloader events. Please be aware that this is a one shot type of update loop.
 // It's entered once and as soon as `Done` or `Failed` has been broadcasted the events are unregistered and
 // the loop is exited. This to prevent a major security vuln where external parties can DOS you with blocks
