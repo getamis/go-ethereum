@@ -203,11 +203,19 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		}
 	}
 
-	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.FastSync, config.NetworkId, maxPeers, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb); err != nil {
-		return nil, err
+	pbft := true
+	if !pbft {
+		if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.FastSync, config.NetworkId, maxPeers, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb); err != nil {
+			return nil, err
+		}
+		eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.engine)
+	} else {
+		if eth.protocolManager, err = NewPBFTProtocolManager(eth.chainConfig, config.FastSync, config.NetworkId, maxPeers, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb); err != nil {
+			return nil, err
+		}
+		log.Info("New PBFT Protocol Manager")
+		eth.miner = miner.NewPBFT(eth, eth.chainConfig, eth.EventMux(), eth.engine)
 	}
-
-	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.engine)
 	eth.miner.SetGasPrice(config.GasPrice)
 	eth.miner.SetExtra(config.ExtraData)
 
