@@ -32,6 +32,10 @@ const (
 	MsgNewView
 )
 
+// TODO: under cooking
+type State struct {
+}
+
 type Request struct {
 	Payload []byte
 }
