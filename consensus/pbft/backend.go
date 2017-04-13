@@ -16,22 +16,50 @@
 
 package pbft
 
-import "github.com/ethereum/go-ethereum/common"
+import (
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
+)
 
 // Backend provides callbacks for PBFT consensus core
 type Backend interface {
+	// ID returns self id
 	ID() uint64
-	Peer() Peer
+
+	// Peer returns a peer by given id
+	Peer(uint64) Peer
+
+	// Peers returns all connected peers
 	Peers() []Peer
+
+	// AddPeer is to notify pbft engine new peer is connected
 	AddPeer(Peer) error
 
+	// EventMux is defined to handle request event and pbft message event
+	EventMux() *event.TypeMux
+
+	// Send is to send pbft message to peers
 	Send(uint64, interface{}, Peer)
 
+	// UpdateState is to update the current pbft state to backend
+	UpdateState(*State)
+
+	// Commit is to deliver a final result to write into blockchain
+	Commit(*Proposal)
+
+	// Verify is to verify the proposal request
+	Verify(*Proposal) (bool, error)
+
+	// XXX: Sign and CheckSignature might not need to be implemented in pbft backend
+	// Sign is to sign the data
+	Sign([]byte) []byte
+
+	// CheckSignature is to verify the signature is signed from given peer
+	CheckSignature(data []byte, Peer, sig []byte) error
+
+	// XXX: Hash, Encode, Decode and SetHandler are workaround functions for developing
 	Hash(b interface{}) common.Hash
 	Encode(b interface{}) ([]byte, error)
 	Decode([]byte, interface{}) error
-
-	Commit(*Proposal)
-
 	SetHandler(h Handler)
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -62,8 +63,8 @@ func (sb *simulationBackend) ID() uint64 {
 	return sb.id
 }
 
-func (sb *simulationBackend) Peer() pbft.Peer {
-	return sb.me
+func (sb *simulationBackend) Peer(id uint64) pbft.Peer {
+	return sb.peers[id]
 }
 
 func (sb *simulationBackend) AddPeer(p pbft.Peer) error {
@@ -111,4 +112,28 @@ func (sb *simulationBackend) Encode(v interface{}) ([]byte, error) {
 
 func (sb *simulationBackend) Decode(b []byte, v interface{}) error {
 	return rlp.DecodeBytes(b, v)
+}
+
+func (sb *simulationBackend) EventMux() *event.TypeMux {
+	// not implemented
+	return nil
+}
+
+func (sb *simulationBackend) Verify(proposal *pbft.Proposal) (bool, error) {
+	// not implemented
+	return true, nil
+}
+
+func (sb *simulationBackend) Sign(data []byte) []byte {
+	// not implemented
+	return data
+}
+
+func (sb *simulationBackend) CheckSignature(data []byte, Peer, sig []byte) error {
+	// not implemented
+	return nil
+}
+
+func (sb *simulationBackend) UpdateState(*pbft.State) {
+	// not implemented
 }
