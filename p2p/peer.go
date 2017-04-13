@@ -32,7 +32,7 @@ import (
 
 const (
 	baseProtocolVersion    = 4
-	baseProtocolLength     = uint64(16)
+	baseProtocolLength     = uint64(18)
 	baseProtocolMaxMsgSize = 2 * 1024
 
 	pingInterval = 15 * time.Second

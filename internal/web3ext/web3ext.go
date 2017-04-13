@@ -30,9 +30,8 @@ var Modules = map[string]string{
 	"shh":        Shh_JS,
 	"swarmfs":    SWARMFS_JS,
 	"txpool":     TxPool_JS,
-
+	"pbft":       PBFT_JS,
 }
-
 
 const Chequebook_JS = `
 web3._extend({
@@ -576,5 +575,20 @@ web3._extend({
 			}
 		})
 	]
+});
+`
+
+const PBFT_JS = `
+web3._extend({
+	property: 'pbft',
+	methods:
+	[
+		new web3._extend.Method({
+			name: 'sendVote',
+			call: 'pbft_sendVote',
+			params: 0,
+		}),
+	],
+	properties: []
 });
 `

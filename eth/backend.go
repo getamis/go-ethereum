@@ -203,8 +203,14 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		}
 	}
 
-	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.FastSync, config.NetworkId, maxPeers, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb); err != nil {
-		return nil, err
+	if chainConfig.PBFT != nil {
+		if eth.protocolManager, err = NewPBFTProtocolManager(eth.chainConfig, config.FastSync, config.NetworkId, maxPeers, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb); err != nil {
+			return nil, err
+		}
+	} else {
+		if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.FastSync, config.NetworkId, maxPeers, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb); err != nil {
+			return nil, err
+		}
 	}
 
 	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.engine)
@@ -309,8 +315,17 @@ func (s *Ethereum) APIs() []rpc.API {
 			Version:   "1.0",
 			Service:   s.netRPCService,
 			Public:    true,
+		}, {
+			Namespace: "pbft",
+			Version:   "1.0",
+			Service:   s,
+			Public:    true,
 		},
 	}...)
+}
+
+func (s *Ethereum) SendVote() {
+	s.protocolManager.BroadcastVote()
 }
 
 func (s *Ethereum) ResetWithGenesisBlock(gb *types.Block) {
