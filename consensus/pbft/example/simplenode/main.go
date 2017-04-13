@@ -55,7 +55,7 @@ func main() {
 		for j := 0; j < N; j++ {
 			if i != j {
 				backend := backends[i]
-				if err := backend.AddPeer(backends[j].Peer()); err != nil {
+				if err := backend.AddPeer(backends[j].Peer(backends[j].ID())); err != nil {
 					log.Error("Failed to add peer", "error", err)
 				}
 			}
