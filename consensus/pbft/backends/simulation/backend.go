@@ -22,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
+	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -47,6 +48,7 @@ type simulationBackend struct {
 	id        uint64
 	n         uint64
 	f         uint64
+	mux       *event.TypeMux
 	me        *peer
 	peers     []pbft.Peer
 	logger    log.Logger
@@ -84,9 +86,9 @@ func (sb *simulationBackend) Peers() []pbft.Peer {
 	return sb.peers
 }
 
-func (sb *simulationBackend) Send(code uint64, msg interface{}, peer pbft.Peer) {
-	if err := p2p.Send(sb.me.Writer(), code, msg); err != nil {
-		log.Error("Failed to send message", "msg", msg, "error", err)
+func (sb *simulationBackend) Send(payload []byte) {
+	for _, p := range sb.peers {
+		p2p.Send(p, eth.PBFTMsg, payload)
 	}
 }
 
@@ -110,8 +112,7 @@ func (sb *simulationBackend) Decode(b []byte, v interface{}) error {
 }
 
 func (sb *simulationBackend) EventMux() *event.TypeMux {
-	// not implemented
-	return nil
+	return sb.mux
 }
 
 func (sb *simulationBackend) Verify(proposal *pbft.Proposal) (bool, error) {
