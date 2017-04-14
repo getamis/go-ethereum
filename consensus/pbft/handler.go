@@ -25,44 +25,37 @@ func (pbft *pbft) Handle(src Peer) error {
 	r := src.Reader()
 
 	// Read the next message from the remote peer, and ensure it's fully consumed
-	msg, err := r.ReadMsg()
+	msg, err := r.ReadMessage()
 	if err != nil {
 		log.Error("Failed to read message", "error", err, "peer", src)
 		return err
 	}
 
-	// TODO
-	// if msg.Size > ProtocolMaxMsgSize {
-	// 	return errResp(ErrMsgTooLarge, "%v > %v", msg.Size, ProtocolMaxMsgSize)
-	// }
-
-	defer msg.Discard()
-
 	switch msg.Code {
 	case MsgRequest:
 		var m *Request
-		if err := msg.Decode(&m); err != nil {
+		if err := Decode(&msg, &m); err != nil {
 			log.Error("Failed to decode request", "error", err)
 			return err
 		}
 		return pbft.handleRequest(m, src)
 	case MsgPreprepare:
 		var m *Preprepare
-		if err := msg.Decode(&m); err != nil {
+		if err := Decode(&msg, &m); err != nil {
 			log.Error("Failed to decode preprepare", "error", err)
 			return err
 		}
 		return pbft.handlePreprepare(m, src)
 	case MsgPrepare:
 		var m *Subject
-		if err := msg.Decode(&m); err != nil {
+		if err := Decode(&msg, &m); err != nil {
 			log.Error("Failed to decode prepare", "error", err)
 			return err
 		}
 		return pbft.handlePrepare(m, src)
 	case MsgCommit:
 		var m *Subject
-		if err := msg.Decode(&m); err != nil {
+		if err := Decode(&msg, &m); err != nil {
 			log.Error("Failed to decode commit", "error", err)
 			return err
 		}
