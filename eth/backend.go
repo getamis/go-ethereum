@@ -28,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
+	pbft "github.com/ethereum/go-ethereum/consensus/pbft/backends/simple"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -236,6 +237,11 @@ func CreateConsensusEngine(ctx *node.ServiceContext, config *Config, chainConfig
 	if chainConfig.Clique != nil {
 		return clique.New(chainConfig.Clique, db)
 	}
+	// If PBFT is requested, set it up
+	if chainConfig.PBFT != nil {
+		return pbft.NewBackend(chainConfig.ChainId.Uint64(), uint64(0), uint64(0), ctx.EventMux, ctx.NodeKey())
+	}
+
 	// Otherwise assume proof-of-work
 	switch {
 	case config.PowFake:
