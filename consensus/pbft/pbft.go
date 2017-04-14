@@ -83,7 +83,7 @@ func (pbft *pbft) NewRequest(payload []byte) {
 }
 
 func (pbft *pbft) send(code uint64, msg interface{}, peer Peer) {
-	go pbft.backend.Send(code, msg, peer)
+	//go pbft.backend.Send(code, msg, peer)
 }
 
 func (pbft *pbft) broadcast(code uint64, msg interface{}) {
