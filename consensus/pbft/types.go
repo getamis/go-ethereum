@@ -17,9 +17,12 @@
 package pbft
 
 import (
+	"bytes"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 const (
@@ -39,6 +42,33 @@ type State struct {
 
 	PrepareMsgs map[uint64]*Subject
 	CommitMsgs  map[uint64]*Subject
+}
+
+type Message struct {
+	Code    uint64
+	Size    uint32
+	Payload []byte
+}
+
+func Decode(msg *Message, val interface{}) error {
+	s := rlp.NewStream(bytes.NewReader(msg.Payload), uint64(msg.Size))
+	if err := s.Decode(val); err != nil {
+		return fmt.Errorf("failed to decode (code %x) (size %d) %v", msg.Code, msg.Size, err)
+	}
+	return nil
+}
+
+func Encode(code uint64, val interface{}) (*Message, error) {
+	payload, err := rlp.EncodeToBytes(val)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode (code %x) %v", code, err)
+	}
+
+	return &Message{
+		Code:    code,
+		Payload: payload,
+		Size:    uint32(len(payload)),
+	}, nil
 }
 
 type Request struct {
@@ -95,4 +125,17 @@ type Checkpoint struct {
 	Sequence  *big.Int
 	Digest    []byte
 	Signature []byte
+}
+
+type MessageReader interface {
+	ReadMessage() (Message, error)
+}
+
+type MessageWriter interface {
+	// WriteMessage sends a message. It will block until the message's
+	// Payload has been consumed by the other end.
+	//
+	// Note that messages can be sent only once because their
+	// payload reader is drained.
+	WriteMessage(Message) error
 }

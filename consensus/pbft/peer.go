@@ -16,11 +16,9 @@
 
 package pbft
 
-import p2p "github.com/ethereum/go-ethereum/p2p"
-
 type Peer interface {
 	ID() uint64
 
-	Reader() p2p.MsgReader
-	Writer() p2p.MsgWriter
+	Reader() MessageReader
+	Writer() MessageWriter
 }
