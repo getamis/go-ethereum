@@ -17,6 +17,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -36,15 +37,18 @@ func main() {
 	log.Root().SetHandler(glogger)
 
 	var validators = make([]pbft.Algorithm, N)
-	var backends = make([]pbft.Backend, N)
+	var backends = make([]*simulation.Backend, N)
 	// var peerList = make([]pbft.Peer, N)
 
 	for i := 0; i < N; i++ {
 		// log.Info("Initialize", "peer", i)
 
-		backend := simulation.NewSimulationBackend(uint64(i), N, F)
+		backend := simulation.NewBackend(uint64(i))
+		backend.Start()
+		defer backend.Stop()
 		validator := pbft.New(backend)
-		backend.SetHandler(validator)
+		validator.Start()
+		defer validator.Stop()
 
 		validators[i] = validator
 		backends[i] = backend
@@ -54,10 +58,7 @@ func main() {
 	for i := 0; i < N; i++ {
 		for j := 0; j < N; j++ {
 			if i != j {
-				backend := backends[i]
-				if err := backend.AddPeer(backends[j].Peer(backends[j].ID())); err != nil {
-					log.Error("Failed to add peer", "error", err)
-				}
+				backends[i].AddPeer(fmt.Sprintf("%v", j))
 			}
 		}
 	}
