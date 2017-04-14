@@ -80,7 +80,12 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 
 // APIs returns the RPC APIs this consensus engine provides.
 func (sb *simpleBackend) APIs(chain consensus.ChainReader) []rpc.API {
-	return nil
+	return []rpc.API{{
+		Namespace: "pbft",
+		Version:   "1.0",
+		Service:   &API{chain: chain, backend: sb},
+		Public:    true,
+	}}
 }
 
 func (sb *simpleBackend) AddPeer(peerPublicKey string) {
