@@ -60,9 +60,9 @@ func (p *peer) close() {
 }
 
 func (p *peer) ReadMsg() (p2p.Msg, error) {
-	return p.in.ReadMsg()
+	return p.out.ReadMsg()
 }
 
 func (p *peer) WriteMsg(msg p2p.Msg) error {
-	return p.out.WriteMsg(msg)
+	return p.in.WriteMsg(msg)
 }

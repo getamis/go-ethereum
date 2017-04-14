@@ -17,7 +17,7 @@
 package simulation
 
 import (
-	"fmt"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
@@ -29,14 +29,20 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-func NewSimulationBackend(id uint64, n uint64, f uint64) pbft.Backend {
-	backend := &simulationBackend{
+var peers []*peer = []*peer{
+	newPeer(uint64(0)),
+	newPeer(uint64(1)),
+	newPeer(uint64(2)),
+	newPeer(uint64(3)),
+}
+
+func NewBackend(id uint64) *Backend {
+	backend := &Backend{
 		id:     id,
-		n:      n,
-		f:      f,
 		me:     newPeer(id),
-		peers:  make([]pbft.Peer, n),
+		peers:  make([]pbft.Peer, len(peers)),
 		logger: log.New("backend", "simulated"),
+		mux:    new(event.TypeMux),
 	}
 
 	return backend
@@ -44,92 +50,134 @@ func NewSimulationBackend(id uint64, n uint64, f uint64) pbft.Backend {
 
 // ----------------------------------------------------------------------------
 
-type simulationBackend struct {
+type Backend struct {
 	id        uint64
-	n         uint64
-	f         uint64
 	mux       *event.TypeMux
 	me        *peer
 	peers     []pbft.Peer
 	logger    log.Logger
 	newPeerCh chan *peer
 	quitSync  chan struct{}
+
+	peerIDCount uint64
 }
 
-func (sb *simulationBackend) ID() uint64 {
+func (sb *Backend) ID() uint64 {
 	return sb.id
 }
 
-func (sb *simulationBackend) Peer(id uint64) pbft.Peer {
-	return sb.peers[id]
+func (sb *Backend) Peer(id uint64) pbft.Peer {
+	return peers[id]
 }
 
-func (sb *simulationBackend) AddPeer(p pbft.Peer) error {
-
-	if sb.ID() == p.ID() {
-		return fmt.Errorf("Don't add myself, %v = %v", sb.ID(), p.ID())
-	}
-
-	go func() {
-		for {
-			if sb.peerHandler != nil {
-				sb.peerHandler.Handle(p)
-			}
-		}
-	}()
-
-	sb.peers[p.ID()] = p
-	return nil
-}
-
-func (sb *simulationBackend) Peers() []pbft.Peer {
+func (sb *Backend) Peers() []pbft.Peer {
 	return sb.peers
 }
 
-func (sb *simulationBackend) Send(payload []byte) {
-	for _, p := range sb.peers {
-		p2p.Send(p, eth.PBFTMsg, payload)
+func (sb *Backend) Send(payload []byte) {
+	for _, p := range peers {
+		if p != nil {
+			log.Info("Send", "peer", p)
+			p2p.Send(p, eth.PBFTMsg, payload)
+		}
 	}
 }
 
-func (sb *simulationBackend) Commit(proposal *pbft.Proposal) {
-	log.Info("Committed", "id", sb.ID(), "proposal", proposal)
+func (sb *Backend) Commit(proposal *pbft.Proposal) {
+	sb.logger.Info("Committed", "id", sb.ID(), "proposal", proposal)
 }
 
-func (sb *simulationBackend) Hash(x interface{}) (h common.Hash) {
+func (sb *Backend) Hash(x interface{}) (h common.Hash) {
 	hw := sha3.NewKeccak256()
 	rlp.Encode(hw, x)
 	hw.Sum(h[:0])
 	return h
 }
 
-func (sb *simulationBackend) Encode(v interface{}) ([]byte, error) {
+func (sb *Backend) Encode(v interface{}) ([]byte, error) {
 	return rlp.EncodeToBytes(v)
 }
 
-func (sb *simulationBackend) Decode(b []byte, v interface{}) error {
+func (sb *Backend) Decode(b []byte, v interface{}) error {
 	return rlp.DecodeBytes(b, v)
 }
 
-func (sb *simulationBackend) EventMux() *event.TypeMux {
+func (sb *Backend) EventMux() *event.TypeMux {
 	return sb.mux
 }
 
-func (sb *simulationBackend) Verify(proposal *pbft.Proposal) (bool, error) {
+func (sb *Backend) Verify(proposal *pbft.Proposal) (bool, error) {
 	// not implemented
 	return true, nil
 }
 
-func (sb *simulationBackend) Sign(data []byte) []byte {
+func (sb *Backend) Sign(data []byte) []byte {
 	// not implemented
 	return data
 }
 
-func (sb *simulationBackend) CheckSignature(data []byte, Peer, sig []byte) error {
+func (sb *Backend) CheckSignature(data []byte, Peer, sig []byte) error {
 	// not implemented
 	return nil
 }
 
-func (sb *simulationBackend) UpdateState(*pbft.State) {
+func (sb *Backend) UpdateState(*pbft.State) {
 	// not implemented
+}
+
+func (sb *Backend) AddPeer(id string) {
+	numID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		sb.logger.Error("Invalid peer ID", "id", id)
+		return
+	}
+	if sb.ID() == uint64(numID) {
+		sb.logger.Error("Don't add myself", sb.ID(), numID)
+		return
+	}
+
+	peer := peers[numID]
+
+	go func() {
+		for {
+			m, err := peer.ReadMsg()
+			if err != nil {
+				sb.logger.Error("Failed to ReadMsg", "error", err, "peer", peer)
+				continue
+			}
+
+			defer m.Discard()
+
+			log.Debug("New message", "peer", peer, "msg", m)
+
+			if m.Code == eth.PBFTMsg {
+				var payload []byte
+				err := m.Decode(&payload)
+				if err != nil {
+					sb.logger.Error("Failed to read payload", "error", err, "peer", peer, "msg", m)
+					continue
+				}
+
+				sb.mux.Post(pbft.MessageEvent{
+					ID:      peer.ID(),
+					Payload: payload,
+				})
+			}
+		}
+	}()
+
+	sb.peers[numID] = peer
+}
+
+func (sb *Backend) RemovePeer(id string) {
+}
+
+func (sb *Backend) HandleMsg(id string, data []byte) {
+	// TODO: forward pbft message to pbft engine
+}
+
+func (sb *Backend) Start() {
+}
+
+func (sb *Backend) Stop() {
 }
