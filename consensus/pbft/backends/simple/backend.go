@@ -26,14 +26,14 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-func NewBackend(id uint64, n uint64, f uint64, evenMux *event.TypeMux) consensus.PBFT {
+func NewBackend(id uint64, n uint64, f uint64, eventMux *event.TypeMux) consensus.PBFT {
 	backend := &simpleBackend{
-		id:      id,
-		n:       n,
-		f:       f,
-		peers:   make([]pbft.Peer, n),
-		evenMux: evenMux,
-		logger:  log.New("backend", "simple"),
+		id:       id,
+		n:        n,
+		f:        f,
+		peers:    make([]pbft.Peer, n),
+		eventMux: eventMux,
+		logger:   log.New("backend", "simple"),
 	}
 
 	return backend
@@ -46,7 +46,7 @@ type simpleBackend struct {
 	n              uint64
 	f              uint64
 	peers          []pbft.Peer
-	evenMux        *event.TypeMux
+	eventMux       *event.TypeMux
 	consensusState *pbft.State
 	logger         log.Logger
 	quitSync       chan struct{}
