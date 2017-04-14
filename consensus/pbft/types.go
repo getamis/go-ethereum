@@ -34,6 +34,11 @@ const (
 
 // TODO: under cooking
 type State struct {
+	View     *View
+	Proposal *Proposal
+
+	PrepareMsgs map[uint64]*Subject
+	CommitMsgs  map[uint64]*Subject
 }
 
 type Request struct {
