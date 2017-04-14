@@ -20,7 +20,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus"
 )
 
 const (
@@ -32,7 +31,6 @@ const (
 )
 
 type Algorithm interface {
-	consensus.Engine
 	Handler
 
 	NewRequest(payload []byte)
