@@ -59,10 +59,10 @@ func (p *peer) close() {
 	p.out.Close()
 }
 
-func (p *peer) Reader() p2p.MsgReader {
-	return p.in
+func (p *peer) ReadMsg() (p2p.Msg, error) {
+	return p.in.ReadMsg()
 }
 
-func (p *peer) Writer() p2p.MsgWriter {
-	return p.out
+func (p *peer) WriteMsg(msg p2p.Msg) error {
+	return p.out.WriteMsg(msg)
 }
