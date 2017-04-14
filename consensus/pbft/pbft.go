@@ -20,6 +20,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 )
 
 const (
@@ -31,8 +32,8 @@ const (
 )
 
 type Algorithm interface {
-	Handler
-
+	Start()
+	Stop()
 	NewRequest(payload []byte)
 }
 
@@ -48,6 +49,11 @@ func New(backend Backend) Algorithm {
 		checkpointMsgs: make(map[uint64]*Checkpoint),
 		sequence:       new(big.Int),
 		viewNumber:     new(big.Int),
+		events: backend.EventMux().Subscribe(
+			RequestEvent{},
+			ConnectionEvent{},
+			MessageEvent{},
+		),
 	}
 
 	return pbft
@@ -62,6 +68,7 @@ type pbft struct {
 	state int
 
 	backend Backend
+	events  *event.TypeMuxSubscription
 
 	sequence   *big.Int
 	viewNumber *big.Int
@@ -81,9 +88,15 @@ func (pbft *pbft) NewRequest(payload []byte) {
 }
 
 func (pbft *pbft) broadcast(code uint64, msg interface{}) {
-	payload, err := Encode(code, msg)
+	m, err := Encode(code, msg)
 	if err != nil {
 		log.Error("failed to encode message", "msg", msg, "error", err)
+		return
+	}
+
+	payload, err := m.ToPayload()
+	if err != nil {
+		log.Error("failed to marshal message", "msg", msg, "error", err)
 		return
 	}
 

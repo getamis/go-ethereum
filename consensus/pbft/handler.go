@@ -16,48 +16,61 @@
 
 package pbft
 
-type Handler interface {
-	Handle(Peer) error
-	ID() uint64
+import "fmt"
+
+func (pbft *pbft) Start() {
+	go func() {
+		for event := range pbft.events.Chan() {
+			// A real event arrived, process interesting content
+			switch ev := event.Data.(type) {
+			case ConnectionEvent:
+
+			case RequestEvent:
+
+			case MessageEvent:
+				pbft.handleMessage(ev.Payload, pbft.backend.Peer(ev.ID))
+			}
+		}
+	}()
 }
 
-func (pbft *pbft) Handle(src Peer) error {
-	r := src.Reader()
+func (pbft *pbft) Stop() {
+	pbft.events.Unsubscribe()
+}
 
-	// Read the next message from the remote peer, and ensure it's fully consumed
-	msg, err := r.ReadMessage()
+func (pbft *pbft) handleMessage(payload []byte, src Peer) error {
+	logger := log.New("id", pbft.ID(), "from", src)
+	var msg Message
+
+	err := Decode(payload, &msg)
 	if err != nil {
-		log.Error("Failed to read message", "error", err, "peer", src)
+		logger.Error("Failed to decode message", "error", err)
 		return err
 	}
 
 	switch msg.Code {
 	case MsgRequest:
-		var m *Request
-		if err := Decode(&msg, &m); err != nil {
-			log.Error("Failed to decode request", "error", err)
-			return err
+		m, ok := msg.Msg.(*Request)
+		if !ok {
+			return fmt.Errorf("failed to decode Request, err:%v", err)
 		}
 		return pbft.handleRequest(m, src)
 	case MsgPreprepare:
-		var m *Preprepare
-		if err := Decode(&msg, &m); err != nil {
-			log.Error("Failed to decode preprepare", "error", err)
-			return err
+		m, ok := msg.Msg.(*Preprepare)
+		if !ok {
+			return fmt.Errorf("failed to decode Preprepare, err:%v", err)
 		}
 		return pbft.handlePreprepare(m, src)
 	case MsgPrepare:
-		var m *Subject
-		if err := Decode(&msg, &m); err != nil {
-			log.Error("Failed to decode prepare", "error", err)
-			return err
+		m, ok := msg.Msg.(*Subject)
+		if !ok {
+			return fmt.Errorf("failed to decode Subject, err:%v", err)
 		}
 		return pbft.handlePrepare(m, src)
 	case MsgCommit:
-		var m *Subject
-		if err := Decode(&msg, &m); err != nil {
-			log.Error("Failed to decode commit", "error", err)
-			return err
+		m, ok := msg.Msg.(*Subject)
+		if !ok {
+			return fmt.Errorf("failed to decode Subject, err:%v", err)
 		}
 		return pbft.handleCommit(m, src)
 	case MsgCheckpoint:
