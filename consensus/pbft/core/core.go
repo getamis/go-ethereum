@@ -14,13 +14,24 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package pbft
+package core
 
 import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/event"
+)
+
+const (
+	MsgRequest uint64 = iota
+	MsgPreprepare
+	MsgPrepare
+	MsgCommit
+	MsgCheckpoint
+	MsgViewChange
+	MsgNewView
 )
 
 const (
@@ -31,64 +42,62 @@ const (
 	StateCheckpointReady
 )
 
-type Algorithm interface {
+type Engine interface {
 	Start()
 	Stop()
 	NewRequest(payload []byte)
 }
 
-func New(backend Backend) Algorithm {
-	pbft := &pbft{
+func New(backend pbft.Backend) Engine {
+	return &core{
 		id:             backend.ID(),
 		N:              4,
 		F:              1,
 		state:          StateAcceptRequest,
 		backend:        backend,
-		prepareMsgs:    make(map[uint64]*Subject),
-		commitMsgs:     make(map[uint64]*Subject),
-		checkpointMsgs: make(map[uint64]*Checkpoint),
+		prepareMsgs:    make(map[uint64]*pbft.Subject),
+		commitMsgs:     make(map[uint64]*pbft.Subject),
+		checkpointMsgs: make(map[uint64]*pbft.Checkpoint),
 		sequence:       new(big.Int),
 		viewNumber:     new(big.Int),
 		events: backend.EventMux().Subscribe(
-			RequestEvent{},
-			ConnectionEvent{},
-			MessageEvent{},
+			pbft.RequestEvent{},
+			pbft.ConnectionEvent{},
+			pbft.MessageEvent{},
 		),
 	}
-
-	return pbft
 }
 
 // ----------------------------------------------------------------------------
 
-type pbft struct {
+type core struct {
 	id    uint64
 	N     int64
 	F     int64
 	state int
 
-	backend Backend
+	backend pbft.Backend
 	events  *event.TypeMuxSubscription
 
 	sequence   *big.Int
 	viewNumber *big.Int
 
-	subject        *Subject
-	preprepareMsg  *Preprepare
-	prepareMsgs    map[uint64]*Subject
-	commitMsgs     map[uint64]*Subject
-	checkpointMsgs map[uint64]*Checkpoint
+	subject        *pbft.Subject
+	preprepareMsg  *pbft.Preprepare
+	prepareMsgs    map[uint64]*pbft.Subject
+	commitMsgs     map[uint64]*pbft.Subject
+	checkpointMsgs map[uint64]*pbft.Checkpoint
 }
 
-func (pbft *pbft) NewRequest(payload []byte) {
+func (c *core) NewRequest(payload []byte) {
 	// Lazy preprepare
-	pbft.sendPreprepare(&Request{
+	c.sendPreprepare(&pbft.Request{
 		Payload: payload,
 	})
 }
 
-func (pbft *pbft) broadcast(code uint64, msg interface{}) {
-	m, err := Encode(code, msg)
+func (c *core) broadcast(code uint64, msg interface{}) {
+	m, err := pbft.Encode(code, msg)
 	if err != nil {
 		log.Error("failed to encode message", "msg", msg, "error", err)
 		return
@@ -100,38 +109,38 @@ func (pbft *pbft) broadcast(code uint64, msg interface{}) {
 		return
 	}
 
-	pbft.backend.Send(payload)
+	c.backend.Send(payload)
 }
 
-func (pbft *pbft) nextSequence() *View {
-	return &View{
-		ViewNumber: pbft.viewNumber,
-		Sequence:   new(big.Int).Add(pbft.sequence, common.Big1),
+func (c *core) nextSequence() *pbft.View {
+	return &pbft.View{
+		ViewNumber: c.viewNumber,
+		Sequence:   new(big.Int).Add(c.sequence, common.Big1),
 	}
 }
 
-func (pbft *pbft) primaryIDView() *big.Int {
-	return new(big.Int).Mod(pbft.viewNumber, big.NewInt(pbft.N))
+func (c *core) primaryIDView() *big.Int {
+	return new(big.Int).Mod(c.viewNumber, big.NewInt(c.N))
 }
 
-func (pbft *pbft) primaryID() *big.Int {
-	return pbft.primaryIDView()
+func (c *core) primaryID() *big.Int {
+	return c.primaryIDView()
 }
 
-func (pbft *pbft) isPrimary() bool {
-	return pbft.primaryID().Uint64() == pbft.ID()
+func (c *core) isPrimary() bool {
+	return c.primaryID().Uint64() == c.ID()
 }
 
-func (pbft *pbft) makeProposal(seq *big.Int, request *Request) *Proposal {
-	header := &ProposalHeader{
+func (c *core) makeProposal(seq *big.Int, request *pbft.Request) *pbft.Proposal {
+	header := &pbft.ProposalHeader{
 		Sequence:   seq,
-		ParentHash: pbft.backend.Hash(request.Payload),
-		DataHash:   pbft.backend.Hash(request.Payload),
+		ParentHash: c.backend.Hash(request.Payload),
+		DataHash:   c.backend.Hash(request.Payload),
 	}
 
-	rawHeader, _ := pbft.backend.Encode(header)
+	rawHeader, _ := c.backend.Encode(header)
 
-	return &Proposal{
+	return &pbft.Proposal{
 		Header:  rawHeader,
 		Payload: request.Payload,
 	}

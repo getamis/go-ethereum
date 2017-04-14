@@ -14,44 +14,48 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package pbft
+package core
 
-import "reflect"
+import (
+	"reflect"
 
-func (pbft *pbft) sendCommit() {
-	log.Info("sendCommit", "id", pbft.ID())
-	pbft.broadcast(MsgCommit, pbft.subject)
-	pbft.commitMsgs[pbft.ID()] = pbft.subject
+	"github.com/ethereum/go-ethereum/consensus/pbft"
+)
+
+func (c *core) sendCommit() {
+	log.Info("sendCommit", "id", c.ID())
+	c.broadcast(MsgCommit, c.subject)
+	c.commitMsgs[c.ID()] = c.subject
 }
 
-func (pbft *pbft) handleCommit(commit *Subject, src Peer) error {
-	log.Info("handleCommit", "id", pbft.ID(), "from", src.ID())
+func (c *core) handleCommit(commit *pbft.Subject, src pbft.Peer) error {
+	log.Info("handleCommit", "id", c.ID(), "from", src.ID())
 
-	if err := pbft.verifyCommit(commit, src); err != nil {
+	if err := c.verifyCommit(commit, src); err != nil {
 		return err
 	}
 
-	pbft.commitMsgs[src.ID()] = commit
+	c.commitMsgs[src.ID()] = commit
 
 	// log.Info("Total commit msgs", "id", pbft.ID(), "num", len(pbft.commitMsgs))
 
-	if int64(len(pbft.commitMsgs)) > 2*pbft.F && pbft.state == StatePrepared {
+	if int64(len(c.commitMsgs)) > 2*c.F && c.state == StatePrepared {
 		// TODO: Enter checkpoint stage?
 
-		pbft.state = StateCommitted
-		pbft.backend.Commit(pbft.preprepareMsg.Proposal)
-		pbft.state = StateAcceptRequest
+		c.state = StateCommitted
+		c.backend.Commit(c.preprepareMsg.Proposal)
+		c.state = StateAcceptRequest
 	}
 
 	return nil
 }
 
-func (pbft *pbft) verifyCommit(commit *Subject, src Peer) error {
-	logger := log.New("id", pbft.ID(), "from", src.ID())
+func (c *core) verifyCommit(commit *pbft.Subject, src pbft.Peer) error {
+	logger := log.New("id", c.ID(), "from", src.ID())
 
-	if !reflect.DeepEqual(commit, pbft.subject) {
-		logger.Warn("Subject not match", "expected", pbft.subject, "got", commit)
-		return ErrSubjectNotMatched
+	if !reflect.DeepEqual(commit, c.subject) {
+		logger.Warn("Subject not match", "expected", c.subject, "got", commit)
+		return pbft.ErrSubjectNotMatched
 	}
 
 	return nil

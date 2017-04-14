@@ -14,35 +14,39 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package pbft
+package core
 
-import "fmt"
+import (
+	"fmt"
 
-func (pbft *pbft) Start() {
+	"github.com/ethereum/go-ethereum/consensus/pbft"
+)
+
+func (c *core) Start() {
 	go func() {
-		for event := range pbft.events.Chan() {
+		for event := range c.events.Chan() {
 			// A real event arrived, process interesting content
 			switch ev := event.Data.(type) {
-			case ConnectionEvent:
+			case pbft.ConnectionEvent:
 
-			case RequestEvent:
+			case pbft.RequestEvent:
 
-			case MessageEvent:
-				pbft.handleMessage(ev.Payload, pbft.backend.Peer(ev.ID))
+			case pbft.MessageEvent:
+				c.handleMessage(ev.Payload, c.backend.Peer(ev.ID))
 			}
 		}
 	}()
 }
 
-func (pbft *pbft) Stop() {
-	pbft.events.Unsubscribe()
+func (c *core) Stop() {
+	c.events.Unsubscribe()
 }
 
-func (pbft *pbft) handleMessage(payload []byte, src Peer) error {
-	logger := log.New("id", pbft.ID(), "from", src)
-	var msg Message
+func (c *core) handleMessage(payload []byte, src pbft.Peer) error {
+	logger := log.New("id", c.ID(), "from", src)
+	var msg pbft.Message
 
-	err := Decode(payload, &msg)
+	err := pbft.Decode(payload, &msg)
 	if err != nil {
 		logger.Error("Failed to decode message", "error", err)
 		return err
@@ -50,29 +54,29 @@ func (pbft *pbft) handleMessage(payload []byte, src Peer) error {
 
 	switch msg.Code {
 	case MsgRequest:
-		m, ok := msg.Msg.(*Request)
+		m, ok := msg.Msg.(*pbft.Request)
 		if !ok {
 			return fmt.Errorf("failed to decode Request, err:%v", err)
 		}
-		return pbft.handleRequest(m, src)
+		return c.handleRequest(m, src)
 	case MsgPreprepare:
-		m, ok := msg.Msg.(*Preprepare)
+		m, ok := msg.Msg.(*pbft.Preprepare)
 		if !ok {
 			return fmt.Errorf("failed to decode Preprepare, err:%v", err)
 		}
-		return pbft.handlePreprepare(m, src)
+		return c.handlePreprepare(m, src)
 	case MsgPrepare:
-		m, ok := msg.Msg.(*Subject)
+		m, ok := msg.Msg.(*pbft.Subject)
 		if !ok {
 			return fmt.Errorf("failed to decode Subject, err:%v", err)
 		}
-		return pbft.handlePrepare(m, src)
+		return c.handlePrepare(m, src)
 	case MsgCommit:
-		m, ok := msg.Msg.(*Subject)
+		m, ok := msg.Msg.(*pbft.Subject)
 		if !ok {
 			return fmt.Errorf("failed to decode Subject, err:%v", err)
 		}
-		return pbft.handleCommit(m, src)
+		return c.handleCommit(m, src)
 	case MsgCheckpoint:
 	case MsgViewChange:
 	case MsgNewView:
@@ -83,6 +87,6 @@ func (pbft *pbft) handleMessage(payload []byte, src Peer) error {
 	return nil
 }
 
-func (pbft *pbft) ID() uint64 {
-	return pbft.id
+func (c *core) ID() uint64 {
+	return c.id
 }

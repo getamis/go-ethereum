@@ -14,10 +14,12 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package pbft
+package core
 
-func (pbft *pbft) handleRequest(request *Request, p Peer) error {
-	log.Info("handleRequest", "id", pbft.ID())
-	pbft.sendPreprepare(request)
+import "github.com/ethereum/go-ethereum/consensus/pbft"
+
+func (c *core) handleRequest(request *pbft.Request, p pbft.Peer) error {
+	log.Info("handleRequest", "id", c.ID())
+	c.sendPreprepare(request)
 	return nil
 }

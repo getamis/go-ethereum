@@ -21,8 +21,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/consensus/pbft/backends/simulation"
+	pbftCore "github.com/ethereum/go-ethereum/consensus/pbft/core"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -36,7 +36,7 @@ func main() {
 	glogger.Verbosity(log.LvlDebug)
 	log.Root().SetHandler(glogger)
 
-	var validators = make([]pbft.Algorithm, N)
+	var validators = make([]pbftCore.Engine, N)
 	var backends = make([]*simulation.Backend, N)
 	// var peerList = make([]pbft.Peer, N)
 
@@ -46,7 +46,7 @@ func main() {
 		backend := simulation.NewBackend(uint64(i))
 		backend.Start()
 		defer backend.Stop()
-		validator := pbft.New(backend)
+		validator := pbftCore.New(backend)
 		validator.Start()
 		defer validator.Stop()
 
