@@ -82,15 +82,14 @@ func (pbft *pbft) NewRequest(payload []byte) {
 	})
 }
 
-func (pbft *pbft) send(code uint64, msg interface{}, peer Peer) {
-	go pbft.backend.Send(code, msg, peer)
-}
-
 func (pbft *pbft) broadcast(code uint64, msg interface{}) {
-	peers := pbft.backend.Peers()
-	for _, p := range peers {
-		pbft.send(code, msg, p)
+	payload, err := Encode(code, msg)
+	if err != nil {
+		log.Error("failed to encode message", "msg", msg, "error", err)
+		return
 	}
+
+	pbft.backend.Send(payload)
 }
 
 func (pbft *pbft) nextSequence() *View {
