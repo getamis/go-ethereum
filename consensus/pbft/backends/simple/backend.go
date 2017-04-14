@@ -50,11 +50,6 @@ type simpleBackend struct {
 	consensusState *pbft.State
 	logger         log.Logger
 	quitSync       chan struct{}
-	peerHandler    pbft.Handler
-}
-
-func (sb *simpleBackend) SetHandler(h pbft.Handler) {
-	sb.peerHandler = h
 }
 
 func (sb *simpleBackend) ID() uint64 {

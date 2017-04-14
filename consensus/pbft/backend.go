@@ -36,7 +36,7 @@ type Backend interface {
 	EventMux() *event.TypeMux
 
 	// Send is to send pbft message to peers
-	Send(uint64, interface{}, Peer)
+	Send([]byte)
 
 	// UpdateState is to update the current pbft state to backend
 	UpdateState(*State)
@@ -58,5 +58,4 @@ type Backend interface {
 	Hash(b interface{}) common.Hash
 	Encode(b interface{}) ([]byte, error)
 	Decode([]byte, interface{}) error
-	SetHandler(h Handler)
 }

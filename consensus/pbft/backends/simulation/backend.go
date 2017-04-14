@@ -44,19 +44,14 @@ func NewSimulationBackend(id uint64, n uint64, f uint64) pbft.Backend {
 // ----------------------------------------------------------------------------
 
 type simulationBackend struct {
-	id          uint64
-	n           uint64
-	f           uint64
-	me          *peer
-	peers       []pbft.Peer
-	logger      log.Logger
-	newPeerCh   chan *peer
-	quitSync    chan struct{}
-	peerHandler pbft.Handler
-}
-
-func (sb *simulationBackend) SetHandler(h pbft.Handler) {
-	sb.peerHandler = h
+	id        uint64
+	n         uint64
+	f         uint64
+	me        *peer
+	peers     []pbft.Peer
+	logger    log.Logger
+	newPeerCh chan *peer
+	quitSync  chan struct{}
 }
 
 func (sb *simulationBackend) ID() uint64 {
