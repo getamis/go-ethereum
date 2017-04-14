@@ -48,7 +48,7 @@ var (
 // newTestProtocolManager creates a new protocol manager for testing purposes,
 // with the given number of blocks already known, and potential notification
 // channels for different events.
-func newTestProtocolManager(fastSync bool, blocks int, generator func(int, *core.BlockGen), newtx chan<- []*types.Transaction) (*ProtocolManager, error) {
+func newTestProtocolManager(fastSync bool, blocks int, generator func(int, *core.BlockGen), newtx chan<- []*types.Transaction) (*protocolManager, error) {
 	var (
 		evmux  = new(event.TypeMux)
 		engine = ethash.NewFaker()
@@ -70,14 +70,19 @@ func newTestProtocolManager(fastSync bool, blocks int, generator func(int, *core
 		return nil, err
 	}
 	pm.Start()
-	return pm, nil
+
+	if p, ok := pm.(*protocolManager); ok {
+		return p, nil
+	} else {
+		panic("cast protocolManager failed")
+	}
 }
 
 // newTestProtocolManagerMust creates a new protocol manager for testing purposes,
 // with the given number of blocks already known, and potential notification
 // channels for different events. In case of an error, the constructor force-
 // fails the test.
-func newTestProtocolManagerMust(t *testing.T, fastSync bool, blocks int, generator func(int, *core.BlockGen), newtx chan<- []*types.Transaction) *ProtocolManager {
+func newTestProtocolManagerMust(t *testing.T, fastSync bool, blocks int, generator func(int, *core.BlockGen), newtx chan<- []*types.Transaction) *protocolManager {
 	pm, err := newTestProtocolManager(fastSync, blocks, generator, newtx)
 	if err != nil {
 		t.Fatalf("Failed to create protocol manager: %v", err)
@@ -138,7 +143,7 @@ type testPeer struct {
 }
 
 // newTestPeer creates a new peer registered at the given protocol manager.
-func newTestPeer(name string, version int, pm *ProtocolManager, shake bool) (*testPeer, <-chan error) {
+func newTestPeer(name string, version int, pm *protocolManager, shake bool) (*testPeer, <-chan error) {
 	// Create a message pipe to communicate through
 	app, net := p2p.MsgPipe()
 

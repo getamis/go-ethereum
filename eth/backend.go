@@ -22,7 +22,6 @@ import (
 	"math/big"
 	"regexp"
 	"sync"
-	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
@@ -110,7 +109,7 @@ type Ethereum struct {
 	txPool          *core.TxPool
 	txMu            sync.Mutex
 	blockchain      *core.BlockChain
-	protocolManager *ProtocolManager
+	protocolManager ProtocolManager
 	lesServer       LesServer
 	// DB interfaces
 	chainDb ethdb.Database // Block chain database
@@ -133,7 +132,7 @@ type Ethereum struct {
 
 func (s *Ethereum) AddLesServer(ls LesServer) {
 	s.lesServer = ls
-	s.protocolManager.lesServer = ls
+	s.protocolManager.SetLesServer(ls)
 }
 
 // New creates a new Ethereum object (including the
@@ -279,7 +278,7 @@ func (s *Ethereum) APIs() []rpc.API {
 		}, {
 			Namespace: "eth",
 			Version:   "1.0",
-			Service:   downloader.NewPublicDownloaderAPI(s.protocolManager.downloader, s.eventMux),
+			Service:   downloader.NewPublicDownloaderAPI(s.protocolManager.Downloader(), s.eventMux),
 			Public:    true,
 		}, {
 			Namespace: "miner",
@@ -354,7 +353,7 @@ func (s *Ethereum) StartMining(local bool) error {
 		// mechanism introduced to speed sync times. CPU mining on mainnet is ludicrous
 		// so noone will ever hit this path, whereas marking sync done on CPU mining
 		// will ensure that private networks work in single miner mode too.
-		atomic.StoreUint32(&s.protocolManager.acceptTxs, 1)
+		s.protocolManager.SetAcceptTxs(1)
 	}
 	go s.miner.Start(eb)
 	return nil
@@ -371,17 +370,17 @@ func (s *Ethereum) EventMux() *event.TypeMux           { return s.eventMux }
 func (s *Ethereum) Engine() consensus.Engine           { return s.engine }
 func (s *Ethereum) ChainDb() ethdb.Database            { return s.chainDb }
 func (s *Ethereum) IsListening() bool                  { return true } // Always listening
-func (s *Ethereum) EthVersion() int                    { return int(s.protocolManager.SubProtocols[0].Version) }
+func (s *Ethereum) EthVersion() int                    { return int(s.protocolManager.Protocols()[0].Version) }
 func (s *Ethereum) NetVersion() int                    { return s.netVersionId }
-func (s *Ethereum) Downloader() *downloader.Downloader { return s.protocolManager.downloader }
+func (s *Ethereum) Downloader() *downloader.Downloader { return s.protocolManager.Downloader() }
 
 // Protocols implements node.Service, returning all the currently configured
 // network protocols to start.
 func (s *Ethereum) Protocols() []p2p.Protocol {
 	if s.lesServer == nil {
-		return s.protocolManager.SubProtocols
+		return s.protocolManager.Protocols()
 	} else {
-		return append(s.protocolManager.SubProtocols, s.lesServer.Protocols()...)
+		return append(s.protocolManager.Protocols(), s.lesServer.Protocols()...)
 	}
 }
 
