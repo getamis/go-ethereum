@@ -32,9 +32,6 @@ type Backend interface {
 	// Peers returns all connected peers
 	Peers() []Peer
 
-	// AddPeer is to notify pbft engine new peer is connected
-	AddPeer(Peer) error
-
 	// EventMux is defined to handle request event and pbft message event
 	EventMux() *event.TypeMux
 

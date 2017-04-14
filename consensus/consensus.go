@@ -92,3 +92,23 @@ type PoW interface {
 	// Hashrate returns the current mining hashrate of a PoW consensus engine.
 	Hashrate() float64
 }
+
+// PBFT is a consensus engine to avoid byzantine failure
+type PBFT interface {
+	Engine
+
+	// Add a peer
+	AddPeer(id string)
+
+	// Remove a peer
+	RemovePeer(id string)
+
+	// Handle a message from peer id
+	HandleMsg(id string, data []byte)
+
+	// Start the engine
+	Start()
+
+	// Stop the engine
+	Stop()
+}
