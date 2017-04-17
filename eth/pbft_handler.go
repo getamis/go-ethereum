@@ -57,8 +57,10 @@ type pbftProtocolManager struct {
 
 // PBFTEvent is posted
 type PBFTEvent struct {
-	id   string
-	data []byte
+	// peer public key
+	PeerPublicKey string
+	// PBFT message data
+	Data []byte
 }
 
 func newPBFTProtocolManager(config *params.ChainConfig, fastSync bool, networkId int, maxPeers int, mux *event.TypeMux, txpool txPool, engine consensus.PBFT, blockchain *core.BlockChain, chaindb ethdb.Database) (*pbftProtocolManager, error) {
@@ -182,6 +184,7 @@ func (pm *pbftProtocolManager) handle(p *peer) error {
 		p.Log().Error("Ethereum peer registration failed", "err", err)
 		return err
 	}
+	pm.engine.AddPeer(p.id)
 	defer pm.removePeer(p.id)
 
 	// Register the peer in the downloader. If the downloader considers it banned, we disconnect
@@ -581,7 +584,11 @@ func (pm *pbftProtocolManager) handleMsg(p *peer) error {
 		pm.txpool.AddBatch(txs)
 
 	case msg.Code == PBFTMsg:
-		// handle the pbft msg from peer
+		var data []byte
+		if err := msg.Decode(&data); err != nil {
+			return errResp(ErrDecode, "msg %v: %v", msg, err)
+		}
+		pm.engine.HandleMsg(p.id, data)
 	default:
 		return errResp(ErrInvalidMsgCode, "%v", msg.Code)
 	}
@@ -589,17 +596,28 @@ func (pm *pbftProtocolManager) handleMsg(p *peer) error {
 }
 
 // event loop for PBFT
-func (self *pbftProtocolManager) eventLoop() {
+func (pm *pbftProtocolManager) eventLoop() {
 	// automatically stops if unsubscribe
-	for obj := range self.eventSub.Chan() {
+	for obj := range pm.eventSub.Chan() {
 		switch ev := obj.Data.(type) {
 		case PBFTEvent:
-			self.sendEvent(ev)
+			pm.sendEvent(ev)
 		}
 	}
 }
 
-// event loop for PBFT
-func (self *pbftProtocolManager) sendEvent(event PBFTEvent) {
+// event loop for PBFT events
+func (pm *pbftProtocolManager) sendEvent(event PBFTEvent) {
+	p := pm.peers.Peer(event.PeerPublicKey)
+	if p == nil {
+		log.Warn("Failed to send event to peer", "id", event.PeerPublicKey)
+		return
+	}
+	p2p.Send(p.rw, PBFTMsg, event.Data)
+}
 
+func (pm *pbftProtocolManager) removePeer(id string) {
+	// peer id is equal to peer public key
+	pm.engine.RemovePeer(id)
+	pm.protocolManager.removePeer(id)
 }

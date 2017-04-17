@@ -83,13 +83,13 @@ func (sb *simpleBackend) APIs(chain consensus.ChainReader) []rpc.API {
 	return nil
 }
 
-func (sb *simpleBackend) AddPeer(id string) {
+func (sb *simpleBackend) AddPeer(peerPublicKey string) {
 }
 
-func (sb *simpleBackend) RemovePeer(id string) {
+func (sb *simpleBackend) RemovePeer(peerPublicKey string) {
 }
 
-func (sb *simpleBackend) HandleMsg(id string, data []byte) {
+func (sb *simpleBackend) HandleMsg(peerPublicKey string, data []byte) {
 	// TODO: forward pbft message to pbft engine
 }
 
