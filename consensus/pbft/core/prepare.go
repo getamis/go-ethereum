@@ -31,13 +31,17 @@ func (c *core) sendPrepare() {
 func (c *core) handlePrepare(prepare *pbft.Subject, src pbft.Peer) error {
 	log.Info("handlePrepare", "id", c.ID(), "from", src.ID())
 
+	if c.isFutureMessage(prepare.View) {
+		return errFutureMessage
+	}
+
 	if err := c.verifyPrepare(prepare, src); err != nil {
 		return err
 	}
 
 	c.acceptPrepare(prepare, src)
-
 	// log.Info("Total prepare msgs", "id", pbft.ID(), "num", len(pbft.prepareMsgs))
+	c.processBacklog()
 
 	// If 2f+1
 	if int64(len(c.prepareMsgs)) > 2*c.F && c.state == StatePreprepared {

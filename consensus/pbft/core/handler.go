@@ -32,7 +32,9 @@ func (c *core) Start() {
 			case pbft.RequestEvent:
 
 			case pbft.MessageEvent:
-				c.handleMessage(ev.Payload, c.backend.Peers().GetByIndex(ev.ID))
+				c.handleMsg(ev.Payload, c.backend.Peers().GetByIndex(ev.ID))
+			case backlogEvent:
+				c.handle(ev.msg, ev.src)
 			}
 		}
 	}()
@@ -42,7 +44,7 @@ func (c *core) Stop() {
 	c.events.Unsubscribe()
 }
 
-func (c *core) handleMessage(payload []byte, src pbft.Peer) error {
+func (c *core) handleMsg(payload []byte, src pbft.Peer) error {
 	logger := log.New("id", c.ID(), "from", src)
 	var msg pbft.Message
 
@@ -52,31 +54,44 @@ func (c *core) handleMessage(payload []byte, src pbft.Peer) error {
 		return err
 	}
 
+	return c.handle(&msg, src)
+}
+
+func (c *core) handle(msg *pbft.Message, src pbft.Peer) error {
+	testBacklog := func(err error) error {
+		if err == errFutureMessage {
+			c.storeBacklog(msg, src)
+			return nil
+		}
+
+		return err
+	}
+
 	switch msg.Code {
 	case MsgRequest:
 		m, ok := msg.Msg.(*pbft.Request)
 		if !ok {
-			return fmt.Errorf("failed to decode Request, err:%v", err)
+			return fmt.Errorf("failed to decode Request")
 		}
 		return c.handleRequest(m, src)
 	case MsgPreprepare:
 		m, ok := msg.Msg.(*pbft.Preprepare)
 		if !ok {
-			return fmt.Errorf("failed to decode Preprepare, err:%v", err)
+			return fmt.Errorf("failed to decode Preprepare")
 		}
 		return c.handlePreprepare(m, src)
 	case MsgPrepare:
 		m, ok := msg.Msg.(*pbft.Subject)
 		if !ok {
-			return fmt.Errorf("failed to decode Prepare, err:%v", err)
+			return fmt.Errorf("failed to decode Prepare")
 		}
-		return c.handlePrepare(m, src)
+		return testBacklog(c.handlePrepare(m, src))
 	case MsgCommit:
 		m, ok := msg.Msg.(*pbft.Subject)
 		if !ok {
-			return fmt.Errorf("failed to decode Commit, err:%v", err)
+			return fmt.Errorf("failed to decode Commit")
 		}
-		return c.handleCommit(m, src)
+		return testBacklog(c.handleCommit(m, src))
 	case MsgCheckpoint:
 	case MsgViewChange:
 	case MsgNewView:
