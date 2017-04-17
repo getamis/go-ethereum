@@ -57,10 +57,10 @@ type pbftProtocolManager struct {
 
 // PBFTEvent is posted
 type PBFTEvent struct {
-	// peer id
-	id   string
+	// peer public key
+	PeerPublicKey string
 	// PBFT message data
-	data []byte
+	Data []byte
 }
 
 func newPBFTProtocolManager(config *params.ChainConfig, fastSync bool, networkId int, maxPeers int, mux *event.TypeMux, txpool txPool, engine consensus.PBFT, blockchain *core.BlockChain, chaindb ethdb.Database) (*pbftProtocolManager, error) {
@@ -608,15 +608,16 @@ func (pm *pbftProtocolManager) eventLoop() {
 
 // event loop for PBFT events
 func (pm *pbftProtocolManager) sendEvent(event PBFTEvent) {
-	p := pm.peers.Peer(event.id)
+	p := pm.peers.Peer(event.PeerPublicKey)
 	if p == nil {
-		log.Warn("Failed to send event to peer", "id", event.id)
+		log.Warn("Failed to send event to peer", "id", event.PeerPublicKey)
 		return
 	}
-	p2p.Send(p.rw, PBFTMsg, event.data)
+	p2p.Send(p.rw, PBFTMsg, event.Data)
 }
 
 func (pm *pbftProtocolManager) removePeer(id string) {
+	// peer id is equal to peer public key
 	pm.engine.RemovePeer(id)
 	pm.protocolManager.removePeer(id)
 }
