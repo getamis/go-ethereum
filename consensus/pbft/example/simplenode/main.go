@@ -67,7 +67,7 @@ func main() {
 	for {
 		b, _ := bufio.NewReader(os.Stdin).ReadByte()
 		if b != '\n' {
-			validators[0].NewRequest([]byte(time.Now().String()))
+			backends[0].NewRequest([]byte(time.Now().String()))
 		}
 	}
 }

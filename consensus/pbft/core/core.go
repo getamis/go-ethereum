@@ -28,8 +28,7 @@ import (
 )
 
 const (
-	MsgRequest uint64 = iota
-	MsgPreprepare
+	MsgPreprepare uint64 = iota
 	MsgPrepare
 	MsgCommit
 	MsgCheckpoint
@@ -48,7 +47,6 @@ const (
 type Engine interface {
 	Start()
 	Stop()
-	NewRequest(payload []byte)
 }
 
 func New(backend pbft.Backend) Engine {
@@ -95,13 +93,6 @@ type core struct {
 
 	backlogs   map[pbft.Peer]*prque.Prque
 	backlogsMu *sync.Mutex
-}
-
-func (c *core) NewRequest(payload []byte) {
-	// Lazy preprepare
-	c.sendPreprepare(&pbft.Request{
-		Payload: payload,
-	})
 }
 
 func (c *core) broadcast(code uint64, msg interface{}) {

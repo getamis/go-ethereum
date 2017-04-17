@@ -30,7 +30,9 @@ func (c *core) Start() {
 			case pbft.ConnectionEvent:
 
 			case pbft.RequestEvent:
-
+				c.handleRequest(&pbft.Request{
+					Payload: ev.Payload,
+				}, c.backend.Peers().GetByIndex(c.ID()))
 			case pbft.MessageEvent:
 				c.handleMsg(ev.Payload, c.backend.Peers().GetByIndex(ev.ID))
 			case backlogEvent:
@@ -68,12 +70,6 @@ func (c *core) handle(msg *pbft.Message, src pbft.Peer) error {
 	}
 
 	switch msg.Code {
-	case MsgRequest:
-		m, ok := msg.Msg.(*pbft.Request)
-		if !ok {
-			return fmt.Errorf("failed to decode Request")
-		}
-		return c.handleRequest(m, src)
 	case MsgPreprepare:
 		m, ok := msg.Msg.(*pbft.Preprepare)
 		if !ok {

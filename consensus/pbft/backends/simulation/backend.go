@@ -172,3 +172,9 @@ func (sb *Backend) Start() {
 
 func (sb *Backend) Stop() {
 }
+
+func (sb *Backend) NewRequest(payload []byte) {
+	go sb.mux.Post(pbft.RequestEvent{
+		Payload: payload,
+	})
+}
