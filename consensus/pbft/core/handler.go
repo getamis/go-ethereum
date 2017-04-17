@@ -68,13 +68,13 @@ func (c *core) handleMessage(payload []byte, src pbft.Peer) error {
 	case MsgPrepare:
 		m, ok := msg.Msg.(*pbft.Subject)
 		if !ok {
-			return fmt.Errorf("failed to decode Subject, err:%v", err)
+			return fmt.Errorf("failed to decode Prepare, err:%v", err)
 		}
 		return c.handlePrepare(m, src)
 	case MsgCommit:
 		m, ok := msg.Msg.(*pbft.Subject)
 		if !ok {
-			return fmt.Errorf("failed to decode Subject, err:%v", err)
+			return fmt.Errorf("failed to decode Commit, err:%v", err)
 		}
 		return c.handleCommit(m, src)
 	case MsgCheckpoint:
