@@ -40,7 +40,7 @@ var peers []*peer = []*peer{
 func NewBackend(id uint64) *Backend {
 	backend := &Backend{
 		id:     id,
-		me:     newPeer(id),
+		me:     peers[id],
 		peers:  make([]pbft.Peer, len(peers)),
 		logger: log.New("backend", "simulated"),
 		mux:    new(event.TypeMux),
@@ -52,15 +52,11 @@ func NewBackend(id uint64) *Backend {
 // ----------------------------------------------------------------------------
 
 type Backend struct {
-	id        uint64
-	mux       *event.TypeMux
-	me        *peer
-	peers     []pbft.Peer
-	logger    log.Logger
-	newPeerCh chan *peer
-	quitSync  chan struct{}
-
-	peerIDCount uint64
+	id     uint64
+	mux    *event.TypeMux
+	me     *peer
+	peers  []pbft.Peer
+	logger log.Logger
 }
 
 func (sb *Backend) ID() uint64 {
@@ -73,10 +69,7 @@ func (sb *Backend) Peers() pbft.PeerSet {
 
 func (sb *Backend) Send(payload []byte) {
 	for _, p := range peers {
-		if p != nil {
-			log.Info("Send", "peer", p)
-			p2p.Send(p, eth.PBFTMsg, payload)
-		}
+		p2p.Send(p, eth.PBFTMsg, payload)
 	}
 }
 
