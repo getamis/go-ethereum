@@ -19,6 +19,7 @@ package simulation
 import (
 	"crypto/rand"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 )
@@ -65,4 +66,8 @@ func (p *peer) ReadMsg() (p2p.Msg, error) {
 
 func (p *peer) WriteMsg(msg p2p.Msg) error {
 	return p.in.WriteMsg(msg)
+}
+
+func (p *peer) Address() common.Address {
+	return common.HexToAddress(p.p.Name())
 }
