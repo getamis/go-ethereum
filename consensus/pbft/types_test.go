@@ -43,8 +43,19 @@ func testPreprepare(t *testing.T) {
 		t.Error(err)
 	}
 
+	msgPayload, err := m.ToPayload()
+	if err != nil {
+		t.Error(err)
+	}
+
+	var decodedMsg Message
+	err = Decode(msgPayload, &decodedMsg)
+	if err != nil {
+		t.Error(err)
+	}
+
 	var decodedPP *Preprepare
-	err = Decode(m, &decodedPP)
+	decodedPP = decodedMsg.Msg.(*Preprepare)
 	if err != nil {
 		t.Error(err)
 	}
@@ -68,8 +79,19 @@ func testSubject(t *testing.T) {
 		t.Error(err)
 	}
 
+	msgPayload, err := m.ToPayload()
+	if err != nil {
+		t.Error(err)
+	}
+
+	var decodedMsg Message
+	err = Decode(msgPayload, &decodedMsg)
+	if err != nil {
+		t.Error(err)
+	}
+
 	var decodedSub *Subject
-	err = Decode(m, &decodedSub)
+	decodedSub = decodedMsg.Msg.(*Subject)
 	if err != nil {
 		t.Error(err)
 	}

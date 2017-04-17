@@ -14,16 +14,10 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package pbft
+package core
 
 import (
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/p2p"
+	elog "github.com/ethereum/go-ethereum/log"
 )
 
-type Peer interface {
-	ID() uint64
-	Address() common.Address
-
-	p2p.MsgReadWriter
-}
+var log = elog.New("consensus", "pbft", "module", "core")

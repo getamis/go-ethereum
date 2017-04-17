@@ -17,11 +17,12 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"time"
 
-	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/consensus/pbft/backends/simulation"
+	pbftCore "github.com/ethereum/go-ethereum/consensus/pbft/core"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -35,16 +36,19 @@ func main() {
 	glogger.Verbosity(log.LvlDebug)
 	log.Root().SetHandler(glogger)
 
-	var validators = make([]pbft.Algorithm, N)
-	var backends = make([]pbft.Backend, N)
+	var validators = make([]pbftCore.Engine, N)
+	var backends = make([]*simulation.Backend, N)
 	// var peerList = make([]pbft.Peer, N)
 
 	for i := 0; i < N; i++ {
 		// log.Info("Initialize", "peer", i)
 
-		backend := simulation.NewSimulationBackend(uint64(i), N, F)
-		validator := pbft.New(backend)
-		backend.SetHandler(validator)
+		backend := simulation.NewBackend(uint64(i))
+		backend.Start()
+		defer backend.Stop()
+		validator := pbftCore.New(backend)
+		validator.Start()
+		defer validator.Stop()
 
 		validators[i] = validator
 		backends[i] = backend
@@ -54,10 +58,7 @@ func main() {
 	for i := 0; i < N; i++ {
 		for j := 0; j < N; j++ {
 			if i != j {
-				backend := backends[i]
-				if err := backend.AddPeer(backends[j].Peer(backends[j].ID())); err != nil {
-					log.Error("Failed to add peer", "error", err)
-				}
+				backends[i].AddPeer(fmt.Sprintf("%v", j))
 			}
 		}
 	}

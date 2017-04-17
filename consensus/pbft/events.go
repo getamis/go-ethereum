@@ -16,14 +16,16 @@
 
 package pbft
 
-import (
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/p2p"
-)
+type RequestEvent struct {
+	ID      uint64
+	Payload []byte
+}
 
-type Peer interface {
-	ID() uint64
-	Address() common.Address
+type ConnectionEvent struct {
+	ID uint64
+}
 
-	p2p.MsgReadWriter
+type MessageEvent struct {
+	ID      uint64
+	Payload []byte
 }
