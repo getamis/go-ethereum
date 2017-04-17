@@ -17,6 +17,7 @@
 package simulation
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -103,7 +104,8 @@ func (sb *Backend) Send(payload []byte) {
 }
 
 func (sb *Backend) Commit(proposal *pbft.Proposal) {
-	sb.logger.Info("Committed", "id", sb.ID(), "proposal", proposal)
+	sb.logger.Info("Committed "+fmt.Sprintf("%s", string(proposal.Payload)), "id", sb.ID())
+
 }
 
 func (sb *Backend) Hash(x interface{}) (h common.Hash) {

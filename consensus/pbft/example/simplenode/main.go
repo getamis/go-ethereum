@@ -17,6 +17,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"time"
@@ -38,11 +39,8 @@ func main() {
 
 	var validators = make([]pbftCore.Engine, N)
 	var backends = make([]*simulation.Backend, N)
-	// var peerList = make([]pbft.Peer, N)
 
 	for i := 0; i < N; i++ {
-		// log.Info("Initialize", "peer", i)
-
 		backend := simulation.NewBackend(uint64(i))
 		backend.Start()
 		defer backend.Stop()
@@ -52,7 +50,6 @@ func main() {
 
 		validators[i] = validator
 		backends[i] = backend
-		// peerList[i] = simulation.NewPeer(uint64(i))
 	}
 
 	for i := 0; i < N; i++ {
@@ -67,9 +64,10 @@ func main() {
 
 	time.Sleep(3 * time.Second)
 
-	validators[0].NewRequest([]byte(time.Now().String()))
-
 	for {
-		select {}
+		b, _ := bufio.NewReader(os.Stdin).ReadByte()
+		if b != '\n' {
+			validators[0].NewRequest([]byte(time.Now().String()))
+		}
 	}
 }
