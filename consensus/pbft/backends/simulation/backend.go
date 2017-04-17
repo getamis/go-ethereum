@@ -23,7 +23,6 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/consensus/pbft/backends"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
-	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -45,6 +44,32 @@ func NewBackend(id uint64) *Backend {
 		logger: log.New("backend", "simulated"),
 		mux:    new(event.TypeMux),
 	}
+
+	go func() {
+		for {
+			m, err := backend.me.ReadMsg()
+			if err != nil {
+				backend.logger.Error("Failed to ReadMsg", "error", err)
+				continue
+			}
+
+			defer m.Discard()
+
+			// log.Debug("New message", "peer", peer, "msg", m)
+
+			var payload []byte
+			err = m.Decode(&payload)
+			if err != nil {
+				backend.logger.Error("Failed to read payload", "error", err, "msg", m)
+				continue
+			}
+
+			backend.mux.Post(pbft.MessageEvent{
+				ID:      m.Code,
+				Payload: payload,
+			})
+		}
+	}()
 
 	return backend
 }
@@ -68,9 +93,13 @@ func (sb *Backend) Peers() pbft.PeerSet {
 }
 
 func (sb *Backend) Send(payload []byte) {
-	for _, p := range peers {
-		p2p.Send(p, eth.PBFTMsg, payload)
-	}
+	go func() {
+		for _, p := range peers {
+			if p.ID() != sb.me.ID() {
+				p2p.Send(p, sb.ID(), payload)
+			}
+		}
+	}()
 }
 
 func (sb *Backend) Commit(proposal *pbft.Proposal) {
@@ -126,37 +155,7 @@ func (sb *Backend) AddPeer(id string) {
 		return
 	}
 
-	peer := peers[numID]
-
-	go func() {
-		for {
-			m, err := peer.ReadMsg()
-			if err != nil {
-				sb.logger.Error("Failed to ReadMsg", "error", err, "peer", peer)
-				continue
-			}
-
-			defer m.Discard()
-
-			log.Debug("New message", "peer", peer, "msg", m)
-
-			if m.Code == eth.PBFTMsg {
-				var payload []byte
-				err := m.Decode(&payload)
-				if err != nil {
-					sb.logger.Error("Failed to read payload", "error", err, "peer", peer, "msg", m)
-					continue
-				}
-
-				sb.mux.Post(pbft.MessageEvent{
-					ID:      peer.ID(),
-					Payload: payload,
-				})
-			}
-		}
-	}()
-
-	sb.peers[numID] = peer
+	sb.peers[numID] = peers[numID]
 }
 
 func (sb *Backend) RemovePeer(id string) {
