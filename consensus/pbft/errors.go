@@ -25,4 +25,5 @@ var (
 	ErrOldMessage        = errors.New("old message")
 	ErrInvalidMessage    = errors.New("invalid message")
 	ErrSubjectNotMatched = errors.New("subjects are not matched")
+	ErrInvalidSignature  = errors.New("Invalid signature")
 )

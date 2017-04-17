@@ -17,23 +17,28 @@
 package simple
 
 import (
+	"bytes"
+	"crypto/ecdsa"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-func NewBackend(id uint64, n uint64, f uint64, eventMux *event.TypeMux) consensus.PBFT {
+func NewBackend(id uint64, n uint64, f uint64, eventMux *event.TypeMux, privateKey *ecdsa.PrivateKey) consensus.PBFT {
 	backend := &simpleBackend{
-		id:       id,
-		n:        n,
-		f:        f,
-		peers:    make([]pbft.Peer, n),
-		eventMux: eventMux,
-		logger:   log.New("backend", "simple"),
+		id:         id,
+		n:          n,
+		f:          f,
+		peers:      make([]pbft.Peer, n),
+		eventMux:   eventMux,
+		privateKey: privateKey,
+		logger:     log.New("backend", "simple"),
 	}
 
 	return backend
@@ -47,6 +52,7 @@ type simpleBackend struct {
 	f              uint64
 	peers          []pbft.Peer
 	eventMux       *event.TypeMux
+	privateKey     *ecdsa.PrivateKey
 	consensusState *pbft.State
 	logger         log.Logger
 	quitSync       chan struct{}
@@ -96,13 +102,26 @@ func (sb *simpleBackend) Verify(proposal *pbft.Proposal) (bool, error) {
 	return true, nil
 }
 
-func (sb *simpleBackend) Sign(data []byte) []byte {
-	// not implemented
-	return data
+func (sb *simpleBackend) Sign(data []byte) ([]byte, error) {
+	hashData := crypto.Keccak256([]byte(data))
+	return crypto.Sign(hashData, sb.privateKey)
 }
 
-func (sb *simpleBackend) CheckSignature(data []byte, Peer, sig []byte) error {
-	// not implemented
+func (sb *simpleBackend) CheckSignature(data []byte, address common.Address, sig []byte) error {
+	//1. Keccak data
+	hashData := crypto.Keccak256([]byte(data))
+	//2. Recover public key
+	pubkey, err := crypto.Ecrecover(hashData, sig)
+	if err != nil {
+		log.Error("CheckSignature", "error", err)
+		return err
+	}
+	//3. Compare derived addresses
+	var signer common.Address
+	copy(signer[:], crypto.Keccak256(pubkey[1:])[12:])
+	if bytes.Compare(signer.Bytes(), address.Bytes()) != 0 {
+		return pbft.ErrInvalidSignature
+	}
 	return nil
 }
 

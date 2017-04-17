@@ -16,8 +16,11 @@
 
 package pbft
 
+import "github.com/ethereum/go-ethereum/common"
+
 type Peer interface {
 	ID() uint64
+	Address() common.Address
 
 	Reader() MessageReader
 	Writer() MessageWriter
