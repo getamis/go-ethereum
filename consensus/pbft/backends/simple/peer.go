@@ -53,6 +53,10 @@ func (p *peer) SetPublicKey(pubKey string) {
 	p.publicKey = pubKey
 }
 
+func (p *peer) IsConnected() bool {
+	return p.publicKey != ""
+}
+
 func (p *peer) ReadMsg() (p2p.Msg, error) {
 	return p2p.Msg{}, nil
 }

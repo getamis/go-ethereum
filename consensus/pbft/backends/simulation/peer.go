@@ -76,4 +76,8 @@ func (p *peer) PublicKey() string {
 	return ""
 }
 
+func (p *peer) IsConnected() bool {
+	return true
+}
+
 func (p *peer) SetPublicKey(pubKey string) {}

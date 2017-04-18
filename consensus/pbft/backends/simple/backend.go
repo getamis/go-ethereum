@@ -85,11 +85,19 @@ func (sb *simpleBackend) Peers() pbft.PeerSet {
 func (sb *simpleBackend) Send(data []byte) {
 	peers := sb.peerSet.Peers()
 	for _, peer := range peers {
-		if peer.PublicKey() != "" {
-			go sb.eventMux.Post(eth.PBFTEvent{
-				PeerPublicKey: peer.PublicKey(),
-				Data:          data,
+		// just post pbft event to pbft core engine if peer is eaqual to self
+		if peer.ID() == sb.ID() {
+			go sb.pbftEventMux.Post(pbft.MessageEvent{
+				ID:      peer.ID(),
+				Payload: data,
 			})
+		} else {
+			if peer.IsConnected() {
+				go sb.eventMux.Post(eth.PBFTEvent{
+					PeerPublicKey: peer.PublicKey(),
+					Data:          data,
+				})
+			}
 		}
 	}
 }

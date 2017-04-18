@@ -27,5 +27,6 @@ type Peer interface {
 	PublicKey() string
 	SetPublicKey(string)
 
+	IsConnected() bool
 	p2p.MsgReadWriter
 }
