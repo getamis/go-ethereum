@@ -18,14 +18,12 @@ package pbft
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/p2p"
 )
 
-type Peer interface {
-	ID() uint64
-	Address() common.Address
-	PublicKey() string
-	SetPublicKey(string)
-
-	p2p.MsgReadWriter
+type PeerSet interface {
+	GetPeerByIndex(uint64) Peer
+	GetPeerByAddress(common.Address) Peer
+	GetPeerByPubKey(string) Peer
+	Peers() []Peer
+	GetProposer() Peer
 }

@@ -14,66 +14,55 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package simulation
+package simple
 
 import (
-	"crypto/rand"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/pbft"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/discover"
 )
 
-func newPeer(newPeerID uint64) *peer {
-	// Create a message pipe to communicate through
-	in, out := p2p.MsgPipe()
-
-	// Generate a random id and create the peer
-	var id discover.NodeID
-	rand.Read(id[:])
-
-	p := &peer{
-		id:  newPeerID,
-		in:  in,
-		out: out,
-		p:   p2p.NewPeer(id, id.String(), nil),
+func newPeer(publicKey string, id uint64) pbft.Peer {
+	return &peer{
+		id:        id,
+		publicKey: publicKey,
+		address:   pubKey2Addr(publicKey),
 	}
-
-	return p
 }
 
 type peer struct {
-	id  uint64
-	in  *p2p.MsgPipeRW
-	out *p2p.MsgPipeRW
-	p   *p2p.Peer
+	id        uint64
+	publicKey string
+	address   common.Address
 }
 
 func (p *peer) ID() uint64 {
 	return p.id
 }
 
-// close terminates the local side of the peer, notifying the remote protocol
-// manager of termination.
-func (p *peer) close() {
-	p.in.Close()
-	p.out.Close()
-}
-
-func (p *peer) ReadMsg() (p2p.Msg, error) {
-	return p.out.ReadMsg()
-}
-
-func (p *peer) WriteMsg(msg p2p.Msg) error {
-	return p.in.WriteMsg(msg)
-}
-
 func (p *peer) Address() common.Address {
-	return common.HexToAddress(p.p.Name())
+	return p.address
 }
 
 func (p *peer) PublicKey() string {
-	return ""
+	return p.publicKey
 }
 
-func (p *peer) SetPublicKey(pubKey string) {}
+func (p *peer) SetPublicKey(pubKey string) {
+	p.publicKey = pubKey
+}
+
+func (p *peer) ReadMsg() (p2p.Msg, error) {
+	return p2p.Msg{}, nil
+}
+
+func (p *peer) WriteMsg(msg p2p.Msg) error {
+	return nil
+}
+
+func pubKey2Addr(pubKey string) common.Address {
+	var address common.Address
+	copy(address[:], crypto.Keccak256([]byte(pubKey)[1:])[12:])
+	return address
+}

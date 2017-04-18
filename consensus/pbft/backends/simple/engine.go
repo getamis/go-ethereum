@@ -88,14 +88,18 @@ func (sb *simpleBackend) APIs(chain consensus.ChainReader) []rpc.API {
 	}}
 }
 
-func (sb *simpleBackend) AddPeer(peerPublicKey string) {
+func (sb *simpleBackend) AddPeer(publicKey string) {
+	// step1: check is validator
+	if ok := sb.updatePeerPubKey(publicKey); !ok {
+		return
+	}
+	// step2: post connection event to pbft core
 }
 
-func (sb *simpleBackend) RemovePeer(peerPublicKey string) {
+func (sb *simpleBackend) RemovePeer(publicKey string) {
 }
 
-func (sb *simpleBackend) HandleMsg(peerPublicKey string, data []byte) {
-	// TODO: forward pbft message to pbft engine
+func (sb *simpleBackend) HandleMsg(publicKey string, data []byte) {
 }
 
 func (sb *simpleBackend) Start() {

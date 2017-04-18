@@ -21,6 +21,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
+	"github.com/ethereum/go-ethereum/consensus/pbft/backends"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/event"
@@ -66,12 +67,8 @@ func (sb *Backend) ID() uint64 {
 	return sb.id
 }
 
-func (sb *Backend) Peer(id uint64) pbft.Peer {
-	return peers[id]
-}
-
-func (sb *Backend) Peers() []pbft.Peer {
-	return sb.peers
+func (sb *Backend) Peers() pbft.PeerSet {
+	return backends.NewPeerSet(sb.peers)
 }
 
 func (sb *Backend) Send(payload []byte) {
@@ -111,12 +108,12 @@ func (sb *Backend) Verify(proposal *pbft.Proposal) (bool, error) {
 	return true, nil
 }
 
-func (sb *Backend) Sign(data []byte) []byte {
+func (sb *Backend) Sign(data []byte) ([]byte, error) {
 	// not implemented
-	return data
+	return data, nil
 }
 
-func (sb *Backend) CheckSignature(data []byte, Peer, sig []byte) error {
+func (sb *Backend) CheckSignature(data []byte, addr common.Address, sig []byte) error {
 	// not implemented
 	return nil
 }

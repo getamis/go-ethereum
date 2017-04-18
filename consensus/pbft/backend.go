@@ -26,11 +26,8 @@ type Backend interface {
 	// ID returns self id
 	ID() uint64
 
-	// Peer returns a peer by given id
-	Peer(uint64) Peer
-
 	// Peers returns all connected peers
-	Peers() []Peer
+	Peers() PeerSet
 
 	// EventMux is defined to handle request event and pbft message event
 	EventMux() *event.TypeMux
@@ -49,10 +46,10 @@ type Backend interface {
 
 	// XXX: Sign and CheckSignature might not need to be implemented in pbft backend
 	// Sign is to sign the data
-	Sign([]byte) []byte
+	Sign([]byte) ([]byte, error)
 
 	// CheckSignature is to verify the signature is signed from given peer
-	CheckSignature(data []byte, Peer, sig []byte) error
+	CheckSignature(data []byte, addr common.Address, sig []byte) error
 
 	// XXX: Hash, Encode, Decode and SetHandler are workaround functions for developing
 	Hash(b interface{}) common.Hash

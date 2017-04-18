@@ -32,7 +32,7 @@ func (c *core) Start() {
 			case pbft.RequestEvent:
 
 			case pbft.MessageEvent:
-				c.handleMessage(ev.Payload, c.backend.Peer(ev.ID))
+				c.handleMessage(ev.Payload, c.backend.Peers().GetPeerByIndex(ev.ID))
 			}
 		}
 	}()
