@@ -17,7 +17,6 @@
 package simulation
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -29,6 +28,10 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
 )
+
+type CommitEvent struct {
+	Payload []byte
+}
 
 var peers []*peer = []*peer{
 	newPeer(uint64(0)),
@@ -42,7 +45,7 @@ func NewBackend(id uint64) *Backend {
 		id:     id,
 		me:     peers[id],
 		peers:  make([]pbft.Peer, len(peers)),
-		logger: log.New("backend", "simulated"),
+		logger: log.New("backend", "simulated", "id", id),
 		mux:    new(event.TypeMux),
 	}
 
@@ -80,6 +83,7 @@ func NewBackend(id uint64) *Backend {
 type Backend struct {
 	id     uint64
 	mux    *event.TypeMux
+	appMux *event.TypeMux
 	me     *peer
 	peers  []pbft.Peer
 	logger log.Logger
@@ -104,8 +108,9 @@ func (sb *Backend) Send(payload []byte) {
 }
 
 func (sb *Backend) Commit(proposal *pbft.Proposal) {
-	sb.logger.Info("Committed "+fmt.Sprintf("%s", string(proposal.Payload)), "id", sb.ID())
-
+	go sb.mux.Post(CommitEvent{
+		Payload: proposal.Payload,
+	})
 }
 
 func (sb *Backend) Hash(x interface{}) (h common.Hash) {
