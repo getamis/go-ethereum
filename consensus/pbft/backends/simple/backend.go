@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
+	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -82,6 +83,15 @@ func (sb *simpleBackend) Peers() pbft.PeerSet {
 }
 
 func (sb *simpleBackend) Send(data []byte) {
+	peers := sb.peerSet.Peers()
+	for _, peer := range peers {
+		if peer.PublicKey() != "" {
+			go sb.eventMux.Post(eth.PBFTEvent{
+				PeerPublicKey: peer.PublicKey(),
+				Data:          data,
+			})
+		}
+	}
 }
 
 func (sb *simpleBackend) Commit(proposal *pbft.Proposal) {

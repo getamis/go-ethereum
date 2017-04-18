@@ -18,6 +18,7 @@ package simple
 
 import (
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -100,6 +101,11 @@ func (sb *simpleBackend) RemovePeer(publicKey string) {
 }
 
 func (sb *simpleBackend) HandleMsg(publicKey string, data []byte) {
+	peer := sb.peerSet.GetPeerByPubKey(publicKey)
+	go sb.eventMux.Post(pbft.MessageEvent{
+		ID:      peer.ID(),
+		Payload: data,
+	})
 }
 
 func (sb *simpleBackend) Start() {
