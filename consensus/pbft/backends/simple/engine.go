@@ -90,11 +90,13 @@ func (sb *simpleBackend) APIs(chain consensus.ChainReader) []rpc.API {
 }
 
 func (sb *simpleBackend) AddPeer(publicKey string) {
-	// step1: check is validator
-	if peer := sb.updatePeerPublicKey(publicKey); peer == nil {
-		return
+	// check is validator
+	if peer := sb.updatePeerPublicKey(publicKey); peer != nil {
+		// post connection event to pbft core
+		go sb.pbftEventMux.Post(pbft.ConnectionEvent{
+			ID: peer.ID(),
+		})
 	}
-	// step2: post connection event to pbft core
 }
 
 func (sb *simpleBackend) RemovePeer(publicKey string) {
@@ -102,7 +104,7 @@ func (sb *simpleBackend) RemovePeer(publicKey string) {
 
 func (sb *simpleBackend) HandleMsg(publicKey string, data []byte) {
 	if peer := sb.peerSet.GetByPublicKey(publicKey); peer != nil {
-		go sb.eventMux.Post(pbft.MessageEvent{
+		go sb.pbftEventMux.Post(pbft.MessageEvent{
 			ID:      peer.ID(),
 			Payload: data,
 		})
