@@ -20,6 +20,9 @@ import "github.com/ethereum/go-ethereum/consensus/pbft"
 
 func (c *core) handleRequest(request *pbft.Request, p pbft.Peer) error {
 	log.Info("handleRequest", "id", c.ID())
-	c.sendPreprepare(request)
+
+	if c.state == StateAcceptRequest {
+		c.sendPreprepare(request)
+	}
 	return nil
 }
