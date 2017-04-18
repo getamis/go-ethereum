@@ -18,7 +18,6 @@ package backends
 
 import (
 	"bytes"
-	"sort"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -36,31 +35,28 @@ type peerSet struct {
 }
 
 func (ps *peerSet) GetByIndex(i uint64) pbft.Peer {
-	return ps.peers[i]
+	if i < uint64(len(ps.peers)) {
+		return ps.peers[i]
+	}
+	return nil
 }
 
 func (ps *peerSet) GetByAddress(addr common.Address) pbft.Peer {
-	idx := sort.Search(len(ps.peers), func(i int) bool {
-		return bytes.Compare(addr.Bytes(), ps.peers[i].Address().Bytes()) <= 0
-	})
-
-	if idx != len(ps.peers) && bytes.Compare(ps.peers[idx].Address().Bytes(), addr.Bytes()) == 0 {
-		return ps.peers[idx]
-	} else {
-		return nil
+	for _, peer := range ps.peers {
+		if bytes.Compare(addr.Bytes(), peer.Address().Bytes()) == 0 {
+			return peer
+		}
 	}
+	return nil
 }
 
 func (ps *peerSet) GetByPublicKey(publicKey string) pbft.Peer {
-	idx := sort.Search(len(ps.peers), func(i int) bool {
-		return strings.Compare(publicKey, ps.peers[i].PublicKey()) <= 0
-	})
-
-	if idx != len(ps.peers) && strings.Compare(ps.peers[idx].PublicKey(), publicKey) == 0 {
-		return ps.peers[idx]
-	} else {
-		return nil
+	for _, peer := range ps.peers {
+		if strings.Compare(publicKey, peer.PublicKey()) == 0 {
+			return peer
+		}
 	}
+	return nil
 }
 
 func (ps *peerSet) Peers() []pbft.Peer {
@@ -68,7 +64,7 @@ func (ps *peerSet) Peers() []pbft.Peer {
 }
 
 func (ps *peerSet) GetProposer() pbft.Peer {
-	// XXX: for workaround, shouldn't return fixed peer always
+	// FIXME: for workaround, shouldn't return fixed peer always
 	if len(ps.peers) == 0 {
 		return nil
 	}
