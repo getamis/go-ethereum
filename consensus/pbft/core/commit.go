@@ -49,7 +49,10 @@ func (c *core) handleCommit(commit *pbft.Subject, src pbft.Peer) error {
 		// TODO: Enter checkpoint stage?
 
 		c.state = StateCommitted
+		log.Info("Ready to commit", "view", c.preprepareMsg.View)
 		c.backend.Commit(c.preprepareMsg.Proposal)
+		c.viewNumber = c.preprepareMsg.View.ViewNumber
+		c.sequence = c.preprepareMsg.View.Sequence
 		c.state = StateAcceptRequest
 	}
 
