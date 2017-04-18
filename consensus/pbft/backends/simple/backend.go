@@ -166,20 +166,21 @@ func (sb *simpleBackend) initPeerSet() {
 
 	// update self public key
 	pub := string(crypto.FromECDSAPub(&sb.privateKey.PublicKey))
-	sb.updatePeerPubKey(pub)
-	sb.id = sb.peerSet.GetPeerByPubKey(pub).ID()
+	if peer := sb.updatePeerPublicKey(pub); peer != nil {
+		sb.id = peer.ID()
+	}
 }
 
-func (sb *simpleBackend) updatePeerPubKey(pubKey string) bool {
+func (sb *simpleBackend) updatePeerPublicKey(pubKey string) pbft.Peer {
 	// get peer by address
 	addr := pubKey2Addr(pubKey)
-	peer := sb.peerSet.GetPeerByAddress(addr)
+	peer := sb.peerSet.GetByAddress(addr)
 	// update public key
 	if peer != nil {
 		peer.SetPublicKey(pubKey)
-		return true
+		return peer
 	}
-	return false
+	return nil
 }
 
 func getValidatorSet(block *types.Header) []common.Address {

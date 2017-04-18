@@ -35,11 +35,11 @@ type peerSet struct {
 	peers []pbft.Peer
 }
 
-func (ps *peerSet) GetPeerByIndex(i uint64) pbft.Peer {
+func (ps *peerSet) GetByIndex(i uint64) pbft.Peer {
 	return ps.peers[i]
 }
 
-func (ps *peerSet) GetPeerByAddress(addr common.Address) pbft.Peer {
+func (ps *peerSet) GetByAddress(addr common.Address) pbft.Peer {
 	idx := sort.Search(len(ps.peers), func(i int) bool {
 		return bytes.Compare(addr.Bytes(), ps.peers[i].Address().Bytes()) <= 0
 	})
@@ -51,7 +51,7 @@ func (ps *peerSet) GetPeerByAddress(addr common.Address) pbft.Peer {
 	}
 }
 
-func (ps *peerSet) GetPeerByPubKey(publicKey string) pbft.Peer {
+func (ps *peerSet) GetByPublicKey(publicKey string) pbft.Peer {
 	idx := sort.Search(len(ps.peers), func(i int) bool {
 		return strings.Compare(publicKey, ps.peers[i].PublicKey()) <= 0
 	})

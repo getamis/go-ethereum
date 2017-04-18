@@ -21,9 +21,9 @@ import (
 )
 
 type PeerSet interface {
-	GetPeerByIndex(uint64) Peer
-	GetPeerByAddress(common.Address) Peer
-	GetPeerByPubKey(string) Peer
+	GetByIndex(uint64) Peer
+	GetByAddress(common.Address) Peer
+	GetByPublicKey(string) Peer
 	Peers() []Peer
 	GetProposer() Peer
 }
