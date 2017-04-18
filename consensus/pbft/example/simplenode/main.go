@@ -17,19 +17,27 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
+	"math/big"
 	"os"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft/backends/simulation"
 	pbftCore "github.com/ethereum/go-ethereum/consensus/pbft/core"
+	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 )
 
 const (
 	F = 1
 	N = 3*F + 1
+)
+
+var (
+	genesisBlock *types.Block
+	blocks       map[common.Hash]*types.Block
 )
 
 func main() {
@@ -64,10 +72,43 @@ func main() {
 
 	time.Sleep(3 * time.Second)
 
-	for {
-		b, _ := bufio.NewReader(os.Stdin).ReadByte()
-		if b != '\n' {
-			backends[0].NewRequest([]byte(time.Now().String()))
-		}
+	genesisBlock, _ = core.DefaultGenesisBlock().ToBlock()
+	block := genesisBlock
+
+	blocks := make(map[common.Hash]*types.Block)
+	blocks[block.Hash()] = block
+
+	for _, backend := range backends {
+		subscription := backend.EventMux().Subscribe(simulation.CommitEvent{})
+		be := backend
+		go func() {
+			for event := range subscription.Chan() {
+				switch ev := event.Data.(type) {
+				case simulation.CommitEvent:
+					b := blocks[common.BytesToHash(ev.Payload)]
+					log.Info("Block committed", "number", b.NumberU64(), "hash", b.Hash().String(), "id", be.ID())
+				}
+			}
+		}()
 	}
+
+	for {
+		backends[0].NewRequest(block.Hash().Bytes())
+		block = makeBlock(block, block.Number())
+		blocks[block.Hash()] = block
+		time.Sleep(1 * time.Second)
+	}
+}
+
+func makeBlock(parent *types.Block, num *big.Int) *types.Block {
+	header := &types.Header{
+		ParentHash: parent.Hash(),
+		Number:     num.Add(num, common.Big1),
+		GasLimit:   new(big.Int),
+		GasUsed:    new(big.Int),
+		Extra:      nil,
+		Time:       big.NewInt(int64(time.Now().Nanosecond())),
+	}
+
+	return types.NewBlockWithHeader(header)
 }
