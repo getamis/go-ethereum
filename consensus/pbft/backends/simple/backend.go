@@ -149,7 +149,7 @@ func (sb *simpleBackend) CheckSignature(data []byte, address common.Address, sig
 		return err
 	}
 	//3. Compare derived addresses
-	signer := pubKey2Addr(string(pubkey))
+	signer := publicKey2Addr(string(pubkey))
 	if bytes.Compare(signer.Bytes(), address.Bytes()) != 0 {
 		return pbft.ErrInvalidSignature
 	}
@@ -181,7 +181,7 @@ func (sb *simpleBackend) initPeerSet() {
 
 func (sb *simpleBackend) updatePeerPublicKey(pubKey string) pbft.Peer {
 	// get peer by address
-	addr := pubKey2Addr(pubKey)
+	addr := publicKey2Addr(pubKey)
 	peer := sb.peerSet.GetByAddress(addr)
 	// update public key
 	if peer != nil {

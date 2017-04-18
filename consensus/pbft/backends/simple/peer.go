@@ -27,7 +27,7 @@ func newPeer(publicKey string, id uint64) pbft.Peer {
 	return &peer{
 		id:        id,
 		publicKey: publicKey,
-		address:   pubKey2Addr(publicKey),
+		address:   publicKey2Addr(publicKey),
 	}
 }
 
@@ -65,7 +65,7 @@ func (p *peer) WriteMsg(msg p2p.Msg) error {
 	return nil
 }
 
-func pubKey2Addr(pubKey string) common.Address {
+func publicKey2Addr(pubKey string) common.Address {
 	var address common.Address
 	copy(address[:], crypto.Keccak256([]byte(pubKey)[1:])[12:])
 	return address
