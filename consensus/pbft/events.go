@@ -16,6 +16,13 @@
 
 package pbft
 
+type ConsensusDataEvent struct {
+	// peer public key
+	PeerPublicKey string
+	// consensus message data
+	Data []byte
+}
+
 type RequestEvent struct {
 	ID      uint64
 	Payload []byte

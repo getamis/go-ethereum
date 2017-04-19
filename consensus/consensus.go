@@ -107,7 +107,7 @@ type PBFT interface {
 	HandleMsg(publicKey string, data []byte)
 
 	// Start the engine
-	Start()
+	Start(chain ChainReader)
 
 	// Stop the engine
 	Stop()
