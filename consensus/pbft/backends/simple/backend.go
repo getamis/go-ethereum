@@ -67,7 +67,7 @@ type simpleBackend struct {
 	core           pbftCore.Engine
 	logger         log.Logger
 	quitSync       chan struct{}
-	db             Dber
+	db             pbft.Dber
 }
 
 func (sb *simpleBackend) ID() uint64 {

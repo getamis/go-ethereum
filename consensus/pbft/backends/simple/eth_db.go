@@ -4,15 +4,9 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/ethdb"
 )
-
-type Dber interface {
-	// Save an object into db
-	Save(key string, val interface{}) error
-	// Restore an object to val from db
-	Restore(key string, val interface{}) error
-}
 
 const (
 	prefixKey = "pbft"
@@ -22,7 +16,7 @@ type ethDB struct {
 	db ethdb.Database
 }
 
-func newDBer(db ethdb.Database) Dber {
+func newDBer(db ethdb.Database) pbft.Dber {
 	return &ethDB{
 		db: db,
 	}
