@@ -17,9 +17,13 @@
 package simple
 
 import (
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/consensus/pbft"
+	"github.com/ethereum/go-ethereum/consensus/pbft/backends"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -88,18 +92,73 @@ func (sb *simpleBackend) APIs(chain consensus.ChainReader) []rpc.API {
 	}}
 }
 
-func (sb *simpleBackend) AddPeer(peerPublicKey string) {
+func (sb *simpleBackend) AddPeer(publicKey string) {
+	// check is validator
+	if peer := sb.updatePeerPublicKey(publicKey); peer != nil {
+		// post connection event to pbft core
+		go sb.pbftEventMux.Post(pbft.ConnectionEvent{
+			ID: peer.ID(),
+		})
+	}
 }
 
-func (sb *simpleBackend) RemovePeer(peerPublicKey string) {
+func (sb *simpleBackend) RemovePeer(publicKey string) {
 }
 
-func (sb *simpleBackend) HandleMsg(peerPublicKey string, data []byte) {
-	// TODO: forward pbft message to pbft engine
+func (sb *simpleBackend) HandleMsg(publicKey string, data []byte) {
+	if peer := sb.peerSet.GetByPublicKey(publicKey); peer != nil {
+		go sb.pbftEventMux.Post(pbft.MessageEvent{
+			ID:      peer.ID(),
+			Payload: data,
+		})
+	}
 }
 
-func (sb *simpleBackend) Start() {
+func (sb *simpleBackend) Start(chain consensus.ChainReader) {
+	sb.initPeerSet(chain)
+	sb.core.Start()
 }
 
 func (sb *simpleBackend) Stop() {
+	sb.core.Stop()
+}
+
+func (sb *simpleBackend) initPeerSet(chain consensus.ChainReader) {
+	currentHeader := chain.CurrentHeader()
+	addrs := getValidatorSet(currentHeader)
+	vals := make([]pbft.Peer, len(addrs))
+	for i, addr := range addrs {
+		vals[i] = &peer{
+			id:      uint64(i),
+			address: addr,
+		}
+	}
+	sb.peerSet = backends.NewPeerSet(vals)
+
+	// update self public key
+	pub := string(crypto.FromECDSAPub(&sb.privateKey.PublicKey))
+	if peer := sb.updatePeerPublicKey(pub); peer != nil {
+		sb.id = peer.ID()
+	}
+}
+
+func (sb *simpleBackend) updatePeerPublicKey(pubKey string) pbft.Peer {
+	// get peer by address
+	addr := publicKey2Addr(pubKey)
+	peer := sb.peerSet.GetByAddress(addr)
+	// update public key
+	if peer != nil {
+		peer.SetPublicKey(pubKey)
+		return peer
+	}
+	return nil
+}
+
+func getValidatorSet(block *types.Header) []common.Address {
+	// get validator address from block header
+	addrs := make([]common.Address, (len(block.Extra)-extraVanity-extraSeal)/common.AddressLength)
+	for i := 0; i < len(addrs); i++ {
+		copy(addrs[i][:], block.Extra[extraVanity+i*common.AddressLength:])
+	}
+	return addrs
 }

@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
+	pbftCore "github.com/ethereum/go-ethereum/consensus/pbft/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/event"
@@ -30,16 +31,22 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-func NewBackend(id uint64, n uint64, f uint64, eventMux *event.TypeMux, privateKey *ecdsa.PrivateKey) consensus.PBFT {
+const (
+	extraVanity = 32 // Fixed number of extra-data prefix bytes reserved for signer vanity
+	extraSeal   = 65 // Fixed number of extra-data suffix bytes reserved for signer seal
+)
+
+func New(n uint64, f uint64, eventMux *event.TypeMux, privateKey *ecdsa.PrivateKey) consensus.PBFT {
 	backend := &simpleBackend{
-		id:         id,
-		n:          n,
-		f:          f,
-		peers:      make([]pbft.Peer, n),
-		eventMux:   eventMux,
-		privateKey: privateKey,
-		logger:     log.New("backend", "simple"),
+		n:            n,
+		f:            f,
+		eventMux:     eventMux,
+		pbftEventMux: new(event.TypeMux),
+		privateKey:   privateKey,
+		logger:       log.New("backend", "simple"),
 	}
+
+	backend.core = pbftCore.New(backend)
 
 	return backend
 }
@@ -50,10 +57,12 @@ type simpleBackend struct {
 	id             uint64
 	n              uint64
 	f              uint64
-	peers          []pbft.Peer
+	peerSet        pbft.PeerSet
 	eventMux       *event.TypeMux
+	pbftEventMux   *event.TypeMux
 	privateKey     *ecdsa.PrivateKey
 	consensusState *pbft.State
+	core           pbftCore.Engine
 	logger         log.Logger
 	quitSync       chan struct{}
 }
@@ -62,19 +71,35 @@ func (sb *simpleBackend) ID() uint64 {
 	return sb.id
 }
 
-func (sb *simpleBackend) Peer(id uint64) pbft.Peer {
-	return sb.peers[id]
+func (sb *simpleBackend) Peers() pbft.PeerSet {
+	return sb.peerSet
 }
 
-func (sb *simpleBackend) Peers() []pbft.Peer {
-	return sb.peers
-}
-
-func (sb *simpleBackend) Send(code uint64, msg interface{}, peer pbft.Peer) {
+func (sb *simpleBackend) Send(data []byte) {
+	peers := sb.peerSet.Peers()
+	for _, peer := range peers {
+		// just post pbft event to pbft core engine if peer is equal to self
+		if peer.ID() == sb.ID() {
+			go sb.pbftEventMux.Post(pbft.MessageEvent{
+				ID:      peer.ID(),
+				Payload: data,
+			})
+		} else {
+			if peer.IsConnected() {
+				go sb.eventMux.Post(pbft.ConsensusDataEvent{
+					PeerPublicKey: peer.PublicKey(),
+					Data:          data,
+				})
+			}
+		}
+	}
 }
 
 func (sb *simpleBackend) Commit(proposal *pbft.Proposal) {
 	log.Info("Committed", "id", sb.ID(), "proposal", proposal)
+	// step1: update validator set from extra data of block
+	// step2: insert chain
+
 }
 
 func (sb *simpleBackend) Hash(x interface{}) (h common.Hash) {
@@ -94,7 +119,7 @@ func (sb *simpleBackend) Decode(b []byte, v interface{}) error {
 
 func (sb *simpleBackend) EventMux() *event.TypeMux {
 	// not implemented
-	return nil
+	return sb.pbftEventMux
 }
 
 func (sb *simpleBackend) Verify(proposal *pbft.Proposal) (bool, error) {
@@ -117,8 +142,7 @@ func (sb *simpleBackend) CheckSignature(data []byte, address common.Address, sig
 		return err
 	}
 	//3. Compare derived addresses
-	var signer common.Address
-	copy(signer[:], crypto.Keccak256(pubkey[1:])[12:])
+	signer := publicKey2Addr(string(pubkey))
 	if bytes.Compare(signer.Bytes(), address.Bytes()) != 0 {
 		return pbft.ErrInvalidSignature
 	}

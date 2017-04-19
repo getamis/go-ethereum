@@ -98,16 +98,16 @@ type PBFT interface {
 	Engine
 
 	// Add a peer
-	AddPeer(peerPublicKey string)
+	AddPeer(publicKey string)
 
 	// Remove a peer
-	RemovePeer(peerPublicKey string)
+	RemovePeer(publicKey string)
 
 	// Handle a message from peer
-	HandleMsg(peerPublicKey string, data []byte)
+	HandleMsg(publicKey string, data []byte)
 
 	// Start the engine
-	Start()
+	Start(chain ChainReader)
 
 	// Stop the engine
 	Stop()

@@ -16,23 +16,14 @@
 
 package pbft
 
-type ConsensusDataEvent struct {
-	// peer public key
-	PeerPublicKey string
-	// consensus message data
-	Data []byte
-}
+import (
+	"github.com/ethereum/go-ethereum/common"
+)
 
-type RequestEvent struct {
-	ID      uint64
-	Payload []byte
-}
-
-type ConnectionEvent struct {
-	ID uint64
-}
-
-type MessageEvent struct {
-	ID      uint64
-	Payload []byte
+type PeerSet interface {
+	GetByIndex(uint64) Peer
+	GetByAddress(common.Address) Peer
+	GetByPublicKey(string) Peer
+	Peers() []Peer
+	GetProposer() Peer
 }

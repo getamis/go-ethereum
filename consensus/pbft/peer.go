@@ -24,6 +24,9 @@ import (
 type Peer interface {
 	ID() uint64
 	Address() common.Address
+	PublicKey() string
+	SetPublicKey(string)
 
+	IsConnected() bool
 	p2p.MsgReadWriter
 }
