@@ -26,6 +26,7 @@ import (
 	pbftCore "github.com/ethereum/go-ethereum/consensus/pbft/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -36,7 +37,7 @@ const (
 	extraSeal   = 65 // Fixed number of extra-data suffix bytes reserved for signer seal
 )
 
-func New(n uint64, f uint64, eventMux *event.TypeMux, privateKey *ecdsa.PrivateKey) consensus.PBFT {
+func New(n uint64, f uint64, eventMux *event.TypeMux, privateKey *ecdsa.PrivateKey, db ethdb.Database) consensus.PBFT {
 	backend := &simpleBackend{
 		n:            n,
 		f:            f,
@@ -44,6 +45,7 @@ func New(n uint64, f uint64, eventMux *event.TypeMux, privateKey *ecdsa.PrivateK
 		pbftEventMux: new(event.TypeMux),
 		privateKey:   privateKey,
 		logger:       log.New("backend", "simple"),
+		db:           newDBer(db),
 	}
 
 	backend.core = pbftCore.New(backend)
@@ -65,6 +67,7 @@ type simpleBackend struct {
 	core           pbftCore.Engine
 	logger         log.Logger
 	quitSync       chan struct{}
+	db             Dber
 }
 
 func (sb *simpleBackend) ID() uint64 {
