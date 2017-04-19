@@ -30,12 +30,12 @@ func TestSaveAndRestore(t *testing.T) {
 		t.Error("Should save the object correctly")
 	}
 
-	result := &Foo{}
-	err = db.Restore(key, result)
+	result := Foo{}
+	err = db.Restore(key, &result)
 	if err != nil {
 		t.Error("Should restore the object correctly")
 	}
-	if reflect.DeepEqual(foo, result); result.Name != foo.Name {
+	if !reflect.DeepEqual(foo, result) {
 		t.Errorf("Should have the same data, result = %v, expected = %v", result, foo)
 	}
 }
