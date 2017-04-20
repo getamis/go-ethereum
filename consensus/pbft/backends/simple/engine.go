@@ -20,7 +20,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
-	"github.com/ethereum/go-ethereum/consensus/pbft/backends"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -115,7 +114,7 @@ func (sb *simpleBackend) HandleMsg(publicKey string, data []byte) {
 }
 
 func (sb *simpleBackend) Start(chain consensus.ChainReader) {
-	sb.initPeerSet(chain)
+	sb.initValidatorSet(chain)
 	sb.core.Start()
 }
 
@@ -123,22 +122,23 @@ func (sb *simpleBackend) Stop() {
 	sb.core.Stop()
 }
 
-func (sb *simpleBackend) initPeerSet(chain consensus.ChainReader) {
+func (sb *simpleBackend) initValidatorSet(chain consensus.ChainReader) {
 	currentHeader := chain.CurrentHeader()
 	addrs := getValidatorSet(currentHeader)
-	vals := make([]pbft.Peer, len(addrs))
+	vals := make([]*pbft.Validator, len(addrs))
 	for i, addr := range addrs {
-		vals[i] = &peer{
-			id:      uint64(i),
-			address: addr,
-		}
+		vals[i] = pbft.NewValidator(uint64(i), addr)
 	}
-	sb.peerSet = backends.NewPeerSet(vals)
+	sb.valSet = pbft.NewValidatorSet(vals)
 
-	// update self public key
-	pub := string(crypto.FromECDSAPub(&sb.privateKey.PublicKey))
-	if peer := sb.updatePeerPublicKey(pub); peer != nil {
-		sb.id = peer.ID()
+	// update self id
+	// get peer by address
+	pubKey := string(crypto.FromECDSAPub(&sb.privateKey.PublicKey))
+	addr := publicKey2Addr(pubKey)
+	privVal := sb.valSet.GetByAddress(addr)
+	// update validator id
+	if privVal != nil {
+		sb.id = privVal.ID()
 	}
 }
 

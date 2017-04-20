@@ -60,6 +60,7 @@ type simpleBackend struct {
 	n              uint64
 	f              uint64
 	peerSet        pbft.PeerSet
+	valSet         *pbft.ValidatorSet
 	eventMux       *event.TypeMux
 	pbftEventMux   *event.TypeMux
 	privateKey     *ecdsa.PrivateKey
@@ -72,6 +73,10 @@ type simpleBackend struct {
 
 func (sb *simpleBackend) ID() uint64 {
 	return sb.id
+}
+
+func (sb *simpleBackend) GetValidators() *pbft.ValidatorSet {
+	return sb.valSet
 }
 
 func (sb *simpleBackend) Peers() pbft.PeerSet {

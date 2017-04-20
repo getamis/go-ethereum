@@ -95,6 +95,10 @@ func (sb *Backend) ID() uint64 {
 	return sb.id
 }
 
+func (sb *Backend) GetValidators() *pbft.ValidatorSet {
+	return nil
+}
+
 func (sb *Backend) Peers() pbft.PeerSet {
 	return backends.NewPeerSet(sb.peers)
 }

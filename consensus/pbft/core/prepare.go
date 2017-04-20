@@ -28,7 +28,7 @@ func (c *core) sendPrepare() {
 	c.broadcast(pbft.MsgPrepare, c.subject)
 }
 
-func (c *core) handlePrepare(prepare *pbft.Subject, src pbft.Peer) error {
+func (c *core) handlePrepare(prepare *pbft.Subject, src *pbft.Validator) error {
 	logger := c.logger.New("from", src.ID(), "state", c.state)
 	logger.Debug("handlePrepare")
 
@@ -52,7 +52,7 @@ func (c *core) handlePrepare(prepare *pbft.Subject, src pbft.Peer) error {
 	return nil
 }
 
-func (c *core) verifyPrepare(prepare *pbft.Subject, src pbft.Peer) error {
+func (c *core) verifyPrepare(prepare *pbft.Subject, src *pbft.Validator) error {
 	logger := c.logger.New("from", src.ID(), "state", c.state)
 
 	if prepare.View.Sequence != nil &&
@@ -70,7 +70,7 @@ func (c *core) verifyPrepare(prepare *pbft.Subject, src pbft.Peer) error {
 	return nil
 }
 
-func (c *core) acceptPrepare(prepare *pbft.Subject, src pbft.Peer) {
+func (c *core) acceptPrepare(prepare *pbft.Subject, src *pbft.Validator) {
 	logger := c.logger.New("from", src.ID(), "state", c.state)
 
 	if _, err := c.current.Prepares.Add(prepare, src); err != nil {

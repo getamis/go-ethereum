@@ -38,7 +38,7 @@ func (c *core) sendPreprepare(request *pbft.Request) {
 	}
 }
 
-func (c *core) handlePreprepare(preprepare *pbft.Preprepare, src pbft.Peer) error {
+func (c *core) handlePreprepare(preprepare *pbft.Preprepare, src *pbft.Validator) error {
 	logger := log.New("from", src.ID(), "state", c.state)
 	logger.Debug("handlePreprepare")
 

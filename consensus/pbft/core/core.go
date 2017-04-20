@@ -57,7 +57,7 @@ func New(backend pbft.Backend) Engine {
 			pbft.ConnectionEvent{},
 			pbft.MessageEvent{},
 		),
-		backlogs:        make(map[pbft.Peer]*prque.Prque),
+		backlogs:        make(map[*pbft.Validator]*prque.Prque),
 		backlogsMu:      new(sync.Mutex),
 		consensusLogsMu: new(sync.RWMutex),
 	}
@@ -82,7 +82,7 @@ type core struct {
 
 	checkpointMsgs map[uint64]*pbft.Checkpoint
 
-	backlogs   map[pbft.Peer]*prque.Prque
+	backlogs   map[*pbft.Validator]*prque.Prque
 	backlogsMu *sync.Mutex
 
 	current         *pbft.Log

@@ -26,8 +26,8 @@ type Backend interface {
 	// ID returns self id
 	ID() uint64
 
-	// Peers returns all connected peers
-	Peers() PeerSet
+	// GetValidators returns validators
+	GetValidators() *ValidatorSet
 
 	// EventMux is defined to handle request event and pbft message event
 	EventMux() *event.TypeMux
@@ -44,7 +44,6 @@ type Backend interface {
 	// Verify is to verify the proposal request
 	Verify(*Proposal) (bool, error)
 
-	// XXX: Sign and CheckSignature might not need to be implemented in pbft backend
 	// Sign is to sign the data
 	Sign([]byte) ([]byte, error)
 

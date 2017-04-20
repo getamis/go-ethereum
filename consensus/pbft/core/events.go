@@ -21,6 +21,6 @@ import (
 )
 
 type backlogEvent struct {
-	src pbft.Peer
+	src *pbft.Validator
 	msg *pbft.Message
 }

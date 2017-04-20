@@ -32,9 +32,9 @@ func (c *core) Start() {
 			case pbft.RequestEvent:
 				c.handleRequest(&pbft.Request{
 					Payload: ev.Payload,
-				}, c.backend.Peers().GetByIndex(c.ID()))
+				}, c.backend.GetValidators().GetByIndex(c.ID()))
 			case pbft.MessageEvent:
-				c.handleMsg(ev.Payload, c.backend.Peers().GetByIndex(ev.ID))
+				c.handleMsg(ev.Payload, c.backend.GetValidators().GetByIndex(ev.ID))
 			case backlogEvent:
 				c.handle(ev.msg, ev.src)
 			}
@@ -46,7 +46,7 @@ func (c *core) Stop() {
 	c.events.Unsubscribe()
 }
 
-func (c *core) handleMsg(payload []byte, src pbft.Peer) error {
+func (c *core) handleMsg(payload []byte, src *pbft.Validator) error {
 	logger := c.logger.New("id", c.ID(), "from", src.ID())
 	var msg pbft.Message
 
@@ -59,7 +59,7 @@ func (c *core) handleMsg(payload []byte, src pbft.Peer) error {
 	return c.handle(&msg, src)
 }
 
-func (c *core) handle(msg *pbft.Message, src pbft.Peer) error {
+func (c *core) handle(msg *pbft.Message, src *pbft.Validator) error {
 	logger := c.logger.New("id", c.ID(), "from", src.ID())
 
 	testBacklog := func(err error) error {
