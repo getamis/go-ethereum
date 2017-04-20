@@ -26,16 +26,22 @@ func (c *core) sendCommit() {
 	log.Info("sendCommit", "id", c.ID())
 	c.broadcast(MsgCommit, c.subject)
 	c.commitMsgs[c.ID()] = c.subject
+	c.processBacklog()
 }
 
 func (c *core) handleCommit(commit *pbft.Subject, src pbft.Peer) error {
 	log.Info("handleCommit", "id", c.ID(), "from", src.ID())
+
+	if c.isFutureMessage(commit.View) {
+		return errFutureMessage
+	}
 
 	if err := c.verifyCommit(commit, src); err != nil {
 		return err
 	}
 
 	c.commitMsgs[src.ID()] = commit
+	c.processBacklog()
 
 	// log.Info("Total commit msgs", "id", pbft.ID(), "num", len(pbft.commitMsgs))
 

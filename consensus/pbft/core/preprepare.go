@@ -35,6 +35,8 @@ func (c *core) sendPreprepare(request *pbft.Request) {
 		c.broadcast(MsgPreprepare, preprepare)
 		c.handleCheckedPreprepare(&preprepare)
 	}
+
+	c.processBacklog()
 }
 
 func (c *core) handlePreprepare(preprepare *pbft.Preprepare, src pbft.Peer) error {
@@ -76,6 +78,7 @@ func (c *core) handleCheckedPreprepare(preprepare *pbft.Preprepare) error {
 
 	if c.state == StatePreprepared {
 		c.sendPrepare()
+		c.processBacklog()
 	}
 
 	return nil

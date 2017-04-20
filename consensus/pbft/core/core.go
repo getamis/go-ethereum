@@ -18,6 +18,9 @@ package core
 
 import (
 	"math/big"
+	"sync"
+
+	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
@@ -65,6 +68,8 @@ func New(backend pbft.Backend) Engine {
 			pbft.ConnectionEvent{},
 			pbft.MessageEvent{},
 		),
+		backlogs:   make(map[pbft.Peer]*prque.Prque),
+		backlogsMu: new(sync.Mutex),
 	}
 }
 
@@ -87,6 +92,9 @@ type core struct {
 	prepareMsgs    map[uint64]*pbft.Subject
 	commitMsgs     map[uint64]*pbft.Subject
 	checkpointMsgs map[uint64]*pbft.Checkpoint
+
+	backlogs   map[pbft.Peer]*prque.Prque
+	backlogsMu *sync.Mutex
 }
 
 func (c *core) NewRequest(payload []byte) {
