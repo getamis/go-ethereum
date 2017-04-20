@@ -49,6 +49,8 @@ func NewBackend(id uint64) *Backend {
 		mux:    new(event.TypeMux),
 	}
 
+	backend.peers[id] = peers[id]
+
 	go func() {
 		for {
 			m, err := backend.me.ReadMsg()
@@ -68,7 +70,7 @@ func NewBackend(id uint64) *Backend {
 				continue
 			}
 
-			backend.mux.Post(pbft.MessageEvent{
+			go backend.mux.Post(pbft.MessageEvent{
 				ID:      m.Code,
 				Payload: payload,
 			})
@@ -102,6 +104,11 @@ func (sb *Backend) Send(payload []byte) {
 		for _, p := range peers {
 			if p.ID() != sb.me.ID() {
 				p2p.Send(p, sb.ID(), payload)
+			} else {
+				go sb.mux.Post(pbft.MessageEvent{
+					ID:      sb.ID(),
+					Payload: payload,
+				})
 			}
 		}
 	}()
