@@ -17,6 +17,8 @@
 package simple
 
 import (
+	"crypto/ecdsa"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
@@ -91,23 +93,31 @@ func (sb *simpleBackend) APIs(chain consensus.ChainReader) []rpc.API {
 	}}
 }
 
-func (sb *simpleBackend) AddPeer(publicKey string) {
+func (sb *simpleBackend) AddPeer(peerID string, publicKey *ecdsa.PublicKey) {
+	peer := newPeer(peerID, publicKey)
 	// check is validator
-	if peer := sb.updatePeerPublicKey(publicKey); peer != nil {
+	if val := sb.valSet.GetByAddress(peer.Address()); val != nil {
+		// add to peer set
+		sb.peerSet.Add(peer)
 		// post connection event to pbft core
 		go sb.pbftEventMux.Post(pbft.ConnectionEvent{
-			ID: peer.ID(),
+			ID: val.ID(),
 		})
 	}
 }
 
-func (sb *simpleBackend) RemovePeer(publicKey string) {
+func (sb *simpleBackend) RemovePeer(peerID string) {
+	sb.peerSet.Remove(peerID)
 }
 
-func (sb *simpleBackend) HandleMsg(publicKey string, data []byte) {
-	if peer := sb.peerSet.GetByPublicKey(publicKey); peer != nil {
+func (sb *simpleBackend) HandleMsg(peerID string, data []byte) {
+	peer := sb.peerSet.Get(peerID)
+	if peer == nil {
+		return
+	}
+	if val := sb.valSet.GetByAddress(peer.Address()); val != nil {
 		go sb.pbftEventMux.Post(pbft.MessageEvent{
-			ID:      peer.ID(),
+			ID:      val.ID(),
 			Payload: data,
 		})
 	}
@@ -131,27 +141,15 @@ func (sb *simpleBackend) initValidatorSet(chain consensus.ChainReader) {
 	}
 	sb.valSet = pbft.NewValidatorSet(vals)
 
+	// FIXME: self should be the one of valifators
 	// update self id
 	// get peer by address
-	pubKey := string(crypto.FromECDSAPub(&sb.privateKey.PublicKey))
-	addr := publicKey2Addr(pubKey)
+	addr := crypto.PubkeyToAddress(sb.privateKey.PublicKey)
 	privVal := sb.valSet.GetByAddress(addr)
 	// update validator id
 	if privVal != nil {
 		sb.id = privVal.ID()
 	}
-}
-
-func (sb *simpleBackend) updatePeerPublicKey(pubKey string) pbft.Peer {
-	// get peer by address
-	addr := publicKey2Addr(pubKey)
-	peer := sb.peerSet.GetByAddress(addr)
-	// update public key
-	if peer != nil {
-		peer.SetPublicKey(pubKey)
-		return peer
-	}
-	return nil
 }
 
 func getValidatorSet(block *types.Header) []common.Address {

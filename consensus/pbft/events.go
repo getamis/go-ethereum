@@ -17,8 +17,8 @@
 package pbft
 
 type ConsensusDataEvent struct {
-	// peer public key
-	PeerPublicKey string
+	// peer id for send p2p message
+	PeerID string
 	// consensus message data
 	Data []byte
 }

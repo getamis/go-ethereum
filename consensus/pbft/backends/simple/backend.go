@@ -41,6 +41,7 @@ func New(n uint64, f uint64, eventMux *event.TypeMux, privateKey *ecdsa.PrivateK
 	backend := &simpleBackend{
 		n:            n,
 		f:            f,
+		peerSet:      newPeerSet(),
 		eventMux:     eventMux,
 		pbftEventMux: new(event.TypeMux),
 		privateKey:   privateKey,
@@ -59,7 +60,7 @@ type simpleBackend struct {
 	id             uint64
 	n              uint64
 	f              uint64
-	peerSet        pbft.PeerSet
+	peerSet        *peerSet
 	valSet         *pbft.ValidatorSet
 	eventMux       *event.TypeMux
 	pbftEventMux   *event.TypeMux
@@ -79,27 +80,19 @@ func (sb *simpleBackend) GetValidators() *pbft.ValidatorSet {
 	return sb.valSet
 }
 
-func (sb *simpleBackend) Peers() pbft.PeerSet {
-	return sb.peerSet
-}
-
 func (sb *simpleBackend) Send(data []byte) {
-	peers := sb.peerSet.Peers()
-	for _, peer := range peers {
-		// just post pbft event to pbft core engine if peer is equal to self
-		if peer.ID() == sb.ID() {
-			go sb.pbftEventMux.Post(pbft.MessageEvent{
-				ID:      peer.ID(),
-				Payload: data,
-			})
-		} else {
-			if peer.IsConnected() {
-				go sb.eventMux.Post(pbft.ConsensusDataEvent{
-					PeerPublicKey: peer.PublicKey(),
-					Data:          data,
-				})
-			}
-		}
+	// send to self
+	go sb.pbftEventMux.Post(pbft.MessageEvent{
+		ID:      sb.ID(),
+		Payload: data,
+	})
+
+	// send to other peers
+	for _, peer := range sb.peerSet.List() {
+		go sb.eventMux.Post(pbft.ConsensusDataEvent{
+			PeerID: peer.ID(),
+			Data:   data,
+		})
 	}
 }
 
@@ -144,13 +137,13 @@ func (sb *simpleBackend) CheckSignature(data []byte, address common.Address, sig
 	//1. Keccak data
 	hashData := crypto.Keccak256([]byte(data))
 	//2. Recover public key
-	pubkey, err := crypto.Ecrecover(hashData, sig)
+	pubkey, err := crypto.SigToPub(hashData, sig)
 	if err != nil {
 		log.Error("CheckSignature", "error", err)
 		return err
 	}
 	//3. Compare derived addresses
-	signer := publicKey2Addr(string(pubkey))
+	signer := crypto.PubkeyToAddress(*pubkey)
 	if bytes.Compare(signer.Bytes(), address.Bytes()) != 0 {
 		return pbft.ErrInvalidSignature
 	}

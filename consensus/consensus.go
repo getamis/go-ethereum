@@ -18,6 +18,8 @@
 package consensus
 
 import (
+	"crypto/ecdsa"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -98,13 +100,13 @@ type PBFT interface {
 	Engine
 
 	// Add a peer
-	AddPeer(publicKey string)
+	AddPeer(peerID string, publicKey *ecdsa.PublicKey)
 
 	// Remove a peer
-	RemovePeer(publicKey string)
+	RemovePeer(peerID string)
 
 	// Handle a message from peer
-	HandleMsg(publicKey string, data []byte)
+	HandleMsg(peerID string, data []byte)
 
 	// Start the engine
 	Start(chain ChainReader)

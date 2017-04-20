@@ -179,7 +179,12 @@ func (pm *pbftProtocolManager) handle(p *peer) error {
 		p.Log().Error("Ethereum peer registration failed", "err", err)
 		return err
 	}
-	pm.engine.AddPeer(p.id)
+	pubKey, err := p.ID().Pubkey()
+	if err != nil {
+		p.Log().Error("Ethereum peer get public key failed", "err", err)
+		return err
+	}
+	pm.engine.AddPeer(p.id, pubKey)
 	defer pm.removePeer(p.id)
 
 	// Register the peer in the downloader. If the downloader considers it banned, we disconnect
@@ -603,9 +608,9 @@ func (pm *pbftProtocolManager) eventLoop() {
 
 // event loop for PBFT events
 func (pm *pbftProtocolManager) sendEvent(event pbft.ConsensusDataEvent) {
-	p := pm.peers.Peer(event.PeerPublicKey)
+	p := pm.peers.Peer(event.PeerID)
 	if p == nil {
-		log.Warn("Failed to send event to peer", "id", event.PeerPublicKey)
+		log.Warn("Failed to send event to peer", "id", event.PeerID)
 		return
 	}
 	p2p.Send(p.rw, PBFTMsg, event.Data)

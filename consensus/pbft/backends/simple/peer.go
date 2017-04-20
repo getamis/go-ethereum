@@ -17,56 +17,85 @@
 package simple
 
 import (
+	"crypto/ecdsa"
+	"sync"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/p2p"
 )
 
-func newPeer(publicKey string, id uint64) pbft.Peer {
-	return &peer{
-		id:        id,
-		publicKey: publicKey,
-		address:   publicKey2Addr(publicKey),
-	}
-}
-
 type peer struct {
-	id        uint64
-	publicKey string
+	id        string
+	publicKey *ecdsa.PublicKey
 	address   common.Address
 }
 
-func (p *peer) ID() uint64 {
-	return p.id
+func newPeer(id string, publicKey *ecdsa.PublicKey) *peer {
+	return &peer{
+		id:        id,
+		publicKey: publicKey,
+		address:   crypto.PubkeyToAddress(*publicKey),
+	}
 }
 
-func (p *peer) Address() common.Address {
-	return p.address
+func (p *peer) ID() string                  { return p.id }
+func (p *peer) Address() common.Address     { return p.address }
+func (p *peer) PublicKey() *ecdsa.PublicKey { return p.publicKey }
+
+//-----------------------------------------------------------------------------
+
+type peerSet struct {
+	mtx sync.Mutex
+
+	peers map[string]*peer
+	list  []*peer
 }
 
-func (p *peer) PublicKey() string {
-	return p.publicKey
+func newPeerSet() *peerSet {
+	return &peerSet{
+		peers: make(map[string]*peer),
+		list:  make([]*peer, 0),
+	}
 }
 
-func (p *peer) SetPublicKey(pubKey string) {
-	p.publicKey = pubKey
+func (ps *peerSet) Add(p *peer) {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+
+	if p == nil {
+		return
+	}
+
+	if ps.peers[p.ID()] == nil {
+		ps.peers[p.ID()] = p
+		ps.list = append(ps.list, p)
+	}
 }
 
-func (p *peer) IsConnected() bool {
-	return p.publicKey != ""
+func (ps *peerSet) Get(id string) *peer {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+	return ps.peers[id]
 }
 
-func (p *peer) ReadMsg() (p2p.Msg, error) {
-	return p2p.Msg{}, nil
+func (ps *peerSet) Remove(id string) {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+
+	if ps.peers[id] == nil {
+		return
+	}
+
+	for i, peer := range ps.list {
+		if peer.ID() == id {
+			ps.list = append(ps.list[:i], ps.list[i+1:]...)
+			delete(ps.peers, id)
+		}
+	}
 }
 
-func (p *peer) WriteMsg(msg p2p.Msg) error {
-	return nil
-}
-
-func publicKey2Addr(pubKey string) common.Address {
-	var address common.Address
-	copy(address[:], crypto.Keccak256([]byte(pubKey)[1:])[12:])
-	return address
+func (ps *peerSet) List() []*peer {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+	return ps.list
 }
