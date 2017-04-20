@@ -23,14 +23,14 @@ import (
 )
 
 func (c *core) sendCommit() {
-	log.Info("sendCommit", "id", c.ID())
+	logger := c.logger.New("state", c.state)
+	logger.Info("sendCommit")
 	c.broadcast(MsgCommit, c.subject)
-	c.commitMsgs[c.ID()] = c.subject
-	c.processBacklog()
 }
 
 func (c *core) handleCommit(commit *pbft.Subject, src pbft.Peer) error {
-	log.Info("handleCommit", "id", c.ID(), "from", src.ID())
+	logger := c.logger.New("from", src.ID(), "state", c.state)
+	logger.Info("handleCommit")
 
 	if c.isFutureMessage(commit.View) {
 		return errFutureMessage
@@ -41,7 +41,6 @@ func (c *core) handleCommit(commit *pbft.Subject, src pbft.Peer) error {
 	}
 
 	c.commitMsgs[src.ID()] = commit
-	c.processBacklog()
 
 	// log.Info("Total commit msgs", "id", pbft.ID(), "num", len(pbft.commitMsgs))
 
@@ -49,8 +48,11 @@ func (c *core) handleCommit(commit *pbft.Subject, src pbft.Peer) error {
 		// TODO: Enter checkpoint stage?
 
 		c.state = StateCommitted
-		log.Info("Ready to commit", "view", c.preprepareMsg.View)
+		logger := c.logger.New("state", c.state)
+		logger.Info("Ready to commit", "view", c.preprepareMsg.View)
 		c.backend.Commit(c.preprepareMsg.Proposal)
+		c.processBacklog()
+
 		c.viewNumber = c.preprepareMsg.View.ViewNumber
 		c.sequence = c.preprepareMsg.View.Sequence
 		c.state = StateAcceptRequest
@@ -60,7 +62,7 @@ func (c *core) handleCommit(commit *pbft.Subject, src pbft.Peer) error {
 }
 
 func (c *core) verifyCommit(commit *pbft.Subject, src pbft.Peer) error {
-	logger := log.New("id", c.ID(), "from", src.ID())
+	logger := c.logger.New("from", src.ID(), "state", c.state)
 
 	if !reflect.DeepEqual(commit, c.subject) {
 		logger.Warn("Subject not match", "expected", c.subject, "got", commit)

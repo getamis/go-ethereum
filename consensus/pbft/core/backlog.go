@@ -41,12 +41,14 @@ func (c *core) isFutureMessage(view *pbft.View) bool {
 }
 
 func (c *core) storeBacklog(msg *pbft.Message, src pbft.Peer) {
+	logger := c.logger.New("from", src.ID(), "state", c.state)
+
 	if src.ID() == c.ID() {
-		log.Warn("Backlog from self")
+		logger.Warn("Backlog from self")
 		return
 	}
 
-	log.Debug("Store future message", "id", c.ID(), "from", src.ID())
+	logger.Debug("Store future message")
 
 	c.backlogsMu.Lock()
 	defer c.backlogsMu.Unlock()
@@ -72,6 +74,7 @@ func (c *core) processBacklog() {
 			continue
 		}
 
+		logger := c.logger.New("from", src.ID(), "state", c.state)
 		isFuture := false
 
 		// We stop processing if
@@ -84,13 +87,13 @@ func (c *core) processBacklog() {
 
 			// Push back if it's a future message
 			if c.isFutureMessage(sub.View) {
-				log.Debug("Stop processing backlog", "id", c.ID(), "msg", msg, "from", src)
+				logger.Debug("Stop processing backlog", "msg", msg)
 				backlog.Push(msg, prio)
 				isFuture = true
 				break
 			}
 
-			log.Debug("Post backlog event", "id", c.ID(), "msg", msg, "from", src)
+			logger.Debug("Post backlog event", "msg", msg)
 
 			go c.backend.EventMux().Post(backlogEvent{
 				src: src,

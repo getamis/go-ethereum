@@ -47,7 +47,7 @@ func (c *core) Stop() {
 }
 
 func (c *core) handleMsg(payload []byte, src pbft.Peer) error {
-	logger := log.New("id", c.ID(), "from", src)
+	logger := c.logger.New("id", c.ID(), "from", src.ID())
 	var msg pbft.Message
 
 	err := pbft.Decode(payload, &msg)
@@ -60,6 +60,8 @@ func (c *core) handleMsg(payload []byte, src pbft.Peer) error {
 }
 
 func (c *core) handle(msg *pbft.Message, src pbft.Peer) error {
+	logger := c.logger.New("id", c.ID(), "from", src.ID())
+
 	testBacklog := func(err error) error {
 		if err == errFutureMessage {
 			c.storeBacklog(msg, src)
@@ -92,7 +94,7 @@ func (c *core) handle(msg *pbft.Message, src pbft.Peer) error {
 	case MsgViewChange:
 	case MsgNewView:
 	default:
-		log.Error("Invalid message", "msg", msg)
+		logger.Error("Invalid message", "msg", msg)
 	}
 
 	return nil
