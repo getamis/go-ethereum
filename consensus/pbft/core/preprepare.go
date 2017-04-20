@@ -34,8 +34,7 @@ func (c *core) sendPreprepare(request *pbft.Request) {
 		}
 
 		logger.Info("sendPreprepare")
-		c.broadcast(MsgPreprepare, preprepare)
-		c.handleCheckedPreprepare(&preprepare)
+		c.broadcast(pbft.MsgPreprepare, preprepare)
 	}
 }
 
@@ -92,7 +91,7 @@ func (c *core) acceptPreprepare(preprepare *pbft.Preprepare) {
 
 	c.subject = subject
 	c.preprepareMsg = preprepare
-	c.prepareMsgs = make(map[uint64]*pbft.Subject)
-	c.commitMsgs = make(map[uint64]*pbft.Subject)
+	c.prepareMsgs = pbft.NewMessageSet(preprepare.View, pbft.MsgPrepare)
+	c.commitMsgs = pbft.NewMessageSet(preprepare.View, pbft.MsgCommit)
 	c.checkpointMsgs = make(map[uint64]*pbft.Checkpoint)
 }

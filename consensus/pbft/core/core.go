@@ -29,15 +29,6 @@ import (
 )
 
 const (
-	MsgPreprepare uint64 = iota
-	MsgPrepare
-	MsgCommit
-	MsgCheckpoint
-	MsgViewChange
-	MsgNewView
-)
-
-const (
 	StateAcceptRequest int = iota
 	StatePreprepared
 	StatePrepared
@@ -58,8 +49,6 @@ func New(backend pbft.Backend) Engine {
 		state:          StateAcceptRequest,
 		logger:         log.New("backend", "simulation", "id", backend.ID()),
 		backend:        backend,
-		prepareMsgs:    make(map[uint64]*pbft.Subject),
-		commitMsgs:     make(map[uint64]*pbft.Subject),
 		checkpointMsgs: make(map[uint64]*pbft.Checkpoint),
 		sequence:       new(big.Int),
 		viewNumber:     new(big.Int),
@@ -88,10 +77,11 @@ type core struct {
 	sequence   *big.Int
 	viewNumber *big.Int
 
-	subject        *pbft.Subject
-	preprepareMsg  *pbft.Preprepare
-	prepareMsgs    map[uint64]*pbft.Subject
-	commitMsgs     map[uint64]*pbft.Subject
+	subject       *pbft.Subject
+	preprepareMsg *pbft.Preprepare
+
+	prepareMsgs    pbft.MessageSet
+	commitMsgs     pbft.MessageSet
 	checkpointMsgs map[uint64]*pbft.Checkpoint
 
 	backlogs   map[pbft.Peer]*prque.Prque

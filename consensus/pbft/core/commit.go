@@ -25,7 +25,7 @@ import (
 func (c *core) sendCommit() {
 	logger := c.logger.New("state", c.state)
 	logger.Info("sendCommit")
-	c.broadcast(MsgCommit, c.subject)
+	c.broadcast(pbft.MsgCommit, c.subject)
 }
 
 func (c *core) handleCommit(commit *pbft.Subject, src pbft.Peer) error {
@@ -40,11 +40,9 @@ func (c *core) handleCommit(commit *pbft.Subject, src pbft.Peer) error {
 		return err
 	}
 
-	c.commitMsgs[src.ID()] = commit
+	c.acceptCommit(commit, src)
 
-	// log.Info("Total commit msgs", "id", pbft.ID(), "num", len(pbft.commitMsgs))
-
-	if int64(len(c.commitMsgs)) > 2*c.F && c.state == StatePrepared {
+	if int64(c.commitMsgs.Size()) > 2*c.F && c.state == StatePrepared {
 		// TODO: Enter checkpoint stage?
 
 		c.state = StateCommitted
@@ -70,4 +68,8 @@ func (c *core) verifyCommit(commit *pbft.Subject, src pbft.Peer) error {
 	}
 
 	return nil
+}
+
+func (c *core) acceptCommit(commit *pbft.Subject, src pbft.Peer) {
+	c.commitMsgs.Add(commit, src)
 }
