@@ -57,8 +57,9 @@ func New(backend pbft.Backend) Engine {
 			pbft.ConnectionEvent{},
 			pbft.MessageEvent{},
 		),
-		backlogs:   make(map[pbft.Peer]*prque.Prque),
-		backlogsMu: new(sync.Mutex),
+		backlogs:        make(map[pbft.Peer]*prque.Prque),
+		backlogsMu:      new(sync.Mutex),
+		consensusLogsMu: new(sync.RWMutex),
 	}
 }
 
@@ -77,15 +78,16 @@ type core struct {
 	sequence   *big.Int
 	viewNumber *big.Int
 
-	subject       *pbft.Subject
-	preprepareMsg *pbft.Preprepare
+	subject *pbft.Subject
 
-	prepareMsgs    pbft.MessageSet
-	commitMsgs     pbft.MessageSet
 	checkpointMsgs map[uint64]*pbft.Checkpoint
 
 	backlogs   map[pbft.Peer]*prque.Prque
 	backlogsMu *sync.Mutex
+
+	current         *pbft.Log
+	consensusLogs   []*pbft.Log
+	consensusLogsMu *sync.RWMutex
 }
 
 func (c *core) broadcast(code uint64, msg interface{}) {
@@ -136,4 +138,20 @@ func (c *core) makeProposal(seq *big.Int, request *pbft.Request) *pbft.Proposal 
 		Header:  rawHeader,
 		Payload: request.Payload,
 	}
+}
+
+func (c *core) commit() {
+	c.state = StateCommitted
+	logger := c.logger.New("state", c.state)
+	logger.Info("Ready to commit", "view", c.current.Preprepare.View)
+	c.backend.Commit(c.current.Preprepare.Proposal)
+	c.processBacklog()
+
+	c.consensusLogsMu.Lock()
+	c.consensusLogs = append(c.consensusLogs, c.current)
+	c.consensusLogsMu.Unlock()
+
+	c.viewNumber = c.current.ViewNumber
+	c.sequence = c.current.Sequence
+	c.state = StateAcceptRequest
 }

@@ -76,8 +76,6 @@ func (c *core) acceptPreprepare(preprepare *pbft.Preprepare) {
 	}
 
 	c.subject = subject
-	c.preprepareMsg = preprepare
-	c.prepareMsgs = pbft.NewMessageSet(preprepare.View, pbft.MsgPrepare)
-	c.commitMsgs = pbft.NewMessageSet(preprepare.View, pbft.MsgCommit)
+	c.current = pbft.NewLog(preprepare)
 	c.checkpointMsgs = make(map[uint64]*pbft.Checkpoint)
 }

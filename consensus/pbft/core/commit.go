@@ -42,18 +42,8 @@ func (c *core) handleCommit(commit *pbft.Subject, src pbft.Peer) error {
 
 	c.acceptCommit(commit, src)
 
-	if int64(c.commitMsgs.Size()) > 2*c.F && c.state == StatePrepared {
-		// TODO: Enter checkpoint stage?
-
-		c.state = StateCommitted
-		logger := c.logger.New("state", c.state)
-		logger.Info("Ready to commit", "view", c.preprepareMsg.View)
-		c.backend.Commit(c.preprepareMsg.Proposal)
-		c.processBacklog()
-
-		c.viewNumber = c.preprepareMsg.View.ViewNumber
-		c.sequence = c.preprepareMsg.View.Sequence
-		c.state = StateAcceptRequest
+	if int64(c.current.Commits.Size()) > 2*c.F && c.state == StatePrepared {
+		c.commit()
 	}
 
 	return nil
@@ -71,5 +61,9 @@ func (c *core) verifyCommit(commit *pbft.Subject, src pbft.Peer) error {
 }
 
 func (c *core) acceptCommit(commit *pbft.Subject, src pbft.Peer) {
-	c.commitMsgs.Add(commit, src)
+	logger := c.logger.New("from", src.ID(), "state", c.state)
+
+	if _, err := c.current.Commits.Add(commit, src); err != nil {
+		logger.Error("Failed to log commit message", "msg", commit, "error", err)
+	}
 }
