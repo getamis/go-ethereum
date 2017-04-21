@@ -17,11 +17,12 @@
 package simulation
 
 import (
+	"crypto/ecdsa"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
-	"github.com/ethereum/go-ethereum/consensus/pbft/backends"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -44,10 +45,15 @@ func NewBackend(id uint64) *Backend {
 	backend := &Backend{
 		id:     id,
 		me:     peers[id],
-		peers:  make([]pbft.Peer, len(peers)),
+		peers:  make([]*peer, len(peers)),
 		logger: log.New("backend", "simulated", "id", id),
 		mux:    new(event.TypeMux),
 	}
+	var vals []*pbft.Validator
+	for i, peer := range peers {
+		vals = append(vals, pbft.NewValidator(uint64(i), peer.Address()))
+	}
+	backend.valSet = pbft.NewValidatorSet(vals)
 
 	backend.peers[id] = peers[id]
 
@@ -87,7 +93,8 @@ type Backend struct {
 	mux    *event.TypeMux
 	appMux *event.TypeMux
 	me     *peer
-	peers  []pbft.Peer
+	valSet *pbft.ValidatorSet
+	peers  []*peer
 	logger log.Logger
 }
 
@@ -96,11 +103,7 @@ func (sb *Backend) ID() uint64 {
 }
 
 func (sb *Backend) GetValidators() *pbft.ValidatorSet {
-	return nil
-}
-
-func (sb *Backend) Peers() pbft.PeerSet {
-	return backends.NewPeerSet(sb.peers)
+	return sb.valSet
 }
 
 func (sb *Backend) Send(payload []byte) {
@@ -162,10 +165,10 @@ func (sb *Backend) UpdateState(*pbft.State) {
 	// not implemented
 }
 
-func (sb *Backend) AddPeer(id string) {
-	numID, err := strconv.ParseInt(id, 10, 64)
+func (sb *Backend) AddPeer(peerID string, publicKey *ecdsa.PublicKey) {
+	numID, err := strconv.ParseInt(peerID, 10, 64)
 	if err != nil {
-		sb.logger.Error("Invalid peer ID", "id", id)
+		sb.logger.Error("Invalid peer ID", "id", peerID)
 		return
 	}
 	if sb.ID() == uint64(numID) {
@@ -176,14 +179,14 @@ func (sb *Backend) AddPeer(id string) {
 	sb.peers[numID] = peers[numID]
 }
 
-func (sb *Backend) RemovePeer(id string) {
+func (sb *Backend) RemovePeer(peerID string) {
 }
 
-func (sb *Backend) HandleMsg(id string, data []byte) {
+func (sb *Backend) HandleMsg(peerID string, data []byte) {
 	// TODO: forward pbft message to pbft engine
 }
 
-func (sb *Backend) Start() {
+func (sb *Backend) Start(chain consensus.ChainReader) {
 }
 
 func (sb *Backend) Stop() {

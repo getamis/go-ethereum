@@ -50,7 +50,7 @@ func main() {
 
 	for i := 0; i < N; i++ {
 		backend := simulation.NewBackend(uint64(i))
-		backend.Start()
+		backend.Start(nil)
 		defer backend.Stop()
 		validator := pbftCore.New(backend)
 		validator.Start()
@@ -63,7 +63,7 @@ func main() {
 	for i := 0; i < N; i++ {
 		for j := 0; j < N; j++ {
 			if i != j {
-				backends[i].AddPeer(fmt.Sprintf("%v", j))
+				backends[i].AddPeer(fmt.Sprintf("%v", j), nil)
 			}
 		}
 	}
