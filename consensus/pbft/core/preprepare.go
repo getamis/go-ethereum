@@ -33,14 +33,14 @@ func (c *core) sendPreprepare(request *pbft.Request) {
 			Proposal: c.makeProposal(nextSeqView.Sequence, request),
 		}
 
-		logger.Info("sendPreprepare")
+		logger.Debug("sendPreprepare")
 		c.broadcast(pbft.MsgPreprepare, preprepare)
 	}
 }
 
 func (c *core) handlePreprepare(preprepare *pbft.Preprepare, src pbft.Peer) error {
 	logger := log.New("from", src.ID(), "state", c.state)
-	logger.Info("handlePreprepare")
+	logger.Debug("handlePreprepare")
 
 	if src.ID() != c.primaryID().Uint64() {
 		logger.Warn("Ignore preprepare messages from non-proposer")

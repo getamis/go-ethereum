@@ -143,7 +143,7 @@ func (c *core) makeProposal(seq *big.Int, request *pbft.Request) *pbft.Proposal 
 func (c *core) commit() {
 	c.state = StateCommitted
 	logger := c.logger.New("state", c.state)
-	logger.Info("Ready to commit", "view", c.current.Preprepare.View)
+	logger.Debug("Ready to commit", "view", c.current.Preprepare.View)
 	c.backend.Commit(c.current.Preprepare.Proposal)
 	c.processBacklog()
 

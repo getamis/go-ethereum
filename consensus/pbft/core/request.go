@@ -20,7 +20,7 @@ import "github.com/ethereum/go-ethereum/consensus/pbft"
 
 func (c *core) handleRequest(request *pbft.Request, p pbft.Peer) error {
 	logger := c.logger.New("state", c.state)
-	logger.Info("handleRequest")
+	logger.Debug("handleRequest")
 
 	if c.state == StateAcceptRequest {
 		c.sendPreprepare(request)

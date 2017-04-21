@@ -24,13 +24,13 @@ import (
 
 func (c *core) sendCommit() {
 	logger := c.logger.New("state", c.state)
-	logger.Info("sendCommit")
+	logger.Debug("sendCommit")
 	c.broadcast(pbft.MsgCommit, c.subject)
 }
 
 func (c *core) handleCommit(commit *pbft.Subject, src pbft.Peer) error {
 	logger := c.logger.New("from", src.ID(), "state", c.state)
-	logger.Info("handleCommit")
+	logger.Debug("handleCommit")
 
 	if c.isFutureMessage(commit.View) {
 		return errFutureMessage

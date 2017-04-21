@@ -24,13 +24,13 @@ import (
 
 func (c *core) sendPrepare() {
 	logger := c.logger.New("state", c.state)
-	logger.Info("sendPrepare")
+	logger.Debug("sendPrepare")
 	c.broadcast(pbft.MsgPrepare, c.subject)
 }
 
 func (c *core) handlePrepare(prepare *pbft.Subject, src pbft.Peer) error {
 	logger := c.logger.New("from", src.ID(), "state", c.state)
-	logger.Info("handlePrepare")
+	logger.Debug("handlePrepare")
 
 	if c.isFutureMessage(prepare.View) {
 		return errFutureMessage
@@ -41,7 +41,6 @@ func (c *core) handlePrepare(prepare *pbft.Subject, src pbft.Peer) error {
 	}
 
 	c.acceptPrepare(prepare, src)
-	// log.Info("Total prepare msgs", "id", pbft.ID(), "num", len(pbft.prepareMsgs))
 
 	// If 2f+1
 	if int64(c.current.Prepares.Size()) > 2*c.F && c.state == StatePreprepared {
