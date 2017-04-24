@@ -24,13 +24,13 @@ import (
 
 func (c *core) sendPrepare() {
 	logger := c.logger.New("state", c.state)
-	logger.Info("sendPrepare")
-	c.broadcast(MsgPrepare, c.subject)
+	logger.Debug("sendPrepare")
+	c.broadcast(pbft.MsgPrepare, c.subject)
 }
 
 func (c *core) handlePrepare(prepare *pbft.Subject, src pbft.Peer) error {
 	logger := c.logger.New("from", src.ID(), "state", c.state)
-	logger.Info("handlePrepare")
+	logger.Debug("handlePrepare")
 
 	if c.isFutureMessage(prepare.View) {
 		return errFutureMessage
@@ -41,10 +41,9 @@ func (c *core) handlePrepare(prepare *pbft.Subject, src pbft.Peer) error {
 	}
 
 	c.acceptPrepare(prepare, src)
-	// log.Info("Total prepare msgs", "id", pbft.ID(), "num", len(pbft.prepareMsgs))
 
 	// If 2f+1
-	if int64(len(c.prepareMsgs)) > 2*c.F && c.state == StatePreprepared {
+	if int64(c.current.Prepares.Size()) > 2*c.F && c.state == StatePreprepared {
 		c.state = StatePrepared
 		c.sendCommit()
 		c.processBacklog()
@@ -72,5 +71,9 @@ func (c *core) verifyPrepare(prepare *pbft.Subject, src pbft.Peer) error {
 }
 
 func (c *core) acceptPrepare(prepare *pbft.Subject, src pbft.Peer) {
-	c.prepareMsgs[src.ID()] = prepare
+	logger := c.logger.New("from", src.ID(), "state", c.state)
+
+	if _, err := c.current.Prepares.Add(prepare, src); err != nil {
+		logger.Error("Failed to log prepare message", "msg", prepare, "error", err)
+	}
 }

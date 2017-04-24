@@ -17,7 +17,24 @@
 package pbft
 
 import (
-	elog "github.com/ethereum/go-ethereum/log"
+	"math/big"
+	"reflect"
 )
 
-var log = elog.New("consensus", "pbft")
+func NewLog(preprepare *Preprepare) *Log {
+	return &Log{
+		ViewNumber: preprepare.View.ViewNumber,
+		Sequence:   preprepare.View.Sequence,
+		Preprepare: preprepare,
+		Prepares:   NewMessageSet(preprepare.View, reflect.TypeOf(&Subject{})),
+		Commits:    NewMessageSet(preprepare.View, reflect.TypeOf(&Subject{})),
+	}
+}
+
+type Log struct {
+	ViewNumber *big.Int
+	Sequence   *big.Int
+	Preprepare *Preprepare
+	Prepares   MessageSet
+	Commits    MessageSet
+}

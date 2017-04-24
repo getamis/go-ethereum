@@ -33,18 +33,18 @@ func (c *core) sendPreprepare(request *pbft.Request) {
 			Proposal: c.makeProposal(nextSeqView.Sequence, request),
 		}
 
-		logger.Info("sendPreprepare")
-		c.broadcast(MsgPreprepare, preprepare)
-		c.handleCheckedPreprepare(&preprepare)
+		logger.Debug("sendPreprepare")
+		c.broadcast(pbft.MsgPreprepare, preprepare)
 	}
 }
 
 func (c *core) handlePreprepare(preprepare *pbft.Preprepare, src pbft.Peer) error {
 	logger := log.New("from", src.ID(), "state", c.state)
+	logger.Debug("handlePreprepare")
 
-	if c.ID() == src.ID() {
-		logger.Warn("Ignore preprepare message from self")
-		return pbft.ErrFromSelf
+	if src.ID() != c.primaryID().Uint64() {
+		logger.Warn("Ignore preprepare messages from non-proposer")
+		return pbft.ErrNotFromProposer
 	}
 
 	view := c.nextSequence()
@@ -53,30 +53,14 @@ func (c *core) handlePreprepare(preprepare *pbft.Preprepare, src pbft.Peer) erro
 		return pbft.ErrInvalidMessage
 	}
 
-	if src.ID() != c.primaryID().Uint64() {
-		logger.Warn("Ignore preprepare messages from non-primary replicas")
-		return pbft.ErrNotFromProposer
-	}
-
 	if preprepare.Proposal == nil {
 		logger.Warn("Proposal is nil")
 		return pbft.ErrNilProposal
 	}
 
-	logger.Info("handlePreprepare")
-
-	return c.handleCheckedPreprepare(preprepare)
-}
-
-func (c *core) handleCheckedPreprepare(preprepare *pbft.Preprepare) error {
 	if c.state == StateAcceptRequest {
 		c.acceptPreprepare(preprepare)
 		c.state = StatePreprepared
-	} else {
-		return nil
-	}
-
-	if c.state == StatePreprepared {
 		c.sendPrepare()
 		c.processBacklog()
 	}
@@ -86,13 +70,12 @@ func (c *core) handleCheckedPreprepare(preprepare *pbft.Preprepare) error {
 
 func (c *core) acceptPreprepare(preprepare *pbft.Preprepare) {
 	subject := &pbft.Subject{
-		View:   preprepare.View,
+		View: preprepare.View,
+		// TODO: calculate digest
 		Digest: []byte{0x01},
 	}
 
 	c.subject = subject
-	c.preprepareMsg = preprepare
-	c.prepareMsgs = make(map[uint64]*pbft.Subject)
-	c.commitMsgs = make(map[uint64]*pbft.Subject)
+	c.current = pbft.NewLog(preprepare)
 	c.checkpointMsgs = make(map[uint64]*pbft.Checkpoint)
 }

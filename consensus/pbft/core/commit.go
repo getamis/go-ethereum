@@ -24,13 +24,13 @@ import (
 
 func (c *core) sendCommit() {
 	logger := c.logger.New("state", c.state)
-	logger.Info("sendCommit")
-	c.broadcast(MsgCommit, c.subject)
+	logger.Debug("sendCommit")
+	c.broadcast(pbft.MsgCommit, c.subject)
 }
 
 func (c *core) handleCommit(commit *pbft.Subject, src pbft.Peer) error {
 	logger := c.logger.New("from", src.ID(), "state", c.state)
-	logger.Info("handleCommit")
+	logger.Debug("handleCommit")
 
 	if c.isFutureMessage(commit.View) {
 		return errFutureMessage
@@ -40,22 +40,10 @@ func (c *core) handleCommit(commit *pbft.Subject, src pbft.Peer) error {
 		return err
 	}
 
-	c.commitMsgs[src.ID()] = commit
+	c.acceptCommit(commit, src)
 
-	// log.Info("Total commit msgs", "id", pbft.ID(), "num", len(pbft.commitMsgs))
-
-	if int64(len(c.commitMsgs)) > 2*c.F && c.state == StatePrepared {
-		// TODO: Enter checkpoint stage?
-
-		c.state = StateCommitted
-		logger := c.logger.New("state", c.state)
-		logger.Info("Ready to commit", "view", c.preprepareMsg.View)
-		c.backend.Commit(c.preprepareMsg.Proposal)
-		c.processBacklog()
-
-		c.viewNumber = c.preprepareMsg.View.ViewNumber
-		c.sequence = c.preprepareMsg.View.Sequence
-		c.state = StateAcceptRequest
+	if int64(c.current.Commits.Size()) > 2*c.F && c.state == StatePrepared {
+		c.commit()
 	}
 
 	return nil
@@ -70,4 +58,12 @@ func (c *core) verifyCommit(commit *pbft.Subject, src pbft.Peer) error {
 	}
 
 	return nil
+}
+
+func (c *core) acceptCommit(commit *pbft.Subject, src pbft.Peer) {
+	logger := c.logger.New("from", src.ID(), "state", c.state)
+
+	if _, err := c.current.Commits.Add(commit, src); err != nil {
+		logger.Error("Failed to log commit message", "msg", commit, "error", err)
+	}
 }

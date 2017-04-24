@@ -24,6 +24,16 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+const (
+	MsgPreprepare uint64 = iota
+	MsgPrepare
+	MsgCommit
+	MsgCheckpoint
+	MsgViewChange
+	MsgNewView
+	MsgInvalid
+)
+
 // TODO: under cooking
 type State struct {
 	View     *View

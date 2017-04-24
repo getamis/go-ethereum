@@ -72,27 +72,27 @@ func (c *core) handle(msg *pbft.Message, src pbft.Peer) error {
 	}
 
 	switch msg.Code {
-	case MsgPreprepare:
+	case pbft.MsgPreprepare:
 		m, ok := msg.Msg.(*pbft.Preprepare)
 		if !ok {
 			return fmt.Errorf("failed to decode Preprepare")
 		}
 		return c.handlePreprepare(m, src)
-	case MsgPrepare:
+	case pbft.MsgPrepare:
 		m, ok := msg.Msg.(*pbft.Subject)
 		if !ok {
 			return fmt.Errorf("failed to decode Prepare")
 		}
 		return testBacklog(c.handlePrepare(m, src))
-	case MsgCommit:
+	case pbft.MsgCommit:
 		m, ok := msg.Msg.(*pbft.Subject)
 		if !ok {
 			return fmt.Errorf("failed to decode Commit")
 		}
 		return testBacklog(c.handleCommit(m, src))
-	case MsgCheckpoint:
-	case MsgViewChange:
-	case MsgNewView:
+	case pbft.MsgCheckpoint:
+	case pbft.MsgViewChange:
+	case pbft.MsgNewView:
 	default:
 		logger.Error("Invalid message", "msg", msg)
 	}

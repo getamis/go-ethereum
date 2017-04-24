@@ -29,15 +29,6 @@ import (
 )
 
 const (
-	MsgPreprepare uint64 = iota
-	MsgPrepare
-	MsgCommit
-	MsgCheckpoint
-	MsgViewChange
-	MsgNewView
-)
-
-const (
 	StateAcceptRequest int = iota
 	StatePreprepared
 	StatePrepared
@@ -58,8 +49,6 @@ func New(backend pbft.Backend) Engine {
 		state:          StateAcceptRequest,
 		logger:         log.New("backend", "simulation", "id", backend.ID()),
 		backend:        backend,
-		prepareMsgs:    make(map[uint64]*pbft.Subject),
-		commitMsgs:     make(map[uint64]*pbft.Subject),
 		checkpointMsgs: make(map[uint64]*pbft.Checkpoint),
 		sequence:       new(big.Int),
 		viewNumber:     new(big.Int),
@@ -68,8 +57,9 @@ func New(backend pbft.Backend) Engine {
 			pbft.ConnectionEvent{},
 			pbft.MessageEvent{},
 		),
-		backlogs:   make(map[pbft.Peer]*prque.Prque),
-		backlogsMu: new(sync.Mutex),
+		backlogs:        make(map[pbft.Peer]*prque.Prque),
+		backlogsMu:      new(sync.Mutex),
+		consensusLogsMu: new(sync.RWMutex),
 	}
 }
 
@@ -88,14 +78,16 @@ type core struct {
 	sequence   *big.Int
 	viewNumber *big.Int
 
-	subject        *pbft.Subject
-	preprepareMsg  *pbft.Preprepare
-	prepareMsgs    map[uint64]*pbft.Subject
-	commitMsgs     map[uint64]*pbft.Subject
+	subject *pbft.Subject
+
 	checkpointMsgs map[uint64]*pbft.Checkpoint
 
 	backlogs   map[pbft.Peer]*prque.Prque
 	backlogsMu *sync.Mutex
+
+	current         *pbft.Log
+	consensusLogs   []*pbft.Log
+	consensusLogsMu *sync.RWMutex
 }
 
 func (c *core) broadcast(code uint64, msg interface{}) {
@@ -146,4 +138,20 @@ func (c *core) makeProposal(seq *big.Int, request *pbft.Request) *pbft.Proposal 
 		Header:  rawHeader,
 		Payload: request.Payload,
 	}
+}
+
+func (c *core) commit() {
+	c.state = StateCommitted
+	logger := c.logger.New("state", c.state)
+	logger.Debug("Ready to commit", "view", c.current.Preprepare.View)
+	c.backend.Commit(c.current.Preprepare.Proposal)
+	c.processBacklog()
+
+	c.consensusLogsMu.Lock()
+	c.consensusLogs = append(c.consensusLogs, c.current)
+	c.consensusLogsMu.Unlock()
+
+	c.viewNumber = c.current.ViewNumber
+	c.sequence = c.current.Sequence
+	c.state = StateAcceptRequest
 }
