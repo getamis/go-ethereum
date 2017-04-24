@@ -23,13 +23,14 @@ import (
 )
 
 func (c *core) sendPrepare() {
-	log.Info("sendPrepare", "id", c.ID())
+	logger := c.logger.New("state", c.state)
+	logger.Info("sendPrepare")
 	c.broadcast(MsgPrepare, c.subject)
-	c.prepareMsgs[c.ID()] = c.subject
 }
 
 func (c *core) handlePrepare(prepare *pbft.Subject, src pbft.Peer) error {
-	log.Info("handlePrepare", "id", c.ID(), "from", src.ID())
+	logger := c.logger.New("from", src.ID(), "state", c.state)
+	logger.Info("handlePrepare")
 
 	if c.isFutureMessage(prepare.View) {
 		return errFutureMessage
@@ -41,19 +42,19 @@ func (c *core) handlePrepare(prepare *pbft.Subject, src pbft.Peer) error {
 
 	c.acceptPrepare(prepare, src)
 	// log.Info("Total prepare msgs", "id", pbft.ID(), "num", len(pbft.prepareMsgs))
-	c.processBacklog()
 
 	// If 2f+1
 	if int64(len(c.prepareMsgs)) > 2*c.F && c.state == StatePreprepared {
 		c.state = StatePrepared
 		c.sendCommit()
+		c.processBacklog()
 	}
 
 	return nil
 }
 
 func (c *core) verifyPrepare(prepare *pbft.Subject, src pbft.Peer) error {
-	logger := log.New("id", c.ID(), "from", src.ID())
+	logger := c.logger.New("from", src.ID(), "state", c.state)
 
 	if prepare.View.Sequence != nil &&
 		c.subject != nil &&

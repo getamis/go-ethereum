@@ -25,11 +25,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 const (
-	MsgRequest uint64 = iota
-	MsgPreprepare
+	MsgPreprepare uint64 = iota
 	MsgPrepare
 	MsgCommit
 	MsgCheckpoint
@@ -48,7 +48,6 @@ const (
 type Engine interface {
 	Start()
 	Stop()
-	NewRequest(payload []byte)
 }
 
 func New(backend pbft.Backend) Engine {
@@ -57,6 +56,7 @@ func New(backend pbft.Backend) Engine {
 		N:              4,
 		F:              1,
 		state:          StateAcceptRequest,
+		logger:         log.New("backend", "simulation", "id", backend.ID()),
 		backend:        backend,
 		prepareMsgs:    make(map[uint64]*pbft.Subject),
 		commitMsgs:     make(map[uint64]*pbft.Subject),
@@ -76,10 +76,11 @@ func New(backend pbft.Backend) Engine {
 // ----------------------------------------------------------------------------
 
 type core struct {
-	id    uint64
-	N     int64
-	F     int64
-	state int
+	id     uint64
+	N      int64
+	F      int64
+	state  int
+	logger log.Logger
 
 	backend pbft.Backend
 	events  *event.TypeMuxSubscription
@@ -95,13 +96,6 @@ type core struct {
 
 	backlogs   map[pbft.Peer]*prque.Prque
 	backlogsMu *sync.Mutex
-}
-
-func (c *core) NewRequest(payload []byte) {
-	// Lazy preprepare
-	c.sendPreprepare(&pbft.Request{
-		Payload: payload,
-	})
 }
 
 func (c *core) broadcast(code uint64, msg interface{}) {

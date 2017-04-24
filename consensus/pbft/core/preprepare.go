@@ -20,9 +20,11 @@ import (
 	"reflect"
 
 	"github.com/ethereum/go-ethereum/consensus/pbft"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 func (c *core) sendPreprepare(request *pbft.Request) {
+	logger := c.logger.New("state", c.state)
 	nextSeqView := c.nextSequence()
 
 	if c.isPrimary() {
@@ -31,16 +33,14 @@ func (c *core) sendPreprepare(request *pbft.Request) {
 			Proposal: c.makeProposal(nextSeqView.Sequence, request),
 		}
 
-		log.Info("sendPreprepare", "id", c.ID())
+		logger.Info("sendPreprepare")
 		c.broadcast(MsgPreprepare, preprepare)
 		c.handleCheckedPreprepare(&preprepare)
 	}
-
-	c.processBacklog()
 }
 
 func (c *core) handlePreprepare(preprepare *pbft.Preprepare, src pbft.Peer) error {
-	logger := log.New("id", c.ID(), "from", src.ID())
+	logger := log.New("from", src.ID(), "state", c.state)
 
 	if c.ID() == src.ID() {
 		logger.Warn("Ignore preprepare message from self")

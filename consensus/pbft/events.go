@@ -24,7 +24,6 @@ type ConsensusDataEvent struct {
 }
 
 type RequestEvent struct {
-	ID      uint64
 	Payload []byte
 }
 
