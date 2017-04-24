@@ -81,17 +81,23 @@ func (sb *simpleBackend) Validators() *pbft.ValidatorSet {
 }
 
 func (sb *simpleBackend) Send(data []byte) {
-	// send to self
-	go sb.pbftEventMux.Post(pbft.MessageEvent{
+	pbftMsg := pbft.MessageEvent{
 		ID:      sb.ID(),
 		Payload: data,
-	})
+	}
+	pbftByte, err := Encode(&pbftMsg)
+	if err != nil {
+		return
+	}
+
+	// send to self
+	go sb.pbftEventMux.Post(pbftMsg)
 
 	// send to other peers
 	for _, peer := range sb.peerSet.List() {
 		go sb.eventMux.Post(pbft.ConsensusDataEvent{
 			PeerID: peer.ID(),
-			Data:   data,
+			Data:   pbftByte,
 		})
 	}
 }

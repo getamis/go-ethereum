@@ -115,11 +115,14 @@ func (sb *simpleBackend) HandleMsg(peerID string, data []byte) {
 	if peer == nil {
 		return
 	}
+
+	msgEvent, err := Decode(data)
+	if err != nil {
+		return
+	}
+
 	if val := sb.valSet.GetByAddress(peer.Address()); val != nil {
-		go sb.pbftEventMux.Post(pbft.MessageEvent{
-			ID:      val.ID(),
-			Payload: data,
-		})
+		go sb.pbftEventMux.Post(*msgEvent)
 	}
 }
 
