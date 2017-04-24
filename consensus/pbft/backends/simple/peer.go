@@ -69,6 +69,12 @@ func (ps *peerSet) Add(p *peer) {
 	if ps.peers[p.ID()] == nil {
 		ps.peers[p.ID()] = p
 		ps.list = append(ps.list, p)
+	} else {
+		// replace old one
+		if i, peer := getPeer(ps.list, p.ID()); i >= 0 && peer != nil {
+			ps.list[i] = p
+		}
+		ps.peers[p.ID()] = p
 	}
 }
 
@@ -86,11 +92,9 @@ func (ps *peerSet) Remove(id string) {
 		return
 	}
 
-	for i, peer := range ps.list {
-		if peer.ID() == id {
-			ps.list = append(ps.list[:i], ps.list[i+1:]...)
-			delete(ps.peers, id)
-		}
+	if i, peer := getPeer(ps.list, id); peer != nil {
+		ps.list = append(ps.list[:i], ps.list[i+1:]...)
+		delete(ps.peers, id)
 	}
 }
 
@@ -98,4 +102,13 @@ func (ps *peerSet) List() []*peer {
 	ps.mtx.Lock()
 	defer ps.mtx.Unlock()
 	return ps.list
+}
+
+func getPeer(list []*peer, id string) (index int, peer *peer) {
+	for i, peer := range list {
+		if peer.ID() == id {
+			return i, peer
+		}
+	}
+	return -1, nil
 }

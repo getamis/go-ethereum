@@ -33,14 +33,12 @@ func TestValidatorSet(t *testing.T) {
 }
 
 func testNormalValSet(t *testing.T) {
-	valSet := NewValidatorSet()
-	add1 := common.HexToAddress(testAddress)
-	val1 := NewValidator(uint(0), addr1)
-	add2 := common.HexToAddress(testAddress2)
-	val2 := NewValidator(uint(1), addr2)
-	vals := []*Validator{val1, val2}
+	addr1 := common.HexToAddress(testAddress)
+	val1 := NewValidator(uint64(0), addr1)
+	addr2 := common.HexToAddress(testAddress2)
+	val2 := NewValidator(uint64(1), addr2)
 
-	valSet := NewValidatorSet(vals)
+	valSet := NewValidatorSet([]*Validator{val1, val2})
 
 	// check size
 	if size := valSet.Size(); size != 2 {
@@ -48,15 +46,15 @@ func testNormalValSet(t *testing.T) {
 
 	}
 	// test get by index
-	if val := valSet.GetByIndex(uint(0)); val != val1 {
+	if val := valSet.GetByIndex(uint64(0)); val != val1 {
 		t.Errorf("get wrong validator, got: %v, expected: %v", val, val1)
 	}
 	// test get by invalid index
-	if val := valSet.GetByIndex(uint(2)); val != nil {
+	if val := valSet.GetByIndex(uint64(2)); val != nil {
 		t.Errorf("get wrong validator, got: %v, expected: nil", val)
 	}
 	// test get by address
-	if val := valSet.GetByAddress(add2); val != val2 {
+	if val := valSet.GetByAddress(addr2); val != val2 {
 		t.Errorf("get wrong validator, got: %v, expected: %v", val, val2)
 	}
 	// test get by invalid address
@@ -76,8 +74,7 @@ func testNormalValSet(t *testing.T) {
 }
 
 func testEmptyValSet(t *testing.T) {
-	vals := []*Validator{}
-	valSet := NewValidatorSet(vals)
+	valSet := NewValidatorSet([]*Validator{})
 
 	// check size
 	if size := valSet.Size(); size != 0 {
@@ -85,7 +82,7 @@ func testEmptyValSet(t *testing.T) {
 
 	}
 	// test get by index
-	if val := valSet.GetByIndex(uint(0)); val != nil {
+	if val := valSet.GetByIndex(uint64(0)); val != nil {
 		t.Errorf("get wrong validator, got: %v, expected: nil", val)
 	}
 	// test get by invalid address

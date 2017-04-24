@@ -26,8 +26,8 @@ type Backend interface {
 	// ID returns self id
 	ID() uint64
 
-	// GetValidators returns validators
-	GetValidators() *ValidatorSet
+	// Validators returns validator set
+	Validators() *ValidatorSet
 
 	// EventMux is defined to handle request event and pbft message event
 	EventMux() *event.TypeMux

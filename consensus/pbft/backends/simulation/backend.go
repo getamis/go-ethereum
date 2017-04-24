@@ -102,7 +102,7 @@ func (sb *Backend) ID() uint64 {
 	return sb.id
 }
 
-func (sb *Backend) GetValidators() *pbft.ValidatorSet {
+func (sb *Backend) Validators() *pbft.ValidatorSet {
 	return sb.valSet
 }
 

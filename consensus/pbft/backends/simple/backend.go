@@ -76,7 +76,7 @@ func (sb *simpleBackend) ID() uint64 {
 	return sb.id
 }
 
-func (sb *simpleBackend) GetValidators() *pbft.ValidatorSet {
+func (sb *simpleBackend) Validators() *pbft.ValidatorSet {
 	return sb.valSet
 }
 

@@ -32,9 +32,9 @@ func (c *core) Start() {
 			case pbft.RequestEvent:
 				c.handleRequest(&pbft.Request{
 					Payload: ev.Payload,
-				}, c.backend.GetValidators().GetByIndex(c.ID()))
+				}, c.backend.Validators().GetByIndex(c.ID()))
 			case pbft.MessageEvent:
-				c.handleMsg(ev.Payload, c.backend.GetValidators().GetByIndex(ev.ID))
+				c.handleMsg(ev.Payload, c.backend.Validators().GetByIndex(ev.ID))
 			case backlogEvent:
 				c.handle(ev.msg, ev.src)
 			}
