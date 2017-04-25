@@ -29,7 +29,7 @@ type MessageSet interface {
 	Sequence() *big.Int
 	ViewNumber() *big.Int
 	Type() reflect.Type
-	Add(interface{}, Peer) (bool, error)
+	Add(interface{}, *Validator) (bool, error)
 	Size() int
 }
 
@@ -51,8 +51,8 @@ type messageSet struct {
 	messages *set.Set
 }
 
-type peerMessage struct {
-	peer    Peer
+type validatorMessage struct {
+	val     *Validator
 	message interface{}
 }
 
@@ -77,9 +77,9 @@ func (ms *messageSet) Type() reflect.Type {
 	return ms.msgType
 }
 
-func (ms *messageSet) Add(msg interface{}, validator Peer) (bool, error) {
-	m := peerMessage{
-		peer:    validator,
+func (ms *messageSet) Add(msg interface{}, validator *Validator) (bool, error) {
+	m := validatorMessage{
+		val:     validator,
 		message: msg,
 	}
 
@@ -97,7 +97,7 @@ func (ms *messageSet) Add(msg interface{}, validator Peer) (bool, error) {
 	return ms.addVerifiedMessage(m)
 }
 
-func (ms *messageSet) addVerifiedMessage(m peerMessage) (bool, error) {
+func (ms *messageSet) addVerifiedMessage(m validatorMessage) (bool, error) {
 	ms.messages.Add(m)
 
 	if !ms.messages.Has(m) {

@@ -28,7 +28,7 @@ func (c *core) sendCommit() {
 	c.broadcast(pbft.MsgCommit, c.subject)
 }
 
-func (c *core) handleCommit(commit *pbft.Subject, src pbft.Peer) error {
+func (c *core) handleCommit(commit *pbft.Subject, src *pbft.Validator) error {
 	logger := c.logger.New("from", src.ID(), "state", c.state)
 	logger.Debug("handleCommit")
 
@@ -49,7 +49,7 @@ func (c *core) handleCommit(commit *pbft.Subject, src pbft.Peer) error {
 	return nil
 }
 
-func (c *core) verifyCommit(commit *pbft.Subject, src pbft.Peer) error {
+func (c *core) verifyCommit(commit *pbft.Subject, src *pbft.Validator) error {
 	logger := c.logger.New("from", src.ID(), "state", c.state)
 
 	if !reflect.DeepEqual(commit, c.subject) {
@@ -60,7 +60,7 @@ func (c *core) verifyCommit(commit *pbft.Subject, src pbft.Peer) error {
 	return nil
 }
 
-func (c *core) acceptCommit(commit *pbft.Subject, src pbft.Peer) {
+func (c *core) acceptCommit(commit *pbft.Subject, src *pbft.Validator) {
 	logger := c.logger.New("from", src.ID(), "state", c.state)
 
 	if _, err := c.current.Commits.Add(commit, src); err != nil {

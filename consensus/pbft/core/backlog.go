@@ -40,7 +40,7 @@ func (c *core) isFutureMessage(view *pbft.View) bool {
 	return false
 }
 
-func (c *core) storeBacklog(msg *pbft.Message, src pbft.Peer) {
+func (c *core) storeBacklog(msg *pbft.Message, src *pbft.Validator) {
 	logger := c.logger.New("from", src.ID(), "state", c.state)
 
 	if src.ID() == c.ID() {

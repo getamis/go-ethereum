@@ -14,19 +14,28 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package pbft
+package simple
 
 import (
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/p2p"
+	"bytes"
+	"encoding/gob"
+
+	"github.com/ethereum/go-ethereum/consensus/pbft"
 )
 
-type Peer interface {
-	ID() uint64
-	Address() common.Address
-	PublicKey() string
-	SetPublicKey(string)
+func Decode(b []byte) (*pbft.MessageEvent, error) {
+	msgEvent := &pbft.MessageEvent{}
+	if err := gob.NewDecoder(bytes.NewBuffer(b)).Decode(msgEvent); err != nil {
+		return nil, err
+	}
+	return msgEvent, nil
+}
 
-	IsConnected() bool
-	p2p.MsgReadWriter
+func Encode(msgEvent *pbft.MessageEvent) ([]byte, error) {
+	var buf bytes.Buffer
+	err := gob.NewEncoder(&buf).Encode(msgEvent)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }

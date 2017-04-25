@@ -71,13 +71,3 @@ func (p *peer) WriteMsg(msg p2p.Msg) error {
 func (p *peer) Address() common.Address {
 	return common.HexToAddress(p.p.Name())
 }
-
-func (p *peer) PublicKey() string {
-	return ""
-}
-
-func (p *peer) IsConnected() bool {
-	return true
-}
-
-func (p *peer) SetPublicKey(pubKey string) {}

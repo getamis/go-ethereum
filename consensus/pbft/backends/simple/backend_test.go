@@ -18,7 +18,6 @@ package simple
 
 import (
 	"crypto/ecdsa"
-	"encoding/hex"
 	"strings"
 	"testing"
 
@@ -66,7 +65,7 @@ func TestCheckSignature(t *testing.T) {
 /**
  * SimpleBackend
  * Private key: bb047e5940b6d83354d9432db7c449ac8fca2248008aaa7271369880f9f11cc1
- * Public key: a2bfb0f7da9e1b9c0c64e14f87e8fb82eb0144e97c25fe3a977a921041a50976984d18257d2495e7bfd3d4b280220217f429287d25ecdf2b0d7c0f7aae9aa624
+ * Public key: 04a2bfb0f7da9e1b9c0c64e14f87e8fb82eb0144e97c25fe3a977a921041a50976984d18257d2495e7bfd3d4b280220217f429287d25ecdf2b0d7c0f7aae9aa624
  * Address: 0x70524d664ffe731100208a0154e556f9bb679ae6
  */
 func getAddress() common.Address {
@@ -78,11 +77,8 @@ func getInvalidAddress() common.Address {
 }
 
 func generatePrivateKey() (*ecdsa.PrivateKey, error) {
-	key, err := hex.DecodeString(string("bb047e5940b6d83354d9432db7c449ac8fca2248008aaa7271369880f9f11cc1"))
-	if err != nil {
-		return nil, err
-	}
-	return crypto.ToECDSA(key), nil
+	key := "bb047e5940b6d83354d9432db7c449ac8fca2248008aaa7271369880f9f11cc1"
+	return crypto.HexToECDSA(key)
 }
 
 func newSimpleBackend() *simpleBackend {
