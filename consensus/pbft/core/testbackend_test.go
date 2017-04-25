@@ -64,15 +64,10 @@ func (self *testSystemBackend) EventMux() *event.TypeMux {
 
 func (self *testSystemBackend) Send(message []byte) {
 	testLogger.Info("enqueuing a message...", "id", self.ID())
-	self.sys.queuedMessage <- &testMessage{
-		From:    self.ID(),
-		Message: message,
+	self.sys.queuedMessage <- pbft.MessageEvent{
+		ID:      self.ID(),
+		Payload: message,
 	}
-}
-
-type testMessage struct {
-	From    uint64
-	Message []byte
 }
 
 func (self *testSystemBackend) UpdateState(state *pbft.State) {
@@ -129,10 +124,7 @@ func (self *testSystemBackend) RemovePeer(peerPublicKey string) {
 
 // Handle a message from peer
 func (self *testSystemBackend) HandleMsg(peerPublicKey string, data []byte) {
-	go self.EventMux().Post(pbft.MessageEvent{
-		ID:      self.peers.GetByPublicKey(peerPublicKey).ID(),
-		Payload: data,
-	})
+	testLogger.Warn("nothing to happen")
 }
 
 // Start is initialized peers
@@ -159,7 +151,7 @@ func (self *testSystemBackend) Stop() {
 type testSystem struct {
 	backends map[uint64]*testSystemBackend
 
-	queuedMessage chan *testMessage
+	queuedMessage chan pbft.MessageEvent
 	quit          chan struct{}
 }
 
@@ -168,7 +160,7 @@ func newTestSystem() *testSystem {
 	return &testSystem{
 		backends: make(map[uint64]*testSystemBackend),
 
-		queuedMessage: make(chan *testMessage),
+		queuedMessage: make(chan pbft.MessageEvent),
 		quit:          make(chan struct{}),
 	}
 }
@@ -182,9 +174,9 @@ func (t *testSystem) run() {
 			case <-t.quit:
 				return
 			case queuedMessage := <-t.queuedMessage:
-				testLogger.Info("consuming a queue message...", "msg from", queuedMessage.From)
+				testLogger.Info("consuming a queue message...", "msg from", queuedMessage.ID)
 				for _, backend := range t.backends {
-					go backend.HandleMsg(backend.peers.GetByIndex(queuedMessage.From).PublicKey(), queuedMessage.Message)
+					go backend.EventMux().Post(queuedMessage)
 				}
 			}
 		}
