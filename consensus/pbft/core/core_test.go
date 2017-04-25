@@ -17,6 +17,7 @@
 package core
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -32,7 +33,7 @@ func connectAll(bs []*testSystemBackend) {
 			if x == y {
 				continue
 			}
-			x.sys.backends[i].AddPeer(getPublicKeyAddress(x.sys.backends[j].privateKey).Hex())
+			x.sys.backends[i].AddPeer(fmt.Sprintf("%d", y.sys.backends[j].ID()), &y.sys.backends[j].privateKey.PublicKey)
 		}
 	}
 }

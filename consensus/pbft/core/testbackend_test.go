@@ -23,7 +23,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
-	"github.com/ethereum/go-ethereum/consensus/pbft/backends"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	elog "github.com/ethereum/go-ethereum/log"
@@ -37,7 +36,7 @@ type testSystemBackend struct {
 	sys *testSystem
 
 	engine Engine
-	peers  pbft.PeerSet
+	peers  *pbft.ValidatorSet
 	events *event.TypeMux
 
 	commitMsgs []*pbft.Proposal
@@ -54,7 +53,7 @@ func (self *testSystemBackend) ID() uint64 {
 }
 
 // Peers returns all connected peers
-func (self *testSystemBackend) Peers() pbft.PeerSet {
+func (self *testSystemBackend) Validators() *pbft.ValidatorSet {
 	return self.peers
 }
 
@@ -113,8 +112,8 @@ func (self *testSystemBackend) NewRequest(request []byte) {
 //
 // define the functions that need to be provided for PBFT protocol manager.
 
-func (self *testSystemBackend) AddPeer(peerPublicKey string) {
-	testLogger.Info(fmt.Sprintf("add peer: %d", self.Peers().GetByPublicKey(peerPublicKey).ID()), "id", self.ID())
+func (self *testSystemBackend) AddPeer(peerID string, publicKey *ecdsa.PublicKey) {
+	testLogger.Info(fmt.Sprintf("add peer: %s", peerID), "id", self.ID())
 }
 
 // Remove a peer
@@ -129,15 +128,14 @@ func (self *testSystemBackend) HandleMsg(peerPublicKey string, data []byte) {
 
 // Start is initialized peers
 func (self *testSystemBackend) Start(chain consensus.ChainReader) {
-	peers := make([]pbft.Peer, len(self.sys.backends))
+	peers := make([]*pbft.Validator, len(self.sys.backends))
 	for i, backend := range self.sys.backends {
-		peers[i] = &testPeer{
-			address:   getPublicKeyAddress(backend.privateKey),
-			publicKey: getPublicKeyAddress(backend.privateKey).Hex(),
-			id:        i, // use the index as id
-		}
+		peers[i] = pbft.NewValidator(
+			uint64(i), // use the index as id
+			getPublicKeyAddress(backend.privateKey),
+		)
 	}
-	self.peers = backends.NewPeerSet(peers)
+	self.peers = pbft.NewValidatorSet(peers)
 }
 
 // Stop the engine
