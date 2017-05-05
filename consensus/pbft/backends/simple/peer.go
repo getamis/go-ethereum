@@ -17,6 +17,7 @@
 package simple
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"sync"
 
@@ -82,6 +83,18 @@ func (ps *peerSet) Get(id string) *peer {
 	ps.mtx.Lock()
 	defer ps.mtx.Unlock()
 	return ps.peers[id]
+}
+
+func (ps *peerSet) GetByAddress(addr common.Address) *peer {
+	ps.mtx.Lock()
+	defer ps.mtx.Unlock()
+
+	for _, peer := range ps.peers {
+		if bytes.Compare(addr.Bytes(), peer.Address().Bytes()) == 0 {
+			return peer
+		}
+	}
+	return nil
 }
 
 func (ps *peerSet) Remove(id string) {

@@ -18,45 +18,44 @@ package simulation
 
 import (
 	"crypto/rand"
-	"math/big"
+	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 )
 
-func newPeer(newPeerID uint64) *peer {
+func newPeer(key *NodeKey) *peer {
 	// Create a message pipe to communicate through
 	in, out := p2p.MsgPipe()
 
 	// Generate a random id and create the peer
-	var id discover.NodeID
-	rand.Read(id[:])
+	var nodeID discover.NodeID
+	rand.Read(nodeID[:])
 
 	p := &peer{
-		id:  newPeerID,
-		in:  in,
-		out: out,
-		p:   p2p.NewPeer(id, id.String(), nil),
+		NodeKey: key,
+		id:      fmt.Sprintf("%x", nodeID[:8]),
+		in:      in,
+		out:     out,
 	}
 
 	return p
 }
 
 type peer struct {
-	id  uint64
+	*NodeKey
+	id  string
 	in  *p2p.MsgPipeRW
 	out *p2p.MsgPipeRW
-	p   *p2p.Peer
 }
 
-func (p *peer) ID() uint64 {
+func (p *peer) ID() string {
 	return p.id
 }
 
 // close terminates the local side of the peer, notifying the remote protocol
 // manager of termination.
-func (p *peer) close() {
+func (p *peer) Close() {
 	p.in.Close()
 	p.out.Close()
 }
@@ -67,8 +66,4 @@ func (p *peer) ReadMsg() (p2p.Msg, error) {
 
 func (p *peer) WriteMsg(msg p2p.Msg) error {
 	return p.in.WriteMsg(msg)
-}
-
-func (p *peer) Address() common.Address {
-	return common.BigToAddress(big.NewInt(int64(p.id)))
 }

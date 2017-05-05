@@ -25,7 +25,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
-	"github.com/ethereum/go-ethereum/consensus/pbft/backends/simulation"
+	"github.com/ethereum/go-ethereum/consensus/pbft/validator"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
@@ -93,19 +94,23 @@ func TestIsFutureMessage(t *testing.T) {
 func TestStoreBacklog(t *testing.T) {
 	c := &core{
 		logger:     log.New("backend", "test", "id", 0),
-		backlogs:   make(map[*pbft.Validator]*prque.Prque),
+		backlogs:   make(map[pbft.Validator]*prque.Prque),
 		backlogsMu: new(sync.Mutex),
 	}
 	v := &pbft.View{
 		ViewNumber: big.NewInt(10),
 		Sequence:   big.NewInt(10),
 	}
-	p := pbft.NewValidator(common.StringToAddress("12345667890"))
+	p := validator.New(common.StringToAddress("12345667890"))
 	// push preprepare msg
 	preprepare := &pbft.Preprepare{
 		View: v,
 		Proposal: &pbft.Proposal{
-			Header:     []byte("header"),
+			Header: &pbft.ProposalHeader{
+				Sequence:   big.NewInt(10),
+				ParentHash: common.HexToHash("0x1234567890"),
+				DataHash:   common.HexToHash("0x9876543210"),
+			},
 			Payload:    []byte("payload"),
 			Signatures: [][]byte{[]byte("sig1")},
 		},
@@ -145,21 +150,24 @@ func TestStoreBacklog(t *testing.T) {
 }
 
 func TestProcessFutureBacklog(t *testing.T) {
-	backend := simulation.NewBackend(1)
-	c := &core{
-		logger:     log.New("backend", "test", "id", 0),
-		backlogs:   make(map[*pbft.Validator]*prque.Prque),
-		backlogsMu: new(sync.Mutex),
-		backend:    backend,
-		events: backend.EventMux().Subscribe(
-			backlogEvent{},
-		),
+	backend := &testSystemBackend{
+		events: new(event.TypeMux),
 	}
+	c := &core{
+		logger:      log.New("backend", "test", "id", 0),
+		backlogs:    make(map[pbft.Validator]*prque.Prque),
+		backlogsMu:  new(sync.Mutex),
+		backend:     backend,
+		internalMux: new(event.TypeMux),
+	}
+	c.subscribeEvents()
+	defer c.unsubscribeEvents()
+
 	v := &pbft.View{
 		ViewNumber: big.NewInt(10),
 		Sequence:   big.NewInt(10),
 	}
-	p := pbft.NewValidator(common.StringToAddress("12345667890"))
+	p := validator.New(common.StringToAddress("12345667890"))
 	// push a future msg
 	subject := &pbft.Subject{
 		View:   v,
@@ -175,7 +183,7 @@ func TestProcessFutureBacklog(t *testing.T) {
 	const timeoutDura = 2 * time.Second
 	timeout := time.NewTimer(timeoutDura)
 	select {
-	case <-c.events.Chan():
+	case <-c.internalEvents.Chan():
 		t.Errorf("Should not receive any events")
 
 	case <-timeout.C:
@@ -191,7 +199,11 @@ func TestProcessBacklog(t *testing.T) {
 	preprepare := &pbft.Preprepare{
 		View: v,
 		Proposal: &pbft.Proposal{
-			Header:     []byte("header"),
+			Header: &pbft.ProposalHeader{
+				Sequence:   big.NewInt(10),
+				ParentHash: common.HexToHash("0x1234567890"),
+				DataHash:   common.HexToHash("0x9876543210"),
+			},
 			Payload:    []byte("payload"),
 			Signatures: [][]byte{[]byte("sig1")},
 		},
@@ -221,17 +233,19 @@ func TestProcessBacklog(t *testing.T) {
 }
 
 func testProcessBacklog(t *testing.T, msg *pbft.Message) {
-	backend := simulation.NewBackend(1)
+	vset := newTestValidatorSet(1)
+	backend := &testSystemBackend{
+		events: new(event.TypeMux),
+		peers:  vset,
+	}
 	c := &core{
-		logger:     log.New("backend", "test", "id", 0),
-		backlogs:   make(map[*pbft.Validator]*prque.Prque),
-		backlogsMu: new(sync.Mutex),
-		backend:    backend,
-		events: backend.EventMux().Subscribe(
-			backlogEvent{},
-		),
-		state:    State(msg.Code),
-		sequence: big.NewInt(1),
+		logger:      log.New("backend", "test", "id", 0),
+		backlogs:    make(map[pbft.Validator]*prque.Prque),
+		backlogsMu:  new(sync.Mutex),
+		backend:     backend,
+		internalMux: new(event.TypeMux),
+		state:       State(msg.Code),
+		sequence:    big.NewInt(1),
 		subject: &pbft.Subject{
 			View: &pbft.View{
 				Sequence:   big.NewInt(1),
@@ -239,14 +253,16 @@ func testProcessBacklog(t *testing.T, msg *pbft.Message) {
 			},
 		},
 	}
-	p := pbft.NewValidator(common.StringToAddress("12345667890"))
-	c.storeBacklog(msg, p)
+	c.subscribeEvents()
+	defer c.unsubscribeEvents()
+
+	c.storeBacklog(msg, vset.GetByIndex(0))
 	c.processBacklog()
 
 	const timeoutDura = 2 * time.Second
 	timeout := time.NewTimer(timeoutDura)
 	select {
-	case ev := <-c.events.Chan():
+	case ev := <-c.internalEvents.Chan():
 		e, ok := ev.Data.(backlogEvent)
 		if !ok {
 			t.Fatalf("Unexpected event comes")

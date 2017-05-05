@@ -17,18 +17,15 @@
 package main
 
 import (
-	"fmt"
-	"math/big"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft/backends/simulation"
-	pbftCore "github.com/ethereum/go-ethereum/consensus/pbft/core"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 const (
@@ -47,80 +44,50 @@ func main() {
 	glogger.Verbosity(log.LvlDebug)
 	log.Root().SetHandler(glogger)
 
-	// 1. Setup validators and backends
-	var validators = make([]pbftCore.Engine, N)
-	var backends = make([]*simulation.Backend, N)
-
+	// 1. Setup validators
+	var nodeKeys = make([]*simulation.NodeKey, N)
+	var addrs = make([]common.Address, N)
 	for i := 0; i < N; i++ {
-		backend := simulation.NewBackend(uint64(i))
-		backend.Start(nil)
-		defer backend.Stop()
-		validator := pbftCore.New(backend)
-		validator.Start()
-		defer validator.Stop()
-
-		validators[i] = validator
-		backends[i] = backend
-		log.Info("Backend:", "Index", i, "Address", backend.Address().Hex())
+		nodeKeys[i] = simulation.NewNodeKey()
+		addrs[i] = nodeKeys[i].Address()
 	}
 
-	// 2. Add peers for each backend
+	// generate genesis block
+	genesis := core.DefaultGenesisBlock()
+	genesis.Config = params.TestChainConfig
+	// force enable PBFT engine
+	genesis.Config.PBFT = &params.PBFTConfig{}
+	genesis.Config.Ethash = nil
+
+	simulation.AppendValidators(genesis, addrs)
+
+	// 2. Setup backends
+	var backends = make([]*simulation.ProtocolManager, N)
+	for i := 0; i < N; i++ {
+		backends[i] = simulation.New(nodeKeys[i], genesis)
+		backends[i].Start()
+		defer backends[i].Stop()
+	}
+
+	// 3. Add peers for each backend
 	for i := 0; i < N; i++ {
 		for j := 0; j < N; j++ {
 			if i != j {
-				backends[i].AddPeer(fmt.Sprintf("%v", j), nil)
+				backends[i].AddPeer(backends[j].SelfPeer())
 			}
 		}
 	}
 
 	log.Info("Start")
 
+	// 4. Make each backend to try to create new request
+	// only proposer can create new request successfully
 	time.Sleep(3 * time.Second)
-
-	genesisBlock, _ = core.DefaultGenesisBlock().ToBlock()
-	block := genesisBlock
-
-	blocks := make(map[common.Hash]*types.Block)
-	blocksMu := new(sync.Mutex)
-	blocks[block.Hash()] = block
-
-	// 3. Subscribe CommitEvent for each backend
 	for _, backend := range backends {
-		subscription := backend.EventMux().Subscribe(simulation.CommitEvent{})
-		be := backend
-		go func() {
-			for event := range subscription.Chan() {
-				switch ev := event.Data.(type) {
-				case simulation.CommitEvent:
-					blocksMu.Lock()
-					b := blocks[common.BytesToHash(ev.Payload)]
-					blocksMu.Unlock()
-					log.Info("Block committed", "number", b.NumberU64(), "hash", b.Hash().String(), "address", be.Address().Hex())
-				}
-			}
-		}()
+		backend.TryNewRequest()
 	}
 
-	// 4. Backend[0] (primary) requests a new block every minute
 	for {
-		backends[0].NewRequest(block.Hash().Bytes())
-		block = makeBlock(block, block.Number())
-		blocksMu.Lock()
-		blocks[block.Hash()] = block
-		blocksMu.Unlock()
-		time.Sleep(1 * time.Second)
+		select {}
 	}
-}
-
-func makeBlock(parent *types.Block, num *big.Int) *types.Block {
-	header := &types.Header{
-		ParentHash: parent.Hash(),
-		Number:     num.Add(num, common.Big1),
-		GasLimit:   new(big.Int),
-		GasUsed:    new(big.Int),
-		Extra:      nil,
-		Time:       big.NewInt(int64(time.Now().Nanosecond())),
-	}
-
-	return types.NewBlockWithHeader(header)
 }

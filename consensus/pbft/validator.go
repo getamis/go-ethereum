@@ -16,90 +16,28 @@
 
 package pbft
 
-import (
-	"bytes"
-	"reflect"
-	"sort"
-	"strings"
+import "github.com/ethereum/go-ethereum/common"
 
-	"github.com/ethereum/go-ethereum/common"
-)
-
-type Validator struct {
-	address common.Address
+type Validator interface {
+	// Return address
+	Address() common.Address
 }
 
-type Validators []*Validator
-
-func (slice Validators) Len() int {
-	return len(slice)
-}
-
-func (slice Validators) Less(i, j int) bool {
-	return strings.Compare(slice[i].Address().Hex(), slice[j].Address().Hex()) < 0
-}
-
-func (slice Validators) Swap(i, j int) {
-	slice[i], slice[j] = slice[j], slice[i]
-}
-
-func NewValidator(addr common.Address) *Validator {
-	return &Validator{
-		address: addr,
-	}
-}
-
-func (val *Validator) Address() common.Address { return val.address }
-
-//------------------------------------------------------------------------
-
-type ValidatorSet struct {
-	validators Validators
-	proposer   *Validator
-}
-
-func NewValidatorSet(vals Validators) *ValidatorSet {
-	sort.Sort(vals)
-	vs := &ValidatorSet{
-		validators: vals,
-	}
-	vs.CalcProposer(0)
-	return vs
-}
-
-func (valSet *ValidatorSet) Size() int          { return len(valSet.validators) }
-func (valSet *ValidatorSet) List() []*Validator { return valSet.validators }
-
-func (valSet *ValidatorSet) GetByIndex(i uint64) *Validator {
-	if i < uint64(valSet.Size()) {
-		return valSet.validators[i]
-	}
-	return nil
-}
-
-func (valSet *ValidatorSet) GetByAddress(addr common.Address) *Validator {
-	for _, val := range valSet.List() {
-		if bytes.Compare(addr.Bytes(), val.Address().Bytes()) == 0 {
-			return val
-		}
-	}
-	return nil
-}
-
-func (valSet *ValidatorSet) GetProposer() *Validator {
-	if valSet.proposer == nil {
-		valSet.CalcProposer(0)
-	}
-	return valSet.proposer
-}
-
-func (valSet *ValidatorSet) CalcProposer(seed uint64) {
-	if valSet.Size() != 0 {
-		pick := seed % uint64(valSet.Size())
-		valSet.proposer = valSet.validators[pick]
-	}
-}
-
-func (valSet *ValidatorSet) IsProposer(address common.Address) bool {
-	return reflect.DeepEqual(valSet.GetProposer(), valSet.GetByAddress(address))
+type ValidatorSet interface {
+	// Check whether the extraData is presented in correct format
+	CheckFormat(extraData []byte) bool
+	// Calculate the proposer
+	CalcProposer(seed uint64)
+	// Return the validator size
+	Size() int
+	// Return the validator array
+	List() []Validator
+	// Get validator by index
+	GetByIndex(i uint64) Validator
+	// Get validator by address
+	GetByAddress(addr common.Address) Validator
+	// Get current proposer
+	GetProposer() Validator
+	// Check whether the validator with address is a proposer
+	IsProposer(address common.Address) bool
 }

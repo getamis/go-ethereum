@@ -14,33 +14,19 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package simple
+package validator
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/consensus/pbft"
 )
 
-const (
-	dbKeyPrefix = "pbft-backend-"
-)
-
-func (sb *simpleBackend) Save(key string, val interface{}) error {
-	blob, err := rlp.EncodeToBytes(val)
-	if err != nil {
-		return err
+func New(addr common.Address) pbft.Validator {
+	return &defaultValidator{
+		address: addr,
 	}
-	return sb.db.Put(toDatabaseKey(sb.Hash, key), blob)
 }
 
-func (sb *simpleBackend) Restore(key string, val interface{}) error {
-	blob, err := sb.db.Get(toDatabaseKey(sb.Hash, key))
-	if err != nil {
-		return err
-	}
-	return rlp.DecodeBytes(blob, val)
-}
-
-func toDatabaseKey(hashfn func(val interface{}) common.Hash, key string) []byte {
-	return hashfn(dbKeyPrefix + key).Bytes()
+func NewSet(extraData []byte) (pbft.ValidatorSet, bool) {
+	return newDefaultSet(extraData)
 }

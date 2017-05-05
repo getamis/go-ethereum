@@ -67,7 +67,7 @@ func (c *core) isFutureMessage(msgCode uint64, view *pbft.View) bool {
 	return priority > newPriority
 }
 
-func (c *core) storeBacklog(msg *pbft.Message, src *pbft.Validator) {
+func (c *core) storeBacklog(msg *pbft.Message, src pbft.Validator) {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 
 	if src.Address() == c.Address() {
@@ -146,7 +146,7 @@ func (c *core) processBacklog() {
 
 			logger.Debug("Post backlog event", "msg", msg)
 
-			go c.backend.EventMux().Post(backlogEvent{
+			go c.sendInternalEvent(backlogEvent{
 				src: src,
 				msg: msg,
 			})

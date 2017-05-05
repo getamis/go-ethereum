@@ -14,19 +14,21 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package pbft
+package validator
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
 var (
-	testAddress  = "0x70524d664ffe731100208a0154e556f9bb679ae6"
-	testAddress2 = "0xb37866a925bccd69cfa98d43b510f1d23d78a851"
+	testAddress  = "70524d664ffe731100208a0154e556f9bb679ae6"
+	testAddress2 = "b37866a925bccd69cfa98d43b510f1d23d78a851"
 )
 
 func TestValidatorSet(t *testing.T) {
@@ -36,19 +38,24 @@ func TestValidatorSet(t *testing.T) {
 }
 
 func testNewValidatorSet(t *testing.T) {
-	var validators []*Validator
+	var validators []pbft.Validator
 	const ValCnt = 100
 
 	// Create 100 validators with random addresses
+	b := []byte{}
 	for i := 0; i < ValCnt; i++ {
 		key, _ := crypto.GenerateKey()
 		addr := crypto.PubkeyToAddress(key.PublicKey)
-		val := NewValidator(addr)
+		val := New(addr)
 		validators = append(validators, val)
+		b = append(b, val.Address().Bytes()...)
 	}
 
 	// Create ValidatorSet
-	validatorSet := NewValidatorSet(validators)
+	validatorSet, r := NewSet(b)
+	if !r {
+		t.Errorf("Cannot parse the validator byte array")
+	}
 
 	// Check validators sorting: should be in ascending order
 	for i := 0; i < ValCnt-1; i++ {
@@ -61,20 +68,24 @@ func testNewValidatorSet(t *testing.T) {
 }
 
 func testNormalValSet(t *testing.T) {
-	addr1 := common.HexToAddress(testAddress)
-	val1 := NewValidator(addr1)
-	addr2 := common.HexToAddress(testAddress2)
-	val2 := NewValidator(addr2)
+	b1 := common.Hex2Bytes(testAddress)
+	b2 := common.Hex2Bytes(testAddress2)
+	addr1 := common.BytesToAddress(b1)
+	addr2 := common.BytesToAddress(b2)
+	val1 := New(addr1)
+	val2 := New(addr2)
 
-	valSet := NewValidatorSet([]*Validator{val1, val2})
+	valSet, r := NewSet(append(b1, b2...))
+	if !r {
+		t.Errorf("invalid validator set format")
+	}
 
 	// check size
 	if size := valSet.Size(); size != 2 {
 		t.Errorf("wrong peer set size, got: %v, expected: 2", size)
-
 	}
 	// test get by index
-	if val := valSet.GetByIndex(uint64(0)); val != val1 {
+	if val := valSet.GetByIndex(uint64(0)); !reflect.DeepEqual(val, val1) {
 		t.Errorf("get wrong validator, got: %v, expected: %v", val, val1)
 	}
 	// test get by invalid index
@@ -82,7 +93,7 @@ func testNormalValSet(t *testing.T) {
 		t.Errorf("get wrong validator, got: %v, expected: nil", val)
 	}
 	// test get by address
-	if val := valSet.GetByAddress(addr2); val != val2 {
+	if val := valSet.GetByAddress(addr2); !reflect.DeepEqual(val, val2) {
 		t.Errorf("get wrong validator, got: %v, expected: %v", val, val2)
 	}
 	// test get by invalid address
@@ -91,18 +102,21 @@ func testNormalValSet(t *testing.T) {
 		t.Errorf("get wrong validator, got: %v, expected: nil", val)
 	}
 	// test get proposer
-	if val := valSet.GetProposer(); val != val1 {
+	if val := valSet.GetProposer(); !reflect.DeepEqual(val, val1) {
 		t.Errorf("get wrong proposer, got: %v, expected: %v", val, val1)
 	}
 	// test calculate proposer
 	valSet.CalcProposer(uint64(3))
-	if val := valSet.GetProposer(); val != val2 {
+	if val := valSet.GetProposer(); !reflect.DeepEqual(val, val2) {
 		t.Errorf("get wrong proposer, got: %v, expected: %v", val, val2)
 	}
 }
 
 func testEmptyValSet(t *testing.T) {
-	valSet := NewValidatorSet([]*Validator{})
+	valSet, r := NewSet([]byte{})
+	if !r {
+		t.Errorf("invalid validator set format")
+	}
 
 	// check size
 	if size := valSet.Size(); size != 0 {

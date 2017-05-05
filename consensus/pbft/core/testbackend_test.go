@@ -22,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
+	"github.com/ethereum/go-ethereum/consensus/pbft/validator"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	elog "github.com/ethereum/go-ethereum/log"
@@ -34,7 +35,7 @@ type testSystemBackend struct {
 	sys *testSystem
 
 	engine Engine
-	peers  *pbft.ValidatorSet
+	peers  pbft.ValidatorSet
 	events *event.TypeMux
 
 	commitMsgs []*pbft.Proposal
@@ -52,7 +53,7 @@ func (self *testSystemBackend) Address() common.Address {
 }
 
 // Peers returns all connected peers
-func (self *testSystemBackend) Validators() *pbft.ValidatorSet {
+func (self *testSystemBackend) Validators() pbft.ValidatorSet {
 	return self.peers
 }
 
@@ -60,7 +61,17 @@ func (self *testSystemBackend) EventMux() *event.TypeMux {
 	return self.events
 }
 
-func (self *testSystemBackend) Send(message []byte) error {
+func (self *testSystemBackend) Send(message []byte, target common.Address) error {
+	testLogger.Info("enqueuing a message...", "address", self.Address())
+	self.sentMsgs = append(self.sentMsgs, message)
+	self.sys.queuedMessage <- pbft.MessageEvent{
+		Address: self.Address(),
+		Payload: message,
+	}
+	return nil
+}
+
+func (self *testSystemBackend) Broadcast(message []byte) error {
 	testLogger.Info("enqueuing a message...", "address", self.Address())
 	self.sentMsgs = append(self.sentMsgs, message)
 	self.sys.queuedMessage <- pbft.MessageEvent{
@@ -193,23 +204,26 @@ func newTestSystem(n uint64) *testSystem {
 	}
 }
 
+func newTestValidatorSet(n int) pbft.ValidatorSet {
+	// generate validators
+	validators := make([]pbft.Validator, n)
+	b := []byte{}
+	for i := 0; i < n; i++ {
+		// TODO: the private key should be stored if we want to add new feature for sign data
+		privateKey, _ := crypto.GenerateKey()
+		validators[i] = validator.New(crypto.PubkeyToAddress(privateKey.PublicKey))
+		b = append(b, validators[i].Address().Bytes()...)
+	}
+	vset, _ := validator.NewSet(b)
+
+	return vset
+}
+
 // FIXME: int64 is needed for N and F
 func NewTestSystemWithBackend(n, f uint64) *testSystem {
 	testLogger.SetHandler(elog.StdoutHandler)
 
-	// generate validators
-	peers := make([]*pbft.Validator, int(n))
-	for i := uint64(0); i < n; i++ {
-		// TODO: the private key should be stored if we want to add new feature for sign data
-		privateKey, err := crypto.GenerateKey()
-		if err != nil {
-			panic(err)
-		}
-
-		peers[i] = pbft.NewValidator(getPublicKeyAddress(privateKey))
-	}
-	vset := pbft.NewValidatorSet(peers)
-
+	vset := newTestValidatorSet(int(n))
 	sys := newTestSystem(n)
 
 	for i := uint64(0); i < n; i++ {
@@ -218,7 +232,7 @@ func NewTestSystemWithBackend(n, f uint64) *testSystem {
 		backend.address = vset.GetByIndex(i).Address()
 
 		core := New(backend).(*core)
-		core.current = pbft.NewLog(&pbft.Preprepare{
+		core.current = newSnapshot(&pbft.Preprepare{
 			View:     &pbft.View{},
 			Proposal: &pbft.Proposal{},
 		})

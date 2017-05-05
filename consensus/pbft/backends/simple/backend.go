@@ -56,7 +56,7 @@ func New(timeout int, eventMux *event.TypeMux, privateKey *ecdsa.PrivateKey, db 
 // ----------------------------------------------------------------------------
 type simpleBackend struct {
 	peerSet        *peerSet
-	valSet         *pbft.ValidatorSet
+	valSet         pbft.ValidatorSet
 	eventMux       *event.TypeMux
 	pbftEventMux   *event.TypeMux
 	privateKey     *ecdsa.PrivateKey
@@ -79,15 +79,37 @@ func (sb *simpleBackend) Address() common.Address {
 }
 
 // Validators implements pbft.Backend.Validators
-func (sb *simpleBackend) Validators() *pbft.ValidatorSet {
+func (sb *simpleBackend) Validators() pbft.ValidatorSet {
 	return sb.valSet
 }
 
-// Send implements pbft.Backend.Send
-func (sb *simpleBackend) Send(data []byte) error {
+func (sb *simpleBackend) Send(payload []byte, target common.Address) error {
 	pbftMsg := pbft.MessageEvent{
 		Address: sb.Address(),
-		Payload: data,
+		Payload: payload,
+	}
+	pbftByte, err := Encode(&pbftMsg)
+	if err != nil {
+		return err
+	}
+
+	peer := sb.peerSet.GetByAddress(target)
+	if peer == nil {
+		return errInvalidPeer
+	}
+
+	go sb.eventMux.Post(pbft.ConsensusDataEvent{
+		PeerID: peer.ID(),
+		Data:   pbftByte,
+	})
+	return nil
+}
+
+// Broadcast implements pbft.Backend.Send
+func (sb *simpleBackend) Broadcast(payload []byte) error {
+	pbftMsg := pbft.MessageEvent{
+		Address: sb.Address(),
+		Payload: payload,
 	}
 	pbftByte, err := Encode(&pbftMsg)
 	if err != nil {
@@ -152,16 +174,6 @@ func (sb *simpleBackend) Hash(x interface{}) (h common.Hash) {
 	return h
 }
 
-// Encode implements pbft.Backend.Encode
-func (sb *simpleBackend) Encode(v interface{}) ([]byte, error) {
-	return rlp.EncodeToBytes(v)
-}
-
-// Decode implements pbft.Backend.Decode
-func (sb *simpleBackend) Decode(b []byte, v interface{}) error {
-	return rlp.DecodeBytes(b, v)
-}
-
 // EventMux implements pbft.Backend.EventMux
 func (sb *simpleBackend) EventMux() *event.TypeMux {
 	// not implemented
@@ -182,20 +194,28 @@ func (sb *simpleBackend) Sign(data []byte) ([]byte, error) {
 
 // CheckSignature implements pbft.Backend.CheckSignature
 func (sb *simpleBackend) CheckSignature(data []byte, address common.Address, sig []byte) error {
+	signer, err := sb.getSignatureAddress(data, sig)
+	if err != nil {
+		log.Error("CheckSignature", "error", err)
+		return err
+	}
+	//Compare derived addresses
+	if bytes.Compare(signer.Bytes(), address.Bytes()) != 0 {
+		return pbft.ErrInvalidSignature
+	}
+	return nil
+}
+
+// get the signer address from the signature
+func (sb *simpleBackend) getSignatureAddress(data []byte, sig []byte) (common.Address, error) {
 	//1. Keccak data
 	hashData := crypto.Keccak256([]byte(data))
 	//2. Recover public key
 	pubkey, err := crypto.SigToPub(hashData, sig)
 	if err != nil {
-		log.Error("CheckSignature", "error", err)
-		return err
+		return common.Address{}, err
 	}
-	//3. Compare derived addresses
-	signer := crypto.PubkeyToAddress(*pubkey)
-	if bytes.Compare(signer.Bytes(), address.Bytes()) != 0 {
-		return pbft.ErrInvalidSignature
-	}
-	return nil
+	return crypto.PubkeyToAddress(*pubkey), nil
 }
 
 // UpdateState implements pbft.Backend.UpdateState

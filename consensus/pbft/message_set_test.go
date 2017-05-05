@@ -21,6 +21,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	set "gopkg.in/fatih/set.v0"
 )
 
@@ -38,7 +40,11 @@ func TestMessageSetWithPreprepare(t *testing.T) {
 	pp := &Preprepare{
 		View: view,
 		Proposal: &Proposal{
-			Header:  []byte{0x01},
+			Header: &ProposalHeader{
+				Sequence:   big.NewInt(10),
+				ParentHash: common.HexToHash("0x1234567890"),
+				DataHash:   common.HexToHash("0x9876543210"),
+			},
 			Payload: []byte{0x02},
 			Signatures: [][]byte{
 				[]byte{0x01, 0x03},
@@ -109,7 +115,11 @@ func TestMessageSetWithSubject(t *testing.T) {
 	added, err = ms.Add(&Preprepare{
 		View: view,
 		Proposal: &Proposal{
-			Header:  []byte{0x01},
+			Header: &ProposalHeader{
+				Sequence:   big.NewInt(10),
+				ParentHash: common.HexToHash("0x1234567890"),
+				DataHash:   common.HexToHash("0x9876543210"),
+			},
 			Payload: []byte{0x02},
 			Signatures: [][]byte{
 				[]byte{0x01, 0x03},

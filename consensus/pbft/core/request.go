@@ -18,7 +18,7 @@ package core
 
 import "github.com/ethereum/go-ethereum/consensus/pbft"
 
-func (c *core) handleRequest(request *pbft.Request, p *pbft.Validator) error {
+func (c *core) handleRequest(request *pbft.Request, p pbft.Validator) error {
 	logger := c.logger.New("state", c.state)
 	logger.Debug("handleRequest")
 

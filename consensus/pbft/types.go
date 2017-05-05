@@ -84,7 +84,7 @@ type ProposalHeader struct {
 }
 
 type Proposal struct {
-	Header     []byte
+	Header     *ProposalHeader
 	Payload    []byte
 	Signatures [][]byte
 }
@@ -127,4 +127,5 @@ type Checkpoint struct {
 func init() {
 	gob.Register(&Preprepare{})
 	gob.Register(&Subject{})
+	gob.Register(&Checkpoint{})
 }

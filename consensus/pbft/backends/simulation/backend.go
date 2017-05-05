@@ -17,247 +17,229 @@
 package simulation
 
 import (
-	"crypto/ecdsa"
-	"strconv"
+	"bytes"
+	"math/big"
+	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
+	"github.com/ethereum/go-ethereum/consensus/pbft/backends/simple"
+	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
-type CommitEvent struct {
-	Payload []byte
-}
+const (
+	extraVanity = 32 // Fixed number of extra-data prefix bytes reserved for signer vanity
+	extraSeal   = 65 // Fixed number of extra-data suffix bytes reserved for signer seal
 
-var peers []*peer = []*peer{
-	newPeer(uint64(0)),
-	newPeer(uint64(1)),
-	newPeer(uint64(2)),
-	newPeer(uint64(3)),
-}
+	PBFTMsg = 0x11
+)
 
-func NewBackend(id uint64) *Backend {
-	db, _ := ethdb.NewMemDatabase()
-	backend := &Backend{
-		address: peers[id].Address(),
-		peerID:  id,
-		me:      peers[id],
-		peers:   make([]*peer, len(peers)),
-		logger:  log.New("backend", "simulated", "id", id),
-		mux:     new(event.TypeMux),
-		db:      db,
+func New(nodeKey *NodeKey, genesis *core.Genesis) *ProtocolManager {
+	eventMux := new(event.TypeMux)
+	memDB, _ := ethdb.NewMemDatabase()
+	backend := simple.New(3000, eventMux, nodeKey.PrivateKey(), memDB)
+	p := newPeer(nodeKey)
+	pm := &ProtocolManager{
+		rwMutex:  new(sync.RWMutex),
+		backend:  backend,
+		db:       memDB,
+		chain:    newTestBlockChain(genesis, eventMux, backend, memDB),
+		eventMux: eventMux,
+		me:       p,
+		peers:    make(map[string]*peer),
+		logger:   log.New("backend", "simulated", "id", p.ID()),
 	}
-	var vals []*pbft.Validator
-	for _, peer := range peers {
-		vals = append(vals, pbft.NewValidator(peer.Address()))
-	}
-	backend.valSet = pbft.NewValidatorSet(vals)
 
-	backend.peers[id] = peers[id]
-
-	go func() {
-		for {
-			m, err := backend.me.ReadMsg()
-			if err != nil {
-				backend.logger.Error("Failed to ReadMsg", "error", err)
-				continue
-			}
-
-			defer m.Discard()
-
-			// log.Debug("New message", "peer", peer, "msg", m)
-
-			var payload []byte
-			err = m.Decode(&payload)
-			if err != nil {
-				backend.logger.Error("Failed to read payload", "error", err, "msg", m)
-				continue
-			}
-
-			go backend.mux.Post(pbft.MessageEvent{
-				Address: backend.peers[m.Code].Address(),
-				Payload: payload,
-			})
-		}
-	}()
-
-	return backend
+	return pm
 }
 
 // ----------------------------------------------------------------------------
 
-type Backend struct {
-	address common.Address
-	mux     *event.TypeMux
-	appMux  *event.TypeMux
-	peerID  uint64
-	me      *peer
-	valSet  *pbft.ValidatorSet
-	peers   []*peer
-	logger  log.Logger
-	db      ethdb.Database
+type ProtocolManager struct {
+	rwMutex *sync.RWMutex
+
+	backend  consensus.PBFT
+	db       ethdb.Database
+	chain    *core.BlockChain
+	eventMux *event.TypeMux
+	eventSub *event.TypeMuxSubscription
+	me       *peer
+	peers    map[string]*peer
+	logger   log.Logger
 }
 
-// Address implements pbft.Backend.Address
-func (sb *Backend) Address() common.Address {
-	return sb.address
+func (pm *ProtocolManager) Start() {
+	pm.eventSub = pm.eventMux.Subscribe(
+		pbft.ConsensusDataEvent{},
+		pbft.ConsensusCommitBlockEvent{},
+		// XXX: Which event should we listen? core.ChainHeadEvent or core.ChainEvent?
+		core.ChainHeadEvent{})
+	go pm.consensusEventLoop()
+
+	pm.backend.Start(pm.chain)
+	go pm.handlePeerMessage()
 }
 
-// Validators implements pbft.Backend.Validators
-func (sb *Backend) Validators() *pbft.ValidatorSet {
-	return sb.valSet
+func (pm *ProtocolManager) Stop() {
+	pm.me.Close()
+	pm.backend.Stop()
+	pm.eventSub.Unsubscribe()
 }
 
-// Send implements pbft.Backend.Send
-func (sb *Backend) Send(payload []byte) error {
-	go func() {
-		for _, p := range peers {
-			if p.Address() != sb.me.Address() {
-				p2p.Send(p, sb.peerID, payload)
-			} else {
-				go sb.mux.Post(pbft.MessageEvent{
-					Address: sb.Address(),
-					Payload: payload,
-				})
-			}
+func (pm *ProtocolManager) TryNewRequest() {
+	// try to make next block
+	pm.newRequest(pm.chain.Genesis())
+}
+
+func (pm *ProtocolManager) SelfPeer() *peer {
+	return pm.me
+}
+
+func (pm *ProtocolManager) AddPeer(p *peer) {
+	pm.rwMutex.Lock()
+	defer pm.rwMutex.Unlock()
+	if p.ID() != pm.me.ID() {
+		pm.peers[p.ID()] = p
+		pm.backend.AddPeer(p.ID(), p.PublicKey())
+	}
+}
+
+func (pm *ProtocolManager) handlePeerMessage() {
+	for {
+		payload, err := pm.readPeerMessage()
+		if err != nil {
+			return
 		}
-	}()
-	return nil
+
+		// FIXME: pass first peer id for test, the real source is hidden in payload
+		pm.rwMutex.RLock()
+		var randP *peer
+		for _, p := range pm.peers {
+			randP = p
+			break
+		}
+		pm.rwMutex.RUnlock()
+		pm.backend.HandleMsg(randP.ID(), payload)
+	}
 }
 
-// Commit implements pbft.Backend.Commit
-func (sb *Backend) Commit(proposal *pbft.Proposal) error {
-	go sb.mux.Post(CommitEvent{
-		Payload: proposal.Payload,
-	})
-	return nil
-}
-
-// Hash implements pbft.Backend.Hash
-func (sb *Backend) Hash(x interface{}) (h common.Hash) {
-	hw := sha3.NewKeccak256()
-	rlp.Encode(hw, x)
-	hw.Sum(h[:0])
-	return h
-}
-
-// Encode implements pbft.Backend.Encode
-func (sb *Backend) Encode(v interface{}) ([]byte, error) {
-	return rlp.EncodeToBytes(v)
-}
-
-// Decode implements pbft.Backend.Decode
-func (sb *Backend) Decode(b []byte, v interface{}) error {
-	return rlp.DecodeBytes(b, v)
-}
-
-// EventMux implements pbft.Backend.EventMux
-func (sb *Backend) EventMux() *event.TypeMux {
-	return sb.mux
-}
-
-// Verify implements pbft.Backend.Verify
-func (sb *Backend) Verify(proposal *pbft.Proposal) (bool, error) {
-	// not implemented
-	return true, nil
-}
-
-// Sign implements pbft.Backend.Sign
-func (sb *Backend) Sign(data []byte) ([]byte, error) {
-	// not implemented
-	return data, nil
-}
-
-// CheckSignature implements pbft.Backend.CheckSignature
-func (sb *Backend) CheckSignature(data []byte, addr common.Address, sig []byte) error {
-	// not implemented
-	return nil
-}
-
-// UpdateState implements pbft.Backend.UpdateState
-func (sb *Backend) UpdateState(*pbft.State) error {
-	// not implemented
-	return nil
-}
-
-// ViewChanged implements pbft.Backend.ViewChanged
-func (sb *Backend) ViewChanged(needNewProposal bool) error {
-	// not implemented
-	return nil
-}
-
-// AddPeer implements consensus.PBFT.AddPeer
-func (sb *Backend) AddPeer(peerID string, publicKey *ecdsa.PublicKey) error {
-	numID, err := strconv.ParseInt(peerID, 10, 64)
+func (pm *ProtocolManager) readPeerMessage() ([]byte, error) {
+	m, err := pm.me.ReadMsg()
 	if err != nil {
-		sb.logger.Error("Invalid peer ID", "id", peerID)
-		return pbft.ErrInvalidPeerId
+		pm.logger.Error("Failed to ReadMsg", "error", err)
+		return nil, err
 	}
-	if sb.peerID == uint64(numID) {
-		sb.logger.Error("Don't add myself", sb.peerID, numID)
-		return pbft.ErrInvalidPeerId
-	}
+	defer m.Discard()
 
-	sb.peers[numID] = peers[numID]
-	return nil
-}
-
-// RemovePeer implements consensus.PBFT.RemovePeer
-func (sb *Backend) RemovePeer(peerID string) error {
-	return nil
-}
-
-// HandleMsg implements consensus.PBFT.HandleMsg
-func (sb *Backend) HandleMsg(peerID string, data []byte) error {
-	// TODO: forward pbft message to pbft engine
-	return nil
-}
-
-// Start implements consensus.PBFT.Start
-func (sb *Backend) Start(chain consensus.ChainReader) error {
-	return nil
-}
-
-// Stop implements consensus.PBFT.Stop
-func (sb *Backend) Stop() error {
-	return nil
-}
-
-func (sb *Backend) NewRequest(payload []byte) {
-	go sb.mux.Post(pbft.RequestEvent{
-		Payload: payload,
-	})
-}
-
-func (sb *Backend) Save(key string, val interface{}) error {
-	blob, err := sb.Encode(val)
+	var payload []byte
+	err = m.Decode(&payload)
 	if err != nil {
-		return err
+		pm.logger.Error("Failed to read payload", "error", err, "msg", m)
+		return nil, err
 	}
-	return sb.db.Put(toDatabaseKey(sb.Hash, key), blob)
+	return payload, nil
 }
 
-func (sb *Backend) Restore(key string, val interface{}) error {
-	blob, err := sb.db.Get(toDatabaseKey(sb.Hash, key))
+func (pm *ProtocolManager) consensusEventLoop() {
+	for obj := range pm.eventSub.Chan() {
+		switch ev := obj.Data.(type) {
+		case pbft.ConsensusDataEvent:
+			pm.sendEvent(ev)
+		case pbft.ConsensusCommitBlockEvent:
+			pm.commitBlock(ev.Block)
+		// After block insertion, we post a CheckpointEvent and make a new request
+		case core.ChainHeadEvent:
+			go pm.backend.(pbft.Backend).EventMux().Post(pbft.CheckpointEvent{
+				BlockNumber: ev.Block.Number(),
+				BlockHash:   ev.Block.Hash(),
+			})
+			go pm.newRequest(pm.chain.CurrentBlock())
+		}
+	}
+}
+
+func (pm *ProtocolManager) sendEvent(event pbft.ConsensusDataEvent) {
+	pm.rwMutex.RLock()
+	defer pm.rwMutex.RUnlock()
+
+	p := pm.peers[event.PeerID]
+	if p == nil {
+		return
+	}
+	p2p.Send(p, PBFTMsg, event.Data)
+}
+
+func (pm *ProtocolManager) commitBlock(block *types.Block) {
+	pm.chain.InsertChain([]*types.Block{block})
+}
+
+func (pm *ProtocolManager) newRequest(lastBlock *types.Block) {
+	block := pm.makeBlock(lastBlock)
+	// only proposer can make block; otherwise, will get nil
+	if block == nil {
+		return
+	}
+
+	// proposer gets new block after Seal and commit it directly
+	// non-proposer validators get new block by receiving ConsensusCommitBlockEvent
+	newBlock, err := pm.backend.Seal(pm.chain, block, nil)
+	if newBlock != nil && err == nil {
+		pm.commitBlock(newBlock)
+	}
+}
+
+func (pm *ProtocolManager) makeBlock(parent *types.Block) *types.Block {
+	header := &types.Header{
+		ParentHash: parent.Hash(),
+		Number:     parent.Number().Add(parent.Number(), common.Big1),
+		GasLimit:   core.CalcGasLimit(parent),
+		GasUsed:    new(big.Int),
+		Extra:      parent.Extra(),
+		Time:       big.NewInt(time.Now().Unix()),
+	}
+
+	if err := pm.backend.Prepare(pm.chain, header); err != nil {
+		return nil
+	}
+
+	state, err := pm.chain.StateAt(parent.Root())
 	if err != nil {
-		return err
+		return nil
 	}
-	return sb.Decode(blob, val)
+
+	block, err := pm.backend.Finalize(pm.chain, header, state, nil, nil, nil)
+	if err != nil {
+		return nil
+	}
+
+	return block
 }
 
-func toDatabaseKey(hashfn func(val interface{}) common.Hash, key string) []byte {
-	return hashfn("pbft-simulation-backend-" + key).Bytes()
+func newTestBlockChain(genesis *core.Genesis, eventMux *event.TypeMux, engine consensus.Engine, db ethdb.Database) *core.BlockChain {
+	genesis.MustCommit(db)
+	blockchain, err := core.NewBlockChain(db, genesis.Config, engine, eventMux, vm.Config{})
+	if err != nil {
+		panic(err)
+	}
+	return blockchain
 }
 
-func (sb *Backend) IsProposer() bool {
-	if sb.valSet == nil {
-		return false
+func AppendValidators(genesis *core.Genesis, addrs []common.Address) {
+	if len(genesis.ExtraData) < extraVanity {
+		genesis.ExtraData = append(genesis.ExtraData, bytes.Repeat([]byte{0x00}, extraVanity)...)
 	}
-	return sb.valSet.IsProposer(sb.address)
+	genesis.ExtraData = genesis.ExtraData[:extraVanity]
+
+	for _, addr := range addrs {
+		genesis.ExtraData = append(genesis.ExtraData, addr[:]...)
+	}
+	genesis.ExtraData = append(genesis.ExtraData, make([]byte, extraSeal)...)
 }

@@ -18,7 +18,6 @@ package core
 
 import (
 	"math/big"
-	"reflect"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/consensus/pbft"
@@ -26,7 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-func TestHandlePrepare(t *testing.T) {
+func TestHandleCommit(t *testing.T) {
 	N := uint64(4)
 	F := uint64(1)
 
@@ -53,7 +52,7 @@ func TestHandlePrepare(t *testing.T) {
 
 					if i == 0 {
 						// replica 0 is primary
-						c.state = StatePreprepared
+						c.state = StatePrepared
 					}
 				}
 				return sys
@@ -71,7 +70,7 @@ func TestHandlePrepare(t *testing.T) {
 					if i == 0 {
 						// replica 0 is primary
 						c.subject = expectedSubject
-						c.state = StatePreprepared
+						c.state = StatePrepared
 					} else {
 						c.subject = &pbft.Subject{
 							View: &pbft.View{
@@ -96,7 +95,7 @@ func TestHandlePrepare(t *testing.T) {
 					if i == 0 {
 						// replica 0 is primary
 						c.subject = expectedSubject
-						c.state = StatePreprepared
+						c.state = StatePrepared
 					} else {
 						c.subject = &pbft.Subject{
 							View: &pbft.View{
@@ -124,7 +123,7 @@ func TestHandlePrepare(t *testing.T) {
 
 					if i == 0 {
 						// replica 0 is primary
-						c.state = StatePreprepared
+						c.state = StatePrepared
 					}
 				}
 				return sys
@@ -150,51 +149,49 @@ OUTER:
 			}
 		}
 
-		// prepared is normal case
-		if r0.state != StatePrepared {
+		// StateAcceptRequest is normal case
+		if r0.state != StateAcceptRequest {
 			// There are not enough prepared messages in core
-			if r0.state != StatePreprepared {
-				t.Error("state should be preprepared")
+			if r0.state != StatePrepared {
+				t.Error("state should be prepared")
 			}
-			if int64(r0.current.Prepares.Size()) > 2*r0.F {
-				t.Error("prepare messages size should less than ", 2*r0.F+1)
+			if int64(r0.current.Commits.Size()) > 2*r0.F {
+				t.Error("commit messages size should less than ", 2*r0.F+1)
 			}
 
 			continue
 		}
 
 		// core should have 2F+1 prepare messages
-		if int64(r0.current.Prepares.Size()) <= 2*r0.F {
+		if int64(r0.current.Commits.Size()) <= 2*r0.F {
 			t.Error("prepare messages size should greater than 2F+1, size:", r0.current.Prepares.Size())
 		}
 
-		// a message will be delivered to backend if 2F+1
-		if int64(len(v0.sentMsgs)) != 1 {
-			t.Error("the Send() should be called once, got:", len(test.system.backends[0].sentMsgs))
+		if len(v0.commitMsgs) != 1 {
+			t.Error("expected length of commit messages should be 1")
 		}
 
-		// verify commit messages
-		var decodedMsg pbft.Message
-		err := pbft.Decode(v0.sentMsgs[0], &decodedMsg)
-		if err != nil {
-			t.Error("failed to parse")
+		if len(r0.snapshots) != 1 {
+			t.Error("expected length of consensus logs should be 1")
 		}
 
-		if decodedMsg.Code != pbft.MsgCommit {
-			t.Error("message code is not the same")
+		// status should be completed
+		if !r0.completed {
+			t.Error("completed should be true")
 		}
-		m, ok := decodedMsg.Msg.(*pbft.Subject)
-		if !ok {
-			t.Error("failed to decode Prepare")
+
+		if r0.viewNumber.Uint64() != uint64(0) {
+			t.Error("expected default view number should be 0")
 		}
-		if !reflect.DeepEqual(m, expectedSubject) {
-			t.Error("subject should be the same")
+
+		if r0.sequence.Uint64() != uint64(0) {
+			t.Error("expected default sequence number should be 0")
 		}
 	}
 }
 
 // view number is not checked for now
-func TestVerifyPrepare(t *testing.T) {
+func TestVerifyCommit(t *testing.T) {
 	// for log purpose
 	privateKey, _ := crypto.GenerateKey()
 	peer := validator.New(getPublicKeyAddress(privateKey))
@@ -204,37 +201,25 @@ func TestVerifyPrepare(t *testing.T) {
 	testCases := []struct {
 		expected error
 
-		prepare *pbft.Subject
-		self    *pbft.Subject
+		commit *pbft.Subject
+		self   *pbft.Subject
 	}{
 		{
 			// normal case
 			expected: nil,
-			prepare: &pbft.Subject{
+			commit: &pbft.Subject{
 				View:   &pbft.View{ViewNumber: big.NewInt(0), Sequence: big.NewInt(0)},
 				Digest: []byte{1},
 			},
 			self: &pbft.Subject{
 				View:   &pbft.View{ViewNumber: big.NewInt(0), Sequence: big.NewInt(0)},
-				Digest: []byte{1},
-			},
-		},
-		{
-			// old message
-			expected: pbft.ErrOldMessage,
-			prepare: &pbft.Subject{
-				View:   &pbft.View{ViewNumber: big.NewInt(0), Sequence: big.NewInt(0)},
-				Digest: []byte{1},
-			},
-			self: &pbft.Subject{
-				View:   &pbft.View{ViewNumber: big.NewInt(1), Sequence: big.NewInt(1)},
 				Digest: []byte{1},
 			},
 		},
 		{
 			// malicious package(lack of sequence)
 			expected: pbft.ErrSubjectNotMatched,
-			prepare: &pbft.Subject{
+			commit: &pbft.Subject{
 				View:   &pbft.View{ViewNumber: big.NewInt(0), Sequence: nil},
 				Digest: []byte{1},
 			},
@@ -244,9 +229,9 @@ func TestVerifyPrepare(t *testing.T) {
 			},
 		},
 		{
-			// wrong prepare message with same sequence but different view number
+			// wrong commit message with same sequence but different view number
 			expected: pbft.ErrSubjectNotMatched,
-			prepare: &pbft.Subject{
+			commit: &pbft.Subject{
 				View:   &pbft.View{ViewNumber: big.NewInt(1), Sequence: big.NewInt(0)},
 				Digest: []byte{1},
 			},
@@ -256,9 +241,9 @@ func TestVerifyPrepare(t *testing.T) {
 			},
 		},
 		{
-			// wrong prepare message with same view number but different sequence
+			// wrong commit message with same view number but different sequence
 			expected: pbft.ErrSubjectNotMatched,
-			prepare: &pbft.Subject{
+			commit: &pbft.Subject{
 				View:   &pbft.View{ViewNumber: big.NewInt(0), Sequence: big.NewInt(1)},
 				Digest: []byte{1},
 			},
@@ -272,7 +257,7 @@ func TestVerifyPrepare(t *testing.T) {
 		c := sys.backends[0].engine.(*core)
 		c.subject = test.self
 
-		if err := c.verifyPrepare(test.prepare, peer); err != nil {
+		if err := c.verifyCommit(test.commit, peer); err != nil {
 			if err != test.expected {
 				t.Errorf("expected result is not the same (%d), err:%v", i, err)
 			}

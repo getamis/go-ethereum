@@ -28,7 +28,7 @@ func (c *core) sendPrepare() {
 	c.broadcast(pbft.MsgPrepare, c.subject)
 }
 
-func (c *core) handlePrepare(prepare *pbft.Subject, src *pbft.Validator) error {
+func (c *core) handlePrepare(prepare *pbft.Subject, src pbft.Validator) error {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 	logger.Debug("handlePrepare")
 
@@ -51,7 +51,7 @@ func (c *core) handlePrepare(prepare *pbft.Subject, src *pbft.Validator) error {
 	return nil
 }
 
-func (c *core) verifyPrepare(prepare *pbft.Subject, src *pbft.Validator) error {
+func (c *core) verifyPrepare(prepare *pbft.Subject, src pbft.Validator) error {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 
 	if prepare.View.Sequence != nil &&
@@ -62,17 +62,17 @@ func (c *core) verifyPrepare(prepare *pbft.Subject, src *pbft.Validator) error {
 	}
 
 	if !reflect.DeepEqual(prepare, c.subject) {
-		logger.Warn("Subject not match", "expected", c.subject, "got", prepare)
+		logger.Warn("Subjects do not match", "expected", c.subject, "got", prepare)
 		return pbft.ErrSubjectNotMatched
 	}
 
 	return nil
 }
 
-func (c *core) acceptPrepare(prepare *pbft.Subject, src *pbft.Validator) {
+func (c *core) acceptPrepare(prepare *pbft.Subject, src pbft.Validator) {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 
 	if _, err := c.current.Prepares.Add(prepare, src); err != nil {
-		logger.Error("Failed to log prepare message", "msg", prepare, "error", err)
+		logger.Error("Failed to record prepare message", "msg", prepare, "error", err)
 	}
 }

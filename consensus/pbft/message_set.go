@@ -29,7 +29,7 @@ type MessageSet interface {
 	Sequence() *big.Int
 	ViewNumber() *big.Int
 	Type() reflect.Type
-	Add(interface{}, *Validator) (bool, error)
+	Add(interface{}, Validator) (bool, error)
 	Size() int
 }
 
@@ -52,7 +52,7 @@ type messageSet struct {
 }
 
 type validatorMessage struct {
-	val     *Validator
+	val     Validator
 	message interface{}
 }
 
@@ -77,7 +77,7 @@ func (ms *messageSet) Type() reflect.Type {
 	return ms.msgType
 }
 
-func (ms *messageSet) Add(msg interface{}, validator *Validator) (bool, error) {
+func (ms *messageSet) Add(msg interface{}, validator Validator) (bool, error) {
 	m := validatorMessage{
 		val:     validator,
 		message: msg,

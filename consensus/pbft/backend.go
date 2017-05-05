@@ -27,13 +27,16 @@ type Backend interface {
 	Address() common.Address
 
 	// Validators returns validator set
-	Validators() *ValidatorSet
+	Validators() ValidatorSet
 
 	// EventMux is defined to handle request event and pbft message event
 	EventMux() *event.TypeMux
 
-	// Send is to send pbft message to peers
-	Send([]byte) error
+	// Send is to send pbft message to specific peer
+	Send(payload []byte, target common.Address) error
+
+	// Broadcast is to send pbft message to all peers
+	Broadcast(payload []byte) error
 
 	// UpdateState is to update the current pbft state to backend
 	UpdateState(*State) error
@@ -58,8 +61,6 @@ type Backend interface {
 
 	// FIXME: Hash, Encode, Decode and SetHandler are workaround functions for developing
 	Hash(b interface{}) common.Hash
-	Encode(b interface{}) ([]byte, error)
-	Decode([]byte, interface{}) error
 
 	Persistence
 }

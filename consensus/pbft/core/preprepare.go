@@ -38,7 +38,7 @@ func (c *core) sendPreprepare(request *pbft.Request) {
 	}
 }
 
-func (c *core) handlePreprepare(preprepare *pbft.Preprepare, src *pbft.Validator) error {
+func (c *core) handlePreprepare(preprepare *pbft.Preprepare, src pbft.Validator) error {
 	logger := log.New("from", src.Address().Hex(), "state", c.state)
 	logger.Debug("handlePreprepare")
 
@@ -79,7 +79,6 @@ func (c *core) acceptPreprepare(preprepare *pbft.Preprepare) {
 	}
 
 	c.subject = subject
-	c.current = pbft.NewLog(preprepare)
-	c.checkpointMsgs = make(map[uint64]*pbft.Checkpoint)
+	c.current = newSnapshot(preprepare)
 	c.completed = false
 }

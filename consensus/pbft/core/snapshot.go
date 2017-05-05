@@ -14,27 +14,31 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package pbft
+package core
 
 import (
 	"math/big"
 	"reflect"
+
+	"github.com/ethereum/go-ethereum/consensus/pbft"
 )
 
-func NewLog(preprepare *Preprepare) *Log {
-	return &Log{
-		ViewNumber: preprepare.View.ViewNumber,
-		Sequence:   preprepare.View.Sequence,
-		Preprepare: preprepare,
-		Prepares:   NewMessageSet(preprepare.View, reflect.TypeOf(&Subject{})),
-		Commits:    NewMessageSet(preprepare.View, reflect.TypeOf(&Subject{})),
+func newSnapshot(preprepare *pbft.Preprepare) *snapshot {
+	return &snapshot{
+		ViewNumber:  preprepare.View.ViewNumber,
+		Sequence:    preprepare.View.Sequence,
+		Preprepare:  preprepare,
+		Prepares:    pbft.NewMessageSet(preprepare.View, reflect.TypeOf(&pbft.Subject{})),
+		Commits:     pbft.NewMessageSet(preprepare.View, reflect.TypeOf(&pbft.Subject{})),
+		Checkpoints: pbft.NewMessageSet(preprepare.View, reflect.TypeOf(&pbft.Checkpoint{})),
 	}
 }
 
-type Log struct {
-	ViewNumber *big.Int
-	Sequence   *big.Int
-	Preprepare *Preprepare
-	Prepares   MessageSet
-	Commits    MessageSet
+type snapshot struct {
+	ViewNumber  *big.Int
+	Sequence    *big.Int
+	Preprepare  *pbft.Preprepare
+	Prepares    pbft.MessageSet
+	Commits     pbft.MessageSet
+	Checkpoints pbft.MessageSet
 }

@@ -16,8 +16,12 @@
 
 package pbft
 
-import "github.com/ethereum/go-ethereum/core/types"
-import "github.com/ethereum/go-ethereum/common"
+import (
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+)
 
 type ConsensusDataEvent struct {
 	// peer id for send p2p message
@@ -42,4 +46,9 @@ type ConnectionEvent struct {
 type MessageEvent struct {
 	Address common.Address
 	Payload []byte
+}
+
+type CheckpointEvent struct {
+	BlockNumber *big.Int
+	BlockHash   common.Hash
 }

@@ -37,7 +37,12 @@ const (
 	StateCheckpointReady
 )
 
+const (
+	keyStableCheckpoint = "StableCheckpoint"
+)
+
 type State uint64
+
 type Engine interface {
 	Start() error
 	Stop() error
@@ -48,24 +53,18 @@ func New(backend pbft.Backend) Engine {
 	n := int64(backend.Validators().Size())
 	f := int64(math.Ceil(float64(n)/3) - 1)
 	return &core{
-		address:        backend.Address(),
-		N:              n,
-		F:              f,
-		state:          StateAcceptRequest,
-		logger:         log.New("address", backend.Address().Hex()),
-		backend:        backend,
-		checkpointMsgs: make(map[uint64]*pbft.Checkpoint),
-		sequence:       new(big.Int),
-		viewNumber:     new(big.Int),
-		events: backend.EventMux().Subscribe(
-			pbft.RequestEvent{},
-			pbft.ConnectionEvent{},
-			pbft.MessageEvent{},
-			backlogEvent{},
-		),
-		backlogs:        make(map[*pbft.Validator]*prque.Prque),
-		backlogsMu:      new(sync.Mutex),
-		consensusLogsMu: new(sync.RWMutex),
+		address:     backend.Address(),
+		N:           n,
+		F:           f,
+		state:       StateAcceptRequest,
+		logger:      log.New("address", backend.Address().Hex()),
+		backend:     backend,
+		sequence:    new(big.Int),
+		viewNumber:  new(big.Int),
+		internalMux: new(event.TypeMux),
+		backlogs:    make(map[pbft.Validator]*prque.Prque),
+		backlogsMu:  new(sync.Mutex),
+		snapshotsMu: new(sync.RWMutex),
 	}
 }
 
@@ -81,36 +80,39 @@ type core struct {
 	backend pbft.Backend
 	events  *event.TypeMuxSubscription
 
+	internalMux    *event.TypeMux
+	internalEvents *event.TypeMuxSubscription
+
 	sequence   *big.Int
 	viewNumber *big.Int
 	completed  bool
 
 	subject *pbft.Subject
 
-	checkpointMsgs map[uint64]*pbft.Checkpoint
-
-	backlogs   map[*pbft.Validator]*prque.Prque
+	backlogs   map[pbft.Validator]*prque.Prque
 	backlogsMu *sync.Mutex
 
-	current         *pbft.Log
-	consensusLogs   []*pbft.Log
-	consensusLogsMu *sync.RWMutex
+	current     *snapshot
+	snapshots   []*snapshot
+	snapshotsMu *sync.RWMutex
 }
 
 func (c *core) broadcast(code uint64, msg interface{}) {
+	logger := c.logger.New("state", c.state)
+
 	m, err := pbft.Encode(code, msg)
 	if err != nil {
-		log.Error("failed to encode message", "msg", msg, "error", err)
+		logger.Error("Failed to encode message", "msg", msg, "error", err)
 		return
 	}
 
 	payload, err := m.ToPayload()
 	if err != nil {
-		log.Error("failed to marshal message", "msg", msg, "error", err)
+		logger.Error("Failed to marshal message", "msg", msg, "error", err)
 		return
 	}
 
-	c.backend.Send(payload)
+	c.backend.Broadcast(payload)
 }
 
 func (c *core) nextSequence() *pbft.View {
@@ -133,15 +135,14 @@ func (c *core) isPrimary() bool {
 
 func (c *core) makeProposal(seq *big.Int, request *pbft.Request) *pbft.Proposal {
 	header := &pbft.ProposalHeader{
-		Sequence:   seq,
+		Sequence: seq,
+		// FIXME: use actual parent hash
 		ParentHash: c.backend.Hash(request.Payload),
 		DataHash:   c.backend.Hash(request.Payload),
 	}
 
-	rawHeader, _ := c.backend.Encode(header)
-
 	return &pbft.Proposal{
-		Header:  rawHeader,
+		Header:  header,
 		Payload: request.Payload,
 	}
 }
@@ -152,14 +153,20 @@ func (c *core) commit() {
 	logger.Debug("Ready to commit", "view", c.current.Preprepare.View)
 	c.backend.Commit(c.current.Preprepare.Proposal)
 
-	c.consensusLogsMu.Lock()
-	c.consensusLogs = append(c.consensusLogs, c.current)
-	c.consensusLogsMu.Unlock()
+	c.snapshotsMu.Lock()
+	c.snapshots = append(c.snapshots, c.current)
+	c.snapshotsMu.Unlock()
 
 	c.viewNumber = c.current.ViewNumber
 	c.sequence = c.current.Sequence
 	c.completed = true
 	c.setState(StateAcceptRequest)
+
+	// We build stable checkpoint every 100 requests
+	// FIXME: this should be passed by configuration
+	if new(big.Int).Mod(c.sequence, big.NewInt(100)).Int64() == 0 {
+		go c.sendInternalEvent(buildCheckpointEvent{})
+	}
 }
 
 func (c *core) setState(state State) {

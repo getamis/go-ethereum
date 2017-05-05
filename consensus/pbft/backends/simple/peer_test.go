@@ -32,6 +32,7 @@ var (
 func TestPeerSet(t *testing.T) {
 	testAddPeer(t)
 	testGetPeer(t)
+	testGetPeerByAddress(t)
 	testRemovePeer(t)
 }
 
@@ -72,6 +73,26 @@ func testGetPeer(t *testing.T) {
 	}
 }
 
+func testGetPeerByAddress(t *testing.T) {
+	peerSet := newPeerSet()
+	pub, _ := hexToECDSAPubKey(testHexPub)
+	peerID := "test-peer-id"
+	peer := newPeer(peerID, pub)
+
+	peerSet.Add(peer)
+	if p := peerSet.GetByAddress(peer.Address()); p != peer {
+		t.Errorf("get wrong peer, got:%v, expected: %v", p, peer)
+	}
+
+	// test get peer not in the peer set
+	pub2, _ := hexToECDSAPubKey(testHexPub2)
+	peerID2 := "test-peer-id2"
+	peer2 := newPeer(peerID2, pub2)
+	if p := peerSet.GetByAddress(peer2.Address()); p != nil {
+		t.Errorf("should not get any peer, got: %v, expected: nil", p)
+	}
+}
+
 func testRemovePeer(t *testing.T) {
 	peerSet := newPeerSet()
 	pub, _ := hexToECDSAPubKey(testHexPub)
@@ -79,7 +100,7 @@ func testRemovePeer(t *testing.T) {
 	peer := newPeer(peerID, pub)
 	peerSet.Add(peer)
 
-	pub2, _ := hexToECDSAPubKey(testHexPub)
+	pub2, _ := hexToECDSAPubKey(testHexPub2)
 	peerID2 := "test-peer-id2"
 	peer2 := newPeer(peerID2, pub2)
 	peerSet.Add(peer2)

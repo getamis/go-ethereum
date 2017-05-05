@@ -21,6 +21,9 @@ import (
 )
 
 type backlogEvent struct {
-	src *pbft.Validator
+	src pbft.Validator
 	msg *pbft.Message
+}
+
+type buildCheckpointEvent struct {
 }

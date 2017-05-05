@@ -20,6 +20,8 @@ import (
 	"math/big"
 	"reflect"
 	"testing"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
 func testPreprepare(t *testing.T) {
@@ -29,7 +31,11 @@ func testPreprepare(t *testing.T) {
 			Sequence:   big.NewInt(2),
 		},
 		Proposal: &Proposal{
-			Header:  []byte{0x01},
+			Header: &ProposalHeader{
+				Sequence:   big.NewInt(10),
+				ParentHash: common.HexToHash("0x1234567890"),
+				DataHash:   common.HexToHash("0x9876543210"),
+			},
 			Payload: []byte{0x02},
 			Signatures: [][]byte{
 				[]byte{0x01},

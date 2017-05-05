@@ -14,33 +14,34 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package simple
+package simulation
 
 import (
+	"crypto/ecdsa"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
-const (
-	dbKeyPrefix = "pbft-backend-"
-)
-
-func (sb *simpleBackend) Save(key string, val interface{}) error {
-	blob, err := rlp.EncodeToBytes(val)
-	if err != nil {
-		return err
+func NewNodeKey() *NodeKey {
+	key, _ := crypto.GenerateKey()
+	return &NodeKey{
+		key: key,
 	}
-	return sb.db.Put(toDatabaseKey(sb.Hash, key), blob)
 }
 
-func (sb *simpleBackend) Restore(key string, val interface{}) error {
-	blob, err := sb.db.Get(toDatabaseKey(sb.Hash, key))
-	if err != nil {
-		return err
-	}
-	return rlp.DecodeBytes(blob, val)
+type NodeKey struct {
+	key *ecdsa.PrivateKey
 }
 
-func toDatabaseKey(hashfn func(val interface{}) common.Hash, key string) []byte {
-	return hashfn(dbKeyPrefix + key).Bytes()
+func (p *NodeKey) Address() common.Address {
+	return crypto.PubkeyToAddress(p.key.PublicKey)
+}
+
+func (p *NodeKey) PublicKey() *ecdsa.PublicKey {
+	return &p.key.PublicKey
+}
+
+func (p *NodeKey) PrivateKey() *ecdsa.PrivateKey {
+	return p.key
 }
