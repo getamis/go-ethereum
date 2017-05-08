@@ -314,8 +314,10 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 			// if we don't need to change block, we keep waiting events.
 		case hash := <-sb.commit:
 			if block.Hash() == hash {
+				sb.commitErr <- nil
 				return block, nil
 			}
+			sb.commitErr <- errOtherBlockCommitted
 			return nil, errOtherBlockCommitted
 		case <-stop:
 			return nil, nil
@@ -386,11 +388,12 @@ func (sb *simpleBackend) NewChainHead(block *types.Block) {
 }
 
 // Start implements consensus.PBFT.Start
-func (sb *simpleBackend) Start(chain consensus.ChainReader) error {
+func (sb *simpleBackend) Start(chain consensus.ChainReader, inserter func(block *types.Block) error) error {
 	if err := sb.initValidatorSet(chain); err != nil {
 		return err
 	}
 	sb.chain = chain
+	sb.inserter = inserter
 	sb.core = pbftCore.New(sb)
 	return sb.core.Start()
 }

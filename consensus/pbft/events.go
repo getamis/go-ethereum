@@ -20,7 +20,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 )
 
 type ConsensusDataEvent struct {
@@ -28,11 +27,6 @@ type ConsensusDataEvent struct {
 	PeerID string
 	// consensus message data
 	Data []byte
-}
-
-type ConsensusCommitBlockEvent struct {
-	// block
-	Block *types.Block
 }
 
 type RequestEvent struct {

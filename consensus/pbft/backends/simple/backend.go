@@ -68,10 +68,12 @@ type simpleBackend struct {
 	db             ethdb.Database
 	timeout        uint64
 	chain          consensus.ChainReader
+	inserter       func(block *types.Block) error
 
 	// the channels for pbft engine notifications
 	viewChange chan bool
 	commit     chan common.Hash
+	commitErr  chan error
 }
 
 // Address implements pbft.Backend.Address
@@ -143,13 +145,16 @@ func (sb *simpleBackend) Commit(proposal *pbft.Proposal) error {
 	}
 	// it's a proposer
 	if sb.commit != nil {
-		go func() {
-			sb.commit <- block.Hash()
-		}()
+		sb.commitErr = make(chan error, 1)
+		closeCommitErr := func() {
+			close(sb.commitErr)
+		}
+		defer closeCommitErr()
+		sb.commit <- block.Hash()
+		return <-sb.commitErr
 	} else {
-		go sb.eventMux.Post(pbft.ConsensusCommitBlockEvent{Block: block})
+		return sb.inserter(block)
 	}
-	return nil
 }
 
 // ViewChanged implements pbft.Backend.ViewChanged

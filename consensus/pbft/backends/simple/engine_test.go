@@ -34,7 +34,12 @@ func newBlockChain(n int) (*core.BlockChain, *simpleBackend) {
 	if err != nil {
 		panic(err)
 	}
-	backend.Start(blockchain)
+	commitBlock := func(block *types.Block) error {
+		_, err := blockchain.InsertChain([]*types.Block{block})
+		return err
+	}
+	backend.Start(blockchain, commitBlock)
+
 	b, _ := backend.(*simpleBackend)
 
 	proposerAddr := b.valSet.GetProposer().Address()
@@ -225,7 +230,16 @@ func TestSealCommittedOtherHash(t *testing.T) {
 			if !ok {
 				t.Errorf("unexpected event comes, got: %v, expected: pbft.RequestEvent", reflect.TypeOf(ev.Data))
 			}
+			engine.commitErr = make(chan error, 1)
+			closeCommitErr := func() {
+				close(engine.commitErr)
+			}
+			defer closeCommitErr()
 			engine.commit <- common.StringToHash("1234567890")
+			err := <-engine.commitErr
+			if err != errOtherBlockCommitted {
+				t.Errorf("unexpected error comes, got: %v, expected: errOtherBlockCommitted", err)
+			}
 		}
 		eventSub.Unsubscribe()
 	}
