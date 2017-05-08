@@ -17,6 +17,7 @@
 package simple
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"errors"
 	"math/big"
@@ -57,6 +58,8 @@ var (
 	errInvalidCoinbase = errors.New("non-zero coinbase")
 	// errInvalidUncleHash is returned if a block contains an non-empty uncle list.
 	errInvalidUncleHash = errors.New("non empty uncle hash")
+	// errInconsistentValidatorSet is returned if the validator set is inconsistent
+	errInconsistentValidatorSet = errors.New("non empty uncle hash")
 )
 var (
 	defaultDifficulty = big.NewInt(1)
@@ -136,6 +139,10 @@ func (sb *simpleBackend) verifyCascadingFields(chain consensus.ChainReader, head
 	// Ensure that the block's timestamp isn't too close to it's parent
 	if parent == nil || parent.Number.Uint64() != number-1 || parent.Hash() != header.ParentHash {
 		return consensus.ErrUnknownAncestor
+	}
+	// Fixed validator set
+	if bytes.Compare(sb.getValidatorBytes(header), sb.getValidatorBytes(parent)) != 0 {
+		return errInconsistentValidatorSet
 	}
 	return sb.verifySigner(chain, header, parent)
 }
@@ -230,8 +237,9 @@ func (sb *simpleBackend) Prepare(chain consensus.ChainReader, header *types.Head
 		return consensus.ErrUnknownAncestor
 	}
 	// Ensure the extra data has all it's components
-	length := len(header.Extra)
-	header.Extra = header.Extra[:length-extraSeal]
+	length := len(parent.Extra)
+	header.Extra = make([]byte, 0)
+	header.Extra = append(header.Extra, parent.Extra[:length-extraSeal]...)
 	header.Extra = append(header.Extra, make([]byte, extraSeal)...)
 	// use the same difficulty for all blocks
 	header.Difficulty = defaultDifficulty
@@ -382,6 +390,7 @@ func (sb *simpleBackend) Start(chain consensus.ChainReader) error {
 	if err := sb.initValidatorSet(chain); err != nil {
 		return err
 	}
+	sb.chain = chain
 	sb.core = pbftCore.New(sb)
 	return sb.core.Start()
 }

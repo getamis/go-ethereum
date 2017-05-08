@@ -67,6 +67,7 @@ type simpleBackend struct {
 	quitSync       chan struct{}
 	db             ethdb.Database
 	timeout        uint64
+	chain          consensus.ChainReader
 
 	// the channels for pbft engine notifications
 	viewChange chan bool
@@ -181,9 +182,16 @@ func (sb *simpleBackend) EventMux() *event.TypeMux {
 }
 
 // Verify implements pbft.Backend.Verify
-func (sb *simpleBackend) Verify(proposal *pbft.Proposal) (bool, error) {
-	// not implemented
-	return true, nil
+func (sb *simpleBackend) Verify(proposal *pbft.Proposal) error {
+	// decode the proposal to block
+	block := &types.Block{}
+	err := rlp.DecodeBytes(proposal.Payload, block)
+	if err != nil {
+		log.Warn("decode block error", "err", err)
+		return err
+	}
+	// verify the header of proposed block
+	return sb.VerifyHeader(sb.chain, block.Header(), false)
 }
 
 // Sign implements pbft.Backend.Sign

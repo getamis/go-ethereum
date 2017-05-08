@@ -96,8 +96,8 @@ func (self *testSystemBackend) Commit(proposal *pbft.Proposal) error {
 	return nil
 }
 
-func (self *testSystemBackend) Verify(proposal *pbft.Proposal) (bool, error) {
-	return true, nil
+func (self *testSystemBackend) Verify(proposal *pbft.Proposal) error {
+	return nil
 }
 
 func (self *testSystemBackend) Sign(data []byte) ([]byte, error) {

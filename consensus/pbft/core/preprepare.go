@@ -46,6 +46,11 @@ func (c *core) handlePreprepare(preprepare *pbft.Preprepare, src pbft.Validator)
 		return errFutureMessage
 	}
 
+	if err := c.backend.Verify(preprepare.Proposal); err != nil {
+		logger.Warn("Verify proposal failed")
+		return err
+	}
+
 	if !c.backend.Validators().IsProposer(src.Address()) {
 		logger.Warn("Ignore preprepare messages from non-proposer")
 		return pbft.ErrNotFromProposer
