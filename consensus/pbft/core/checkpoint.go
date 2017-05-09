@@ -25,15 +25,25 @@ import (
 func (c *core) sendCheckpoint(cp *pbft.Subject) {
 	logger := c.logger.New("state", c.state)
 	logger.Debug("sendCheckpoint")
-	c.broadcast(pbft.MsgCheckpoint, cp)
+	c.broadcast(&pbft.Message{
+		Code: pbft.MsgCheckpoint,
+		Msg:  cp,
+	})
 }
 
-func (c *core) handleCheckpoint(cp *pbft.Subject, src pbft.Validator) error {
-	if cp == nil {
+func (c *core) handleCheckpoint(msg *pbft.Message, src pbft.Validator) error {
+	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
+
+	cp, ok := msg.Msg.(*pbft.Subject)
+	if !ok {
+		logger.Error("Invalid checkpoint message", "msg", msg)
 		return pbft.ErrInvalidMessage
 	}
+	if cp == nil {
+		logger.Warn("Ignore empty checkpoint messsage")
+		return pbft.ErrIgnored
+	}
 
-	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 	var snapshot *snapshot
 
 	logger.Debug("handleCheckpoint")

@@ -107,9 +107,9 @@ func (c *core) handleMsg(payload []byte, src pbft.Validator) error {
 	logger := c.logger.New("address", c.address.Hex(), "from", src.Address().Hex())
 
 	// Decode message
-	msg, err := pbft.Decode(payload, c.backend.CheckValidatorSignature)
-	if err != nil {
-		logger.Error("Failed to decode message", "error", err)
+	msg := new(pbft.Message)
+	if err := msg.FromPayload(payload, c.backend.CheckValidatorSignature); err != nil {
+		logger.Error("Failed to decode message from payload", "error", err)
 		return err
 	}
 
@@ -130,29 +130,13 @@ func (c *core) handle(msg *pbft.Message, src pbft.Validator) error {
 
 	switch msg.Code {
 	case pbft.MsgPreprepare:
-		m, ok := msg.Msg.(*pbft.Preprepare)
-		if !ok {
-			return errFailedDecodePreprepare
-		}
-		return testBacklog(c.handlePreprepare(m, src))
+		return testBacklog(c.handlePreprepare(msg, src))
 	case pbft.MsgPrepare:
-		m, ok := msg.Msg.(*pbft.Subject)
-		if !ok {
-			return errFailedDecodePrepare
-		}
-		return testBacklog(c.handlePrepare(m, src))
+		return testBacklog(c.handlePrepare(msg, src))
 	case pbft.MsgCommit:
-		m, ok := msg.Msg.(*pbft.Subject)
-		if !ok {
-			return errFailedDecodeCommit
-		}
-		return testBacklog(c.handleCommit(m, src))
+		return testBacklog(c.handleCommit(msg, src))
 	case pbft.MsgCheckpoint:
-		m, ok := msg.Msg.(*pbft.Subject)
-		if !ok {
-			return errFailedDecodeCheckpoint
-		}
-		return c.handleCheckpoint(m, src)
+		return c.handleCheckpoint(msg, src)
 	case pbft.MsgViewChange:
 	case pbft.MsgNewView:
 	default:

@@ -97,23 +97,43 @@ type core struct {
 	snapshotsMu *sync.RWMutex
 }
 
-func (c *core) broadcast(code uint64, msg interface{}) {
+func (c *core) finalizeMessage(msg *pbft.Message) ([]byte, error) {
+	// Add sender address
+	msg.Address = c.Address()
+
+	// Sign message
+	data, err := msg.PayloadNoSig()
+	if err != nil {
+		return nil, err
+	}
+	msg.Signature, err = c.backend.Sign(data)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to payload
+	payload, err := msg.Payload()
+	if err != nil {
+		return nil, err
+	}
+
+	return payload, nil
+}
+
+func (c *core) broadcast(msg *pbft.Message) {
 	logger := c.logger.New("state", c.state)
 
-	// Encode message
-	m, err := pbft.Encode(code, msg, c.backend.Sign)
+	payload, err := c.finalizeMessage(msg)
 	if err != nil {
-		logger.Error("Failed to encode message", "msg", msg, "error", err)
+		logger.Error("Failed to finalize message", "msg", msg, "error", err)
 		return
 	}
 
 	// Broadcast payload
-	payload, err := m.ToPayload()
-	if err != nil {
-		logger.Error("Failed to marshal message", "msg", msg, "error", err)
+	if err = c.backend.Broadcast(payload); err != nil {
+		logger.Error("Failed to broadcast message", "msg", msg, "error", err)
 		return
 	}
-	c.backend.Broadcast(payload)
 }
 
 func (c *core) nextSequence() *pbft.View {

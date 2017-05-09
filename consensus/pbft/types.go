@@ -46,10 +46,32 @@ type State struct {
 type Message struct {
 	Code      uint64
 	Msg       interface{}
+	Address   common.Address
 	Signature []byte
 }
 
-func (m *Message) ToPayload() ([]byte, error) {
+func (m *Message) FromPayload(b []byte, validateFn func([]byte, []byte) (common.Address, error)) error {
+	// Decode message
+	err := gob.NewDecoder(bytes.NewBuffer(b)).Decode(m)
+	if err != nil {
+		return err
+	}
+
+	// Validate message (on a Message without Signature)
+	if validateFn != nil {
+		var payload []byte
+		payload, err = m.PayloadNoSig()
+		if err != nil {
+			return err
+		}
+
+		_, err = validateFn(payload, m.Signature)
+	}
+	// Still return the message even the err is not nil
+	return err
+}
+
+func (m *Message) Payload() ([]byte, error) {
 	var buf bytes.Buffer
 	err := gob.NewEncoder(&buf).Encode(m)
 	if err != nil {
@@ -58,53 +80,17 @@ func (m *Message) ToPayload() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func Decode(b []byte, validateFn func([]byte, []byte) (common.Address, error)) (*Message, error) {
-	var msg Message
-	// Decode message
-	err := gob.NewDecoder(bytes.NewBuffer(b)).Decode(&msg)
+func (m *Message) PayloadNoSig() ([]byte, error) {
+	var buf bytes.Buffer
+	err := gob.NewEncoder(&buf).Encode(&Message{
+		Code:    m.Code,
+		Msg:     m.Msg,
+		Address: m.Address,
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	// Validate message (on a Message without Signature)
-	if validateFn != nil {
-		m := &Message{Code: msg.Code, Msg: msg.Msg, Signature: nil}
-		var payload []byte
-		payload, err = m.ToPayload()
-		if err != nil {
-			return nil, err
-		}
-		_, err = validateFn(payload, msg.Signature)
-	}
-	// Still return the message even the err is not nil
-	return &msg, err
-}
-
-func Encode(code uint64, val interface{}, signFn func([]byte) ([]byte, error)) (*Message, error) {
-	var sig []byte
-
-	if signFn != nil {
-		// Create message without signature (for data signing)
-		m := &Message{Code: code, Msg: val, Signature: nil}
-
-		// Sign message
-		payload, err := m.ToPayload()
-		if err != nil {
-			return nil, err
-		}
-
-		sig, err = signFn(payload)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Return Message with signature
-	return &Message{
-		Code:      code,
-		Msg:       val,
-		Signature: sig,
-	}, nil
+	return buf.Bytes(), nil
 }
 
 // BlockContexter supports retrieving height and serialized block to be used during PBFT consensus.
@@ -170,9 +156,8 @@ type Preprepare struct {
 }
 
 type Subject struct {
-	View      *View
-	Digest    []byte
-	Signature []byte
+	View   *View
+	Digest []byte
 }
 
 type ViewChange struct {

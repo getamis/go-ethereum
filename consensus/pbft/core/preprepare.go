@@ -28,19 +28,25 @@ func (c *core) sendPreprepare(request *pbft.Request) {
 	nextSeqView := c.nextSequence()
 
 	if c.isPrimary() {
-		preprepare := pbft.Preprepare{
-			View:     nextSeqView,
-			Proposal: c.makeProposal(nextSeqView.Sequence, request),
-		}
-
 		logger.Debug("sendPreprepare")
-		c.broadcast(pbft.MsgPreprepare, preprepare)
+		c.broadcast(&pbft.Message{
+			Code: pbft.MsgPreprepare,
+			Msg: &pbft.Preprepare{
+				View:     nextSeqView,
+				Proposal: c.makeProposal(nextSeqView.Sequence, request),
+			},
+		})
 	}
 }
 
-func (c *core) handlePreprepare(preprepare *pbft.Preprepare, src pbft.Validator) error {
+func (c *core) handlePreprepare(msg *pbft.Message, src pbft.Validator) error {
 	logger := log.New("from", src.Address().Hex(), "state", c.state)
 	logger.Debug("handlePreprepare")
+
+	preprepare, ok := msg.Msg.(*pbft.Preprepare)
+	if !ok {
+		return errFailedDecodePreprepare
+	}
 
 	if c.isFutureMessage(pbft.MsgPreprepare, preprepare.View) {
 		return errFutureMessage
@@ -78,9 +84,8 @@ func (c *core) handlePreprepare(preprepare *pbft.Preprepare, src pbft.Validator)
 
 func (c *core) acceptPreprepare(preprepare *pbft.Preprepare) {
 	subject := &pbft.Subject{
-		View: preprepare.View,
-		// TODO: calculate digest
-		Digest: []byte{0x01},
+		View:   preprepare.View,
+		Digest: preprepare.Proposal.Header.DataHash.Bytes(),
 	}
 
 	c.subject = subject

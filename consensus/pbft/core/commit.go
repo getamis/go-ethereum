@@ -25,12 +25,20 @@ import (
 func (c *core) sendCommit() {
 	logger := c.logger.New("state", c.state)
 	logger.Debug("sendCommit")
-	c.broadcast(pbft.MsgCommit, c.subject)
+	c.broadcast(&pbft.Message{
+		Code: pbft.MsgCommit,
+		Msg:  c.subject,
+	})
 }
 
-func (c *core) handleCommit(commit *pbft.Subject, src pbft.Validator) error {
+func (c *core) handleCommit(msg *pbft.Message, src pbft.Validator) error {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 	logger.Debug("handleCommit")
+
+	commit, ok := msg.Msg.(*pbft.Subject)
+	if !ok {
+		return errFailedDecodeCommit
+	}
 
 	if c.isFutureMessage(pbft.MsgCommit, commit.View) {
 		return errFutureMessage
@@ -63,6 +71,7 @@ func (c *core) verifyCommit(commit *pbft.Subject, src pbft.Validator) error {
 func (c *core) acceptCommit(commit *pbft.Subject, src pbft.Validator) {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 
+	// We check signature in Add
 	if _, err := c.current.Commits.Add(commit, src); err != nil {
 		logger.Error("Failed to record commit message", "msg", commit, "error", err)
 	}
