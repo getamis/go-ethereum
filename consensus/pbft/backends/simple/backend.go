@@ -140,7 +140,7 @@ func (sb *simpleBackend) Commit(proposal *pbft.Proposal) error {
 	block := &types.Block{}
 	err := rlp.DecodeBytes(proposal.BlockContext.Payload(), block)
 	if err != nil {
-		log.Warn("decode block error", "err", err)
+		sb.logger.Warn("decode block error", "err", err)
 		return err
 	}
 	// it's a proposer
@@ -150,7 +150,9 @@ func (sb *simpleBackend) Commit(proposal *pbft.Proposal) error {
 			close(sb.commitErr)
 		}
 		defer closeCommitErr()
+		// feed block hash to Seal() and wait the Seal() result
 		sb.commit <- block.Hash()
+		// TODO: how do we check the block is inserted correctly?
 		return <-sb.commitErr
 	} else {
 		return sb.inserter(block)
