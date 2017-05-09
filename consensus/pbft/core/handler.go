@@ -19,7 +19,6 @@ package core
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 )
 
@@ -62,15 +61,6 @@ func (c *core) unsubscribeEvents() {
 	c.internalEvents.Unsubscribe()
 }
 
-func (c *core) makeCheckpoint(blockNumber *big.Int, blockHash common.Hash) (*pbft.Checkpoint, error) {
-	logger := c.logger.New("address", c.address.Hex())
-	checkpoint, err := pbft.NewCheckpoint(blockNumber, blockHash.Bytes(), c.backend.Sign)
-	if err != nil {
-		logger.Error("Unable to make checkpoint", "checkpoint", checkpoint, "error", err)
-	}
-	return checkpoint, err
-}
-
 func (c *core) handleExternalEvent() {
 	for event := range c.events.Chan() {
 		// A real event arrived, process interesting content
@@ -78,9 +68,13 @@ func (c *core) handleExternalEvent() {
 		case pbft.CheckpointEvent:
 			// TODO: we only implement sequence and digest now
 			// TODO: might have to handle error
-			cp, _ := c.makeCheckpoint(ev.BlockNumber, ev.BlockHash)
-			c.sendCheckpoint(cp)
-
+			c.sendCheckpoint(&pbft.Subject{
+				View: &pbft.View{
+					Sequence:   ev.BlockNumber,
+					ViewNumber: new(big.Int),
+				},
+				Digest: ev.BlockHash.Bytes(),
+			})
 		case pbft.ConnectionEvent:
 
 		case pbft.RequestEvent:
@@ -154,7 +148,7 @@ func (c *core) handle(msg *pbft.Message, src pbft.Validator) error {
 		}
 		return testBacklog(c.handleCommit(m, src))
 	case pbft.MsgCheckpoint:
-		m, ok := msg.Msg.(*pbft.Checkpoint)
+		m, ok := msg.Msg.(*pbft.Subject)
 		if !ok {
 			return errFailedDecodeCheckpoint
 		}

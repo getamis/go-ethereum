@@ -30,7 +30,7 @@ func newSnapshot(preprepare *pbft.Preprepare) *snapshot {
 		Preprepare:  preprepare,
 		Prepares:    pbft.NewMessageSet(preprepare.View, reflect.TypeOf(&pbft.Subject{})),
 		Commits:     pbft.NewMessageSet(preprepare.View, reflect.TypeOf(&pbft.Subject{})),
-		Checkpoints: pbft.NewMessageSet(preprepare.View, reflect.TypeOf(&pbft.Checkpoint{})),
+		Checkpoints: pbft.NewMessageSet(preprepare.View, reflect.TypeOf(&pbft.Subject{})),
 	}
 }
 

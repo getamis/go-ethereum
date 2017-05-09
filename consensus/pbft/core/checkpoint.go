@@ -22,13 +22,13 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 )
 
-func (c *core) sendCheckpoint(cp *pbft.Checkpoint) {
+func (c *core) sendCheckpoint(cp *pbft.Subject) {
 	logger := c.logger.New("state", c.state)
 	logger.Debug("sendCheckpoint")
 	c.broadcast(pbft.MsgCheckpoint, cp)
 }
 
-func (c *core) handleCheckpoint(cp *pbft.Checkpoint, src pbft.Validator) error {
+func (c *core) handleCheckpoint(cp *pbft.Subject, src pbft.Validator) error {
 	if cp == nil {
 		return pbft.ErrInvalidMessage
 	}
@@ -41,20 +41,13 @@ func (c *core) handleCheckpoint(cp *pbft.Checkpoint, src pbft.Validator) error {
 	c.snapshotsMu.Lock()
 	defer c.snapshotsMu.Unlock()
 
-	// Verify checkpoint
-	err := cp.Validate(c.backend.CheckValidatorSignature)
-	if err != nil {
-		logger.Error("Checkpoint validation failed", "checkpoint", cp, "error", err)
-		return err
-	}
-
 	// Look for matching snapshot
-	if cp.Sequence.Cmp(c.current.Sequence) == 0 { // current
+	if cp.View.Sequence.Cmp(c.current.Sequence) == 0 { // current
 		snapshot = c.current
-	} else if cp.Sequence.Cmp(c.current.Sequence) < 0 { // old checkpoint
+	} else if cp.View.Sequence.Cmp(c.current.Sequence) < 0 { // old checkpoint
 		snapshotIndex := sort.Search(len(c.snapshots),
 			func(i int) bool {
-				return c.snapshots[i].Sequence.Cmp(cp.Sequence) >= 0
+				return c.snapshots[i].Sequence.Cmp(cp.View.Sequence) >= 0
 			},
 		)
 
@@ -62,7 +55,7 @@ func (c *core) handleCheckpoint(cp *pbft.Checkpoint, src pbft.Validator) error {
 		if snapshotIndex < len(c.snapshots) {
 			snapshot = c.snapshots[snapshotIndex]
 		} else {
-			logger.Warn("Failed to find snapshot entry", "seq", cp.Sequence, "current", c.current.Sequence)
+			logger.Warn("Failed to find snapshot entry", "seq", cp.View.Sequence, "current", c.current.Sequence)
 			return pbft.ErrInvalidMessage
 		}
 	} else { // future checkpoint
