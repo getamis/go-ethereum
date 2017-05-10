@@ -17,21 +17,10 @@
 package pbft
 
 import (
-	"bytes"
 	"encoding/gob"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-)
-
-const (
-	MsgPreprepare uint64 = iota
-	MsgPrepare
-	MsgCommit
-	MsgCheckpoint
-	MsgViewChange
-	MsgNewView
-	MsgInvalid
 )
 
 // TODO: under cooking
@@ -41,70 +30,6 @@ type State struct {
 
 	PrepareMsgs map[uint64]*Subject
 	CommitMsgs  map[uint64]*Subject
-}
-
-type Message struct {
-	Code      uint64
-	Msg       interface{}
-	Signature []byte
-}
-
-func (m *Message) ToPayload() ([]byte, error) {
-	var buf bytes.Buffer
-	err := gob.NewEncoder(&buf).Encode(m)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func Decode(b []byte, validateFn func([]byte, []byte) (common.Address, error)) (*Message, error) {
-	var msg Message
-	// Decode message
-	err := gob.NewDecoder(bytes.NewBuffer(b)).Decode(&msg)
-	if err != nil {
-		return nil, err
-	}
-
-	// Validate message (on a Message without Signature)
-	if validateFn != nil {
-		m := &Message{Code: msg.Code, Msg: msg.Msg, Signature: nil}
-		var payload []byte
-		payload, err = m.ToPayload()
-		if err != nil {
-			return nil, err
-		}
-		_, err = validateFn(payload, msg.Signature)
-	}
-	// Still return the message even the err is not nil
-	return &msg, err
-}
-
-func Encode(code uint64, val interface{}, signFn func([]byte) ([]byte, error)) (*Message, error) {
-	var sig []byte
-
-	if signFn != nil {
-		// Create message without signature (for data signing)
-		m := &Message{Code: code, Msg: val, Signature: nil}
-
-		// Sign message
-		payload, err := m.ToPayload()
-		if err != nil {
-			return nil, err
-		}
-
-		sig, err = signFn(payload)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Return Message with signature
-	return &Message{
-		Code:      code,
-		Msg:       val,
-		Signature: sig,
-	}, nil
 }
 
 // BlockContexter supports retrieving height and serialized block to be used during PBFT consensus.
@@ -193,44 +118,8 @@ type NewView struct {
 	Proposal   *Proposal
 }
 
-type Checkpoint struct {
-	Sequence  *big.Int
-	Digest    []byte
-	Signature []byte
-}
-
-// NewCheckpoint uses signFn, if given, to sign sequence+digest and returns a checkpoint with the signature
-// Signature will be nil if signFn is not given
-// The returning Checkpoint won't be nil even there is error in signing
-func NewCheckpoint(sequence *big.Int, digest []byte, signFn func([]byte) ([]byte, error)) (*Checkpoint, error) {
-	var result = &Checkpoint{
-		Sequence: sequence,
-		Digest:   digest,
-	}
-	if signFn != nil {
-		data := append(sequence.Bytes(), digest...)
-		sig, err := signFn(data)
-		if err != nil {
-			return result, err
-		}
-		result.Signature = sig
-	}
-	return result, nil
-}
-
-// Validate uses validateFn to validate checkpoint if validateFn is given
-func (c *Checkpoint) Validate(validateFn func([]byte, []byte) (common.Address, error)) error {
-	if validateFn == nil {
-		return nil
-	}
-	data := append(c.Sequence.Bytes(), c.Digest...)
-	_, err := validateFn(data, c.Signature)
-	return err
-}
-
 func init() {
 	gob.Register(&Preprepare{})
 	gob.Register(&Subject{})
-	gob.Register(&Checkpoint{})
 	gob.Register(&BlockContext{})
 }

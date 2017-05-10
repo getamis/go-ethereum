@@ -38,7 +38,6 @@ type ConnectionEvent struct {
 }
 
 type MessageEvent struct {
-	Address common.Address
 	Payload []byte
 }
 

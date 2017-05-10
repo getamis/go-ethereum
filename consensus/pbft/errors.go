@@ -24,6 +24,7 @@ var (
 	ErrNilProposal       = errors.New("nil proposal")
 	ErrOldMessage        = errors.New("old message")
 	ErrInvalidMessage    = errors.New("invalid message")
+	ErrIgnored           = errors.New("message is ignored")
 	ErrSubjectNotMatched = errors.New("subjects are not matched")
 	ErrInvalidSignature  = errors.New("Invalid signature")
 	ErrInvalidPeerID     = errors.New("Invalid peer ID")

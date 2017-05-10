@@ -25,14 +25,22 @@ import (
 func (c *core) sendPrepare() {
 	logger := c.logger.New("state", c.state)
 	logger.Debug("sendPrepare")
-	c.broadcast(pbft.MsgPrepare, c.subject)
+	c.broadcast(&message{
+		Code: msgPrepare,
+		Msg:  c.subject,
+	})
 }
 
-func (c *core) handlePrepare(prepare *pbft.Subject, src pbft.Validator) error {
+func (c *core) handlePrepare(msg *message, src pbft.Validator) error {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 	logger.Debug("handlePrepare")
 
-	if c.isFutureMessage(pbft.MsgPrepare, prepare.View) {
+	prepare, ok := msg.Msg.(*pbft.Subject)
+	if !ok {
+		return errFailedDecodePrepare
+	}
+
+	if c.isFutureMessage(msgPrepare, prepare.View) {
 		return errFutureMessage
 	}
 
@@ -40,7 +48,7 @@ func (c *core) handlePrepare(prepare *pbft.Subject, src pbft.Validator) error {
 		return err
 	}
 
-	c.acceptPrepare(prepare, src)
+	c.acceptPrepare(msg, src)
 
 	// If 2f+1
 	if int64(c.current.Prepares.Size()) > 2*c.F && c.state == StatePreprepared {
@@ -69,10 +77,11 @@ func (c *core) verifyPrepare(prepare *pbft.Subject, src pbft.Validator) error {
 	return nil
 }
 
-func (c *core) acceptPrepare(prepare *pbft.Subject, src pbft.Validator) {
+func (c *core) acceptPrepare(msg *message, src pbft.Validator) {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 
-	if _, err := c.current.Prepares.Add(prepare, src); err != nil {
-		logger.Error("Failed to record prepare message", "msg", prepare, "error", err)
+	// we check signature in Add
+	if _, err := c.current.Prepares.Add(msg, src); err != nil {
+		logger.Error("Failed to record prepare message", "msg", msg, "error", err)
 	}
 }

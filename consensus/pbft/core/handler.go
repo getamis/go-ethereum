@@ -19,7 +19,6 @@ package core
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 )
 
@@ -62,15 +61,6 @@ func (c *core) unsubscribeEvents() {
 	c.internalEvents.Unsubscribe()
 }
 
-func (c *core) makeCheckpoint(blockNumber *big.Int, blockHash common.Hash) (*pbft.Checkpoint, error) {
-	logger := c.logger.New("address", c.address.Hex())
-	checkpoint, err := pbft.NewCheckpoint(blockNumber, blockHash.Bytes(), c.backend.Sign)
-	if err != nil {
-		logger.Error("Unable to make checkpoint", "checkpoint", checkpoint, "error", err)
-	}
-	return checkpoint, err
-}
-
 func (c *core) handleExternalEvent() {
 	for event := range c.events.Chan() {
 		// A real event arrived, process interesting content
@@ -78,9 +68,13 @@ func (c *core) handleExternalEvent() {
 		case pbft.CheckpointEvent:
 			// TODO: we only implement sequence and digest now
 			// TODO: might have to handle error
-			cp, _ := c.makeCheckpoint(ev.BlockNumber, ev.BlockHash)
-			c.sendCheckpoint(cp)
-
+			c.sendCheckpoint(&pbft.Subject{
+				View: &pbft.View{
+					Sequence:   ev.BlockNumber,
+					ViewNumber: new(big.Int),
+				},
+				Digest: ev.BlockHash.Bytes(),
+			})
 		case pbft.ConnectionEvent:
 
 		case pbft.RequestEvent:
@@ -88,7 +82,7 @@ func (c *core) handleExternalEvent() {
 				BlockContext: ev.BlockContext,
 			}, c.backend.Validators().GetByAddress(c.address))
 		case pbft.MessageEvent:
-			c.handleMsg(ev.Payload, c.backend.Validators().GetByAddress(ev.Address))
+			c.handleMsg(ev.Payload)
 		}
 	}
 }
@@ -109,20 +103,27 @@ func (c *core) handleInternalEvent() {
 	}
 }
 
-func (c *core) handleMsg(payload []byte, src pbft.Validator) error {
-	logger := c.logger.New("address", c.address.Hex(), "from", src.Address().Hex())
+func (c *core) handleMsg(payload []byte) error {
+	logger := c.logger.New("address", c.address.Hex())
 
 	// Decode message
-	msg, err := pbft.Decode(payload, c.backend.CheckValidatorSignature)
-	if err != nil {
-		logger.Error("Failed to decode message", "error", err)
+	msg := new(message)
+	if err := msg.FromPayload(payload, c.backend.CheckValidatorSignature); err != nil {
+		logger.Error("Failed to decode message from payload", "error", err)
 		return err
+	}
+
+	// Only accept message if address is valid
+	src := c.backend.Validators().GetByAddress(msg.Address)
+	if src == nil {
+		logger.Error("Invalid address in message", "msg", msg)
+		return pbft.ErrNoMatchingValidator
 	}
 
 	return c.handle(msg, src)
 }
 
-func (c *core) handle(msg *pbft.Message, src pbft.Validator) error {
+func (c *core) handle(msg *message, src pbft.Validator) error {
 	logger := c.logger.New("address", c.address.Hex(), "from", src.Address().Hex())
 
 	testBacklog := func(err error) error {
@@ -135,32 +136,16 @@ func (c *core) handle(msg *pbft.Message, src pbft.Validator) error {
 	}
 
 	switch msg.Code {
-	case pbft.MsgPreprepare:
-		m, ok := msg.Msg.(*pbft.Preprepare)
-		if !ok {
-			return errFailedDecodePreprepare
-		}
-		return testBacklog(c.handlePreprepare(m, src))
-	case pbft.MsgPrepare:
-		m, ok := msg.Msg.(*pbft.Subject)
-		if !ok {
-			return errFailedDecodePrepare
-		}
-		return testBacklog(c.handlePrepare(m, src))
-	case pbft.MsgCommit:
-		m, ok := msg.Msg.(*pbft.Subject)
-		if !ok {
-			return errFailedDecodeCommit
-		}
-		return testBacklog(c.handleCommit(m, src))
-	case pbft.MsgCheckpoint:
-		m, ok := msg.Msg.(*pbft.Checkpoint)
-		if !ok {
-			return errFailedDecodeCheckpoint
-		}
-		return c.handleCheckpoint(m, src)
-	case pbft.MsgViewChange:
-	case pbft.MsgNewView:
+	case msgPreprepare:
+		return testBacklog(c.handlePreprepare(msg, src))
+	case msgPrepare:
+		return testBacklog(c.handlePrepare(msg, src))
+	case msgCommit:
+		return testBacklog(c.handleCommit(msg, src))
+	case msgCheckpoint:
+		return c.handleCheckpoint(msg, src)
+	case msgViewChange:
+	case msgNewView:
 	default:
 		logger.Error("Invalid message", "msg", msg)
 	}

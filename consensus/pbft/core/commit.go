@@ -25,14 +25,22 @@ import (
 func (c *core) sendCommit() {
 	logger := c.logger.New("state", c.state)
 	logger.Debug("sendCommit")
-	c.broadcast(pbft.MsgCommit, c.subject)
+	c.broadcast(&message{
+		Code: msgCommit,
+		Msg:  c.subject,
+	})
 }
 
-func (c *core) handleCommit(commit *pbft.Subject, src pbft.Validator) error {
+func (c *core) handleCommit(msg *message, src pbft.Validator) error {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 	logger.Debug("handleCommit")
 
-	if c.isFutureMessage(pbft.MsgCommit, commit.View) {
+	commit, ok := msg.Msg.(*pbft.Subject)
+	if !ok {
+		return errFailedDecodeCommit
+	}
+
+	if c.isFutureMessage(msgCommit, commit.View) {
 		return errFutureMessage
 	}
 
@@ -40,7 +48,7 @@ func (c *core) handleCommit(commit *pbft.Subject, src pbft.Validator) error {
 		return err
 	}
 
-	c.acceptCommit(commit, src)
+	c.acceptCommit(msg, src)
 
 	if int64(c.current.Commits.Size()) > 2*c.F && c.state == StatePrepared {
 		c.commit()
@@ -60,10 +68,11 @@ func (c *core) verifyCommit(commit *pbft.Subject, src pbft.Validator) error {
 	return nil
 }
 
-func (c *core) acceptCommit(commit *pbft.Subject, src pbft.Validator) {
+func (c *core) acceptCommit(msg *message, src pbft.Validator) {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 
-	if _, err := c.current.Commits.Add(commit, src); err != nil {
-		logger.Error("Failed to record commit message", "msg", commit, "error", err)
+	// We check signature in Add
+	if _, err := c.current.Commits.Add(msg, src); err != nil {
+		logger.Error("Failed to record commit message", "msg", msg, "error", err)
 	}
 }

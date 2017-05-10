@@ -64,7 +64,6 @@ func (self *testSystemBackend) Send(message []byte, target common.Address) error
 	testLogger.Info("enqueuing a message...", "address", self.Address())
 	self.sentMsgs = append(self.sentMsgs, message)
 	self.sys.queuedMessage <- pbft.MessageEvent{
-		Address: self.Address(),
 		Payload: message,
 	}
 	return nil
@@ -74,7 +73,6 @@ func (self *testSystemBackend) Broadcast(message []byte) error {
 	testLogger.Info("enqueuing a message...", "address", self.Address())
 	self.sentMsgs = append(self.sentMsgs, message)
 	self.sys.queuedMessage <- pbft.MessageEvent{
-		Address: self.Address(),
 		Payload: message,
 	}
 	return nil
@@ -224,7 +222,7 @@ func (t *testSystem) listen() {
 		case <-t.quit:
 			return
 		case queuedMessage := <-t.queuedMessage:
-			testLogger.Info("consuming a queue message...", "msg from", queuedMessage.Address.Hex())
+			testLogger.Info("consuming a queue message...")
 			for _, backend := range t.backends {
 				go backend.EventMux().Post(queuedMessage)
 			}
