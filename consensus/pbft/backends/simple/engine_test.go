@@ -34,7 +34,12 @@ func newBlockChain(n int) (*core.BlockChain, *simpleBackend) {
 	if err != nil {
 		panic(err)
 	}
-	backend.Start(blockchain)
+	commitBlock := func(block *types.Block) error {
+		_, err := blockchain.InsertChain([]*types.Block{block})
+		return err
+	}
+	backend.Start(blockchain, commitBlock)
+
 	b, _ := backend.(*simpleBackend)
 
 	proposerAddr := b.valSet.GetProposer().Address()
@@ -96,11 +101,16 @@ func makeHeader(parent *types.Block) *types.Header {
 }
 
 func makeBlock(chain *core.BlockChain, engine *simpleBackend, parent *types.Block) *types.Block {
+	block := makeBlockWithoutSeal(chain, engine, parent)
+	block, _ = engine.Seal(chain, block, nil)
+	return block
+}
+
+func makeBlockWithoutSeal(chain *core.BlockChain, engine *simpleBackend, parent *types.Block) *types.Block {
 	header := makeHeader(parent)
 	engine.Prepare(chain, header)
 	state, _ := chain.StateAt(parent.Root())
 	block, _ := engine.Finalize(chain, header, state, nil, nil, nil)
-	block, _ = engine.Seal(chain, block, nil)
 	return block
 }
 
@@ -128,9 +138,7 @@ func TestPrepare(t *testing.T) {
 
 func TestSealStopChannel(t *testing.T) {
 	chain, engine := newBlockChain(4)
-	header := makeHeader(chain.Genesis())
-	state, _ := chain.StateAt(chain.Genesis().Root())
-	block, _ := engine.Finalize(chain, header, state, nil, nil, nil)
+	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	stop := make(chan struct{}, 1)
 	eventSub := engine.EventMux().Subscribe(pbft.RequestEvent{})
 	eventLoop := func() {
@@ -156,9 +164,7 @@ func TestSealStopChannel(t *testing.T) {
 
 func TestSealViewChange(t *testing.T) {
 	chain, engine := newBlockChain(4)
-	header := makeHeader(chain.Genesis())
-	state, _ := chain.StateAt(chain.Genesis().Root())
-	block, _ := engine.Finalize(chain, header, state, nil, nil, nil)
+	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	eventSub := engine.EventMux().Subscribe(pbft.RequestEvent{})
 	eventLoop := func() {
 		select {
@@ -189,9 +195,7 @@ func TestSealViewChange(t *testing.T) {
 
 func TestSealViewChangeNeedNewProposal(t *testing.T) {
 	chain, engine := newBlockChain(4)
-	header := makeHeader(chain.Genesis())
-	state, _ := chain.StateAt(chain.Genesis().Root())
-	block, _ := engine.Finalize(chain, header, state, nil, nil, nil)
+	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	eventSub := engine.EventMux().Subscribe(pbft.RequestEvent{})
 	eventLoop := func() {
 		select {
@@ -217,9 +221,7 @@ func TestSealViewChangeNeedNewProposal(t *testing.T) {
 
 func TestSealCommittedOtherHash(t *testing.T) {
 	chain, engine := newBlockChain(4)
-	header := makeHeader(chain.Genesis())
-	state, _ := chain.StateAt(chain.Genesis().Root())
-	block, _ := engine.Finalize(chain, header, state, nil, nil, nil)
+	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	eventSub := engine.EventMux().Subscribe(pbft.RequestEvent{})
 	eventLoop := func() {
 		select {
@@ -228,7 +230,16 @@ func TestSealCommittedOtherHash(t *testing.T) {
 			if !ok {
 				t.Errorf("unexpected event comes, got: %v, expected: pbft.RequestEvent", reflect.TypeOf(ev.Data))
 			}
+			engine.commitErr = make(chan error, 1)
+			closeCommitErr := func() {
+				close(engine.commitErr)
+			}
+			defer closeCommitErr()
 			engine.commit <- common.StringToHash("1234567890")
+			err := <-engine.commitErr
+			if err != errOtherBlockCommitted {
+				t.Errorf("unexpected error comes, got: %v, expected: errOtherBlockCommitted", err)
+			}
 		}
 		eventSub.Unsubscribe()
 	}
@@ -244,9 +255,7 @@ func TestSealCommittedOtherHash(t *testing.T) {
 
 func TestSealCommitted(t *testing.T) {
 	chain, engine := newBlockChain(1)
-	header := makeHeader(chain.Genesis())
-	state, _ := chain.StateAt(chain.Genesis().Root())
-	block, _ := engine.Finalize(chain, header, state, nil, nil, nil)
+	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	expectedBlock := getExpectedBlock(engine, block)
 
 	finalBlock, err := engine.Seal(chain, block, nil)
@@ -365,7 +374,8 @@ func TestVerifyHeaders(t *testing.T) {
 		if i == 0 {
 			blocks = append(blocks, makeBlock(chain, engine, genesis))
 		} else {
-			blocks = append(blocks, makeBlock(chain, engine, blocks[i-1]))
+			b := makeBlockWithoutSeal(chain, engine, blocks[i-1])
+			blocks = append(blocks, getExpectedBlock(engine, b))
 		}
 		headers = append(headers, blocks[i].Header())
 	}
@@ -389,7 +399,6 @@ OUT1:
 			break OUT1
 		}
 	}
-
 	// abort cases
 	abort, results := engine.VerifyHeaders(chain, headers, nil)
 	timeout = time.NewTimer(timeoutDura)
@@ -407,7 +416,8 @@ OUT2:
 				abort <- struct{}{}
 			}
 			// add some buffer here because we may not abort this channel immediately
-			if index > 5+5 {
+			buffer := 10
+			if index > 5+buffer {
 				t.Errorf("verifyheaders should be aborted")
 				break OUT2
 			}
@@ -415,7 +425,6 @@ OUT2:
 			break OUT2
 		}
 	}
-
 	// error header cases
 	headers[2].Number = big.NewInt(100)
 	abort, results = engine.VerifyHeaders(chain, headers, nil)

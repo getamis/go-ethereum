@@ -67,10 +67,13 @@ type simpleBackend struct {
 	quitSync       chan struct{}
 	db             ethdb.Database
 	timeout        uint64
+	chain          consensus.ChainReader
+	inserter       func(block *types.Block) error
 
 	// the channels for pbft engine notifications
 	viewChange chan bool
 	commit     chan common.Hash
+	commitErr  chan error
 }
 
 // Address implements pbft.Backend.Address
@@ -137,18 +140,23 @@ func (sb *simpleBackend) Commit(proposal *pbft.Proposal) error {
 	block := &types.Block{}
 	err := rlp.DecodeBytes(proposal.BlockContext.Payload(), block)
 	if err != nil {
-		log.Warn("decode block error", "err", err)
+		sb.logger.Warn("decode block error", "err", err)
 		return err
 	}
 	// it's a proposer
 	if sb.commit != nil {
-		go func() {
-			sb.commit <- block.Hash()
-		}()
+		sb.commitErr = make(chan error, 1)
+		closeCommitErr := func() {
+			close(sb.commitErr)
+		}
+		defer closeCommitErr()
+		// feed block hash to Seal() and wait the Seal() result
+		sb.commit <- block.Hash()
+		// TODO: how do we check the block is inserted correctly?
+		return <-sb.commitErr
 	} else {
-		go sb.eventMux.Post(pbft.ConsensusCommitBlockEvent{Block: block})
+		return sb.inserter(block)
 	}
-	return nil
 }
 
 // ViewChanged implements pbft.Backend.ViewChanged
@@ -181,9 +189,16 @@ func (sb *simpleBackend) EventMux() *event.TypeMux {
 }
 
 // Verify implements pbft.Backend.Verify
-func (sb *simpleBackend) Verify(proposal *pbft.Proposal) (bool, error) {
-	// not implemented
-	return true, nil
+func (sb *simpleBackend) Verify(proposal *pbft.Proposal) error {
+	// decode the proposal to block
+	block := &types.Block{}
+	err := rlp.DecodeBytes(proposal.BlockContext.Payload(), block)
+	if err != nil {
+		log.Warn("decode block error", "err", err)
+		return err
+	}
+	// verify the header of proposed block
+	return sb.VerifyHeader(sb.chain, block.Header(), false)
 }
 
 // Sign implements pbft.Backend.Sign

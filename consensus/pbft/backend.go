@@ -48,7 +48,7 @@ type Backend interface {
 	ViewChanged(needNewProposal bool) error
 
 	// Verify is to verify the proposal request
-	Verify(*Proposal) (bool, error)
+	Verify(*Proposal) error
 
 	// Sign is to sign the data
 	Sign([]byte) ([]byte, error)

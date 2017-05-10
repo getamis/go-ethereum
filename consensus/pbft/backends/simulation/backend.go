@@ -79,12 +79,11 @@ type ProtocolManager struct {
 func (pm *ProtocolManager) Start() {
 	pm.eventSub = pm.eventMux.Subscribe(
 		pbft.ConsensusDataEvent{},
-		pbft.ConsensusCommitBlockEvent{},
 		// XXX: Which event should we listen? core.ChainHeadEvent or core.ChainEvent?
 		core.ChainHeadEvent{})
 	go pm.consensusEventLoop()
 
-	pm.backend.Start(pm.chain)
+	pm.backend.Start(pm.chain, pm.commitBlock)
 	go pm.handlePeerMessage()
 }
 
@@ -153,8 +152,6 @@ func (pm *ProtocolManager) consensusEventLoop() {
 		switch ev := obj.Data.(type) {
 		case pbft.ConsensusDataEvent:
 			pm.sendEvent(ev)
-		case pbft.ConsensusCommitBlockEvent:
-			pm.commitBlock(ev.Block)
 		// After block insertion, we post a CheckpointEvent and make a new request
 		case core.ChainHeadEvent:
 			go pm.backend.NewChainHead(ev.Block)
@@ -174,8 +171,9 @@ func (pm *ProtocolManager) sendEvent(event pbft.ConsensusDataEvent) {
 	p2p.Send(p, PBFTMsg, event.Data)
 }
 
-func (pm *ProtocolManager) commitBlock(block *types.Block) {
-	pm.chain.InsertChain([]*types.Block{block})
+func (pm *ProtocolManager) commitBlock(block *types.Block) error {
+	_, err := pm.chain.InsertChain([]*types.Block{block})
+	return err
 }
 
 func (pm *ProtocolManager) newRequest(lastBlock *types.Block) {

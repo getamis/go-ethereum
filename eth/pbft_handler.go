@@ -151,10 +151,10 @@ func newPBFTProtocolManager(config *params.ChainConfig, mode downloader.SyncMode
 
 func (pm *pbftProtocolManager) Start() {
 	// receive the PBFT event
-	pm.eventSub = pm.eventMux.Subscribe(pbft.ConsensusDataEvent{}, pbft.ConsensusCommitBlockEvent{}, core.ChainHeadEvent{})
+	pm.eventSub = pm.eventMux.Subscribe(pbft.ConsensusDataEvent{}, core.ChainHeadEvent{})
 	go pm.eventLoop()
 	pm.protocolManager.Start()
-	pm.engine.Start(pm.protocolManager.blockchain)
+	pm.engine.Start(pm.protocolManager.blockchain, pm.commitBlock)
 }
 
 func (pm *pbftProtocolManager) Stop() {
@@ -609,8 +609,6 @@ func (pm *pbftProtocolManager) eventLoop() {
 		switch ev := obj.Data.(type) {
 		case pbft.ConsensusDataEvent:
 			pm.sendEvent(ev)
-		case pbft.ConsensusCommitBlockEvent:
-			pm.commitBlock(ev)
 		case core.ChainHeadEvent:
 			pm.newHead(ev)
 		}
@@ -627,15 +625,15 @@ func (pm *pbftProtocolManager) sendEvent(event pbft.ConsensusDataEvent) {
 	p2p.Send(p.rw, PBFTMsg, event.Data)
 }
 
-func (pm *pbftProtocolManager) commitBlock(event pbft.ConsensusCommitBlockEvent) {
+func (pm *pbftProtocolManager) commitBlock(block *types.Block) error {
 	// TODO: find a better way to handle validator insert block
-	block := event.Block
 	if _, err := pm.blockchain.InsertChain(types.Blocks{block}); err != nil {
 		log.Debug("Block insert failed", "number", block.Number(), "hash", block.Hash(), "err", err)
-		return
+		return err
 	}
 	// Only announce the block, not broadcast it
-	pm.BroadcastBlock(event.Block, false)
+	go pm.BroadcastBlock(block, false)
+	return nil
 }
 
 func (pm *pbftProtocolManager) newHead(event core.ChainHeadEvent) {

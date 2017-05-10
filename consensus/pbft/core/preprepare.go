@@ -51,6 +51,11 @@ func (c *core) handlePreprepare(preprepare *pbft.Preprepare, src pbft.Validator)
 		return pbft.ErrNotFromProposer
 	}
 
+	if err := c.backend.Verify(preprepare.Proposal); err != nil {
+		logger.Warn("Verify proposal failed")
+		return err
+	}
+
 	view := c.nextSequence()
 	if !reflect.DeepEqual(preprepare.View, view) {
 		logger.Warn("Preprepare does not match", "expected", view, "got", preprepare.View)

@@ -120,7 +120,7 @@ type PBFT interface {
 	NewChainHead(block *types.Block)
 
 	// Start the engine
-	Start(chain ChainReader) error
+	Start(chain ChainReader, inserter func(block *types.Block) error) error
 
 	// Stop the engine
 	Stop() error
