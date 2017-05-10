@@ -74,7 +74,7 @@ func (c *core) handleCheckpoint(msg *message, src pbft.Validator) error {
 	}
 
 	// Save to snapshot
-	if _, err := snapshot.Checkpoints.Add(cp, src); err != nil {
+	if _, err := snapshot.Checkpoints.Add(msg, src); err != nil {
 		logger.Error("Failed to add checkpoint", "error", err)
 		return err
 	}

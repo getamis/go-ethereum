@@ -28,9 +28,9 @@ func newSnapshot(preprepare *pbft.Preprepare) *snapshot {
 		ViewNumber:  preprepare.View.ViewNumber,
 		Sequence:    preprepare.View.Sequence,
 		Preprepare:  preprepare,
-		Prepares:    pbft.NewMessageSet(preprepare.View, reflect.TypeOf(&pbft.Subject{})),
-		Commits:     pbft.NewMessageSet(preprepare.View, reflect.TypeOf(&pbft.Subject{})),
-		Checkpoints: pbft.NewMessageSet(preprepare.View, reflect.TypeOf(&pbft.Subject{})),
+		Prepares:    pbft.NewMessageSet(preprepare.View, reflect.TypeOf(&message{})),
+		Commits:     pbft.NewMessageSet(preprepare.View, reflect.TypeOf(&message{})),
+		Checkpoints: pbft.NewMessageSet(preprepare.View, reflect.TypeOf(&message{})),
 	}
 }
 

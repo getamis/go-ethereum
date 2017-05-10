@@ -48,7 +48,7 @@ func (c *core) handlePrepare(msg *message, src pbft.Validator) error {
 		return err
 	}
 
-	c.acceptPrepare(prepare, src)
+	c.acceptPrepare(msg, src)
 
 	// If 2f+1
 	if int64(c.current.Prepares.Size()) > 2*c.F && c.state == StatePreprepared {
@@ -77,11 +77,11 @@ func (c *core) verifyPrepare(prepare *pbft.Subject, src pbft.Validator) error {
 	return nil
 }
 
-func (c *core) acceptPrepare(prepare *pbft.Subject, src pbft.Validator) {
+func (c *core) acceptPrepare(msg *message, src pbft.Validator) {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 
 	// we check signature in Add
-	if _, err := c.current.Prepares.Add(prepare, src); err != nil {
-		logger.Error("Failed to record prepare message", "msg", prepare, "error", err)
+	if _, err := c.current.Prepares.Add(msg, src); err != nil {
+		logger.Error("Failed to record prepare message", "msg", msg, "error", err)
 	}
 }

@@ -48,7 +48,7 @@ func (c *core) handleCommit(msg *message, src pbft.Validator) error {
 		return err
 	}
 
-	c.acceptCommit(commit, src)
+	c.acceptCommit(msg, src)
 
 	if int64(c.current.Commits.Size()) > 2*c.F && c.state == StatePrepared {
 		c.commit()
@@ -68,11 +68,11 @@ func (c *core) verifyCommit(commit *pbft.Subject, src pbft.Validator) error {
 	return nil
 }
 
-func (c *core) acceptCommit(commit *pbft.Subject, src pbft.Validator) {
+func (c *core) acceptCommit(msg *message, src pbft.Validator) {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 
 	// We check signature in Add
-	if _, err := c.current.Commits.Add(commit, src); err != nil {
-		logger.Error("Failed to record commit message", "msg", commit, "error", err)
+	if _, err := c.current.Commits.Add(msg, src); err != nil {
+		logger.Error("Failed to record commit message", "msg", msg, "error", err)
 	}
 }
