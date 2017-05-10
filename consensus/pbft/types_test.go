@@ -17,7 +17,6 @@
 package pbft
 
 import (
-	"bytes"
 	"math/big"
 	"reflect"
 	"testing"
@@ -45,17 +44,19 @@ func testPreprepare(t *testing.T) {
 		},
 	}
 
-	m, err := Encode(MsgPreprepare, pp, nil)
+	m := &Message{
+		Code:    MsgPreprepare,
+		Msg:     pp,
+		Address: common.HexToAddress("0x1234567890"),
+	}
+
+	msgPayload, err := m.Payload()
 	if err != nil {
 		t.Error(err)
 	}
 
-	msgPayload, err := m.ToPayload()
-	if err != nil {
-		t.Error(err)
-	}
-
-	decodedMsg, err := Decode(msgPayload, nil)
+	decodedMsg := new(Message)
+	err = decodedMsg.FromPayload(msgPayload, nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -80,17 +81,19 @@ func testSubject(t *testing.T) {
 		Digest: []byte{0x01, 0x02},
 	}
 
-	m, err := Encode(MsgPrepare, s, nil)
+	m := &Message{
+		Code:    MsgPreprepare,
+		Msg:     s,
+		Address: common.HexToAddress("0x1234567890"),
+	}
+
+	msgPayload, err := m.Payload()
 	if err != nil {
 		t.Error(err)
 	}
 
-	msgPayload, err := m.ToPayload()
-	if err != nil {
-		t.Error(err)
-	}
-
-	decodedMsg, err := Decode(msgPayload, nil)
+	decodedMsg := new(Message)
+	err = decodedMsg.FromPayload(msgPayload, nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -106,42 +109,57 @@ func testSubject(t *testing.T) {
 	}
 }
 
-func testSignature(t *testing.T) {
-	s := &Subject{Digest: []byte{0x01, 0x02}}
+func testWithSignature(t *testing.T) {
+	s := &Subject{
+		View: &View{
+			ViewNumber: big.NewInt(1),
+			Sequence:   big.NewInt(2),
+		},
+		Digest: []byte{0x01, 0x02},
+	}
+	expectedSig := []byte{0x01}
 
 	// 1. Encode test
-	// 1.1. Test nil sign func
-	m, err := Encode(MsgPrepare, s, nil)
-	if err != nil {
-		t.Error(err)
-	}
-	if m.Signature != nil {
-		t.Errorf("Signature should be nil, but got :%v", m.Signature)
+	m := &Message{
+		Code:      MsgPreprepare,
+		Msg:       s,
+		Address:   common.HexToAddress("0x1234567890"),
+		Signature: expectedSig,
 	}
 
-	// 1.2. Test sign fun
-	expectedSig := []byte{0x01}
-	m, err = Encode(MsgPrepare, s, func(data []byte) ([]byte, error) {
-		return expectedSig, nil
-	})
-	if bytes.Compare(m.Signature, expectedSig) != 0 {
-		t.Errorf("Signature should be %v, but got: %v", expectedSig, m.Signature)
+	msgPayload, err := m.Payload()
+	if err != nil {
+		t.Error(err)
 	}
 
 	// 2. Decode test
-	msgPayload, err := m.ToPayload()
+	// 2.1 Test normal validate func
+	decodedMsg := new(Message)
+	err = decodedMsg.FromPayload(msgPayload, func(data []byte, sig []byte) (common.Address, error) {
+		return common.Address{}, nil
+	})
 	if err != nil {
 		t.Error(err)
 	}
 
-	// 2.1 Test nil validate func
-	_, err = Decode(msgPayload, nil)
-	if err != nil {
-		t.Errorf("Decode should succeed, but got error: %v", err)
+	if !reflect.DeepEqual(decodedMsg, m) {
+		t.Errorf("Messages are different, expected '%+v', got '%+v'", m, decodedMsg)
 	}
 
-	// 2.2 Test validate func
-	_, err = Decode(msgPayload, func(data []byte, sig []byte) (common.Address, error) {
+	// 2.2 Test nil validate func
+	decodedMsg = new(Message)
+	err = decodedMsg.FromPayload(msgPayload, nil)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !reflect.DeepEqual(decodedMsg, m) {
+		t.Errorf("Messages are different, expected '%+v', got '%+v'", m, decodedMsg)
+	}
+
+	// 2.3 Test failed validate func
+	decodedMsg = new(Message)
+	err = decodedMsg.FromPayload(msgPayload, func(data []byte, sig []byte) (common.Address, error) {
 		return common.Address{}, ErrNoMatchingValidator
 	})
 	if err != ErrNoMatchingValidator {
@@ -152,5 +170,5 @@ func testSignature(t *testing.T) {
 func TestMessageEncodeDecode(t *testing.T) {
 	testPreprepare(t)
 	testSubject(t)
-	testSignature(t)
+	testWithSignature(t)
 }
