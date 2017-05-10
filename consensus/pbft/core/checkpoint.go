@@ -25,13 +25,13 @@ import (
 func (c *core) sendCheckpoint(cp *pbft.Subject) {
 	logger := c.logger.New("state", c.state)
 	logger.Debug("sendCheckpoint")
-	c.broadcast(&pbft.Message{
-		Code: pbft.MsgCheckpoint,
+	c.broadcast(&message{
+		Code: msgCheckpoint,
 		Msg:  cp,
 	})
 }
 
-func (c *core) handleCheckpoint(msg *pbft.Message, src pbft.Validator) error {
+func (c *core) handleCheckpoint(msg *message, src pbft.Validator) error {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 
 	cp, ok := msg.Msg.(*pbft.Subject)

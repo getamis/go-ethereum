@@ -29,8 +29,8 @@ func (c *core) sendPreprepare(request *pbft.Request) {
 
 	if c.isPrimary() {
 		logger.Debug("sendPreprepare")
-		c.broadcast(&pbft.Message{
-			Code: pbft.MsgPreprepare,
+		c.broadcast(&message{
+			Code: msgPreprepare,
 			Msg: &pbft.Preprepare{
 				View:     nextSeqView,
 				Proposal: c.makeProposal(nextSeqView.Sequence, request),
@@ -39,7 +39,7 @@ func (c *core) sendPreprepare(request *pbft.Request) {
 	}
 }
 
-func (c *core) handlePreprepare(msg *pbft.Message, src pbft.Validator) error {
+func (c *core) handlePreprepare(msg *message, src pbft.Validator) error {
 	logger := log.New("from", src.Address().Hex(), "state", c.state)
 	logger.Debug("handlePreprepare")
 
@@ -48,7 +48,7 @@ func (c *core) handlePreprepare(msg *pbft.Message, src pbft.Validator) error {
 		return errFailedDecodePreprepare
 	}
 
-	if c.isFutureMessage(pbft.MsgPreprepare, preprepare.View) {
+	if c.isFutureMessage(msgPreprepare, preprepare.View) {
 		return errFutureMessage
 	}
 

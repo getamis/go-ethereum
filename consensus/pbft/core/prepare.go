@@ -25,13 +25,13 @@ import (
 func (c *core) sendPrepare() {
 	logger := c.logger.New("state", c.state)
 	logger.Debug("sendPrepare")
-	c.broadcast(&pbft.Message{
-		Code: pbft.MsgPrepare,
+	c.broadcast(&message{
+		Code: msgPrepare,
 		Msg:  c.subject,
 	})
 }
 
-func (c *core) handlePrepare(msg *pbft.Message, src pbft.Validator) error {
+func (c *core) handlePrepare(msg *message, src pbft.Validator) error {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 	logger.Debug("handlePrepare")
 
@@ -40,7 +40,7 @@ func (c *core) handlePrepare(msg *pbft.Message, src pbft.Validator) error {
 		return errFailedDecodePrepare
 	}
 
-	if c.isFutureMessage(pbft.MsgPrepare, prepare.View) {
+	if c.isFutureMessage(msgPrepare, prepare.View) {
 		return errFutureMessage
 	}
 

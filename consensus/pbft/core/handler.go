@@ -82,7 +82,7 @@ func (c *core) handleExternalEvent() {
 				BlockContext: ev.BlockContext,
 			}, c.backend.Validators().GetByAddress(c.address))
 		case pbft.MessageEvent:
-			c.handleMsg(ev.Payload, c.backend.Validators().GetByAddress(ev.Address))
+			c.handleMsg(ev.Payload)
 		}
 	}
 }
@@ -103,20 +103,27 @@ func (c *core) handleInternalEvent() {
 	}
 }
 
-func (c *core) handleMsg(payload []byte, src pbft.Validator) error {
-	logger := c.logger.New("address", c.address.Hex(), "from", src.Address().Hex())
+func (c *core) handleMsg(payload []byte) error {
+	logger := c.logger.New("address", c.address.Hex())
 
 	// Decode message
-	msg := new(pbft.Message)
+	msg := new(message)
 	if err := msg.FromPayload(payload, c.backend.CheckValidatorSignature); err != nil {
 		logger.Error("Failed to decode message from payload", "error", err)
 		return err
 	}
 
+	// Only accept message if address is valid
+	src := c.backend.Validators().GetByAddress(msg.Address)
+	if src == nil {
+		logger.Error("Invalid address in message", "msg", msg)
+		return pbft.ErrNoMatchingValidator
+	}
+
 	return c.handle(msg, src)
 }
 
-func (c *core) handle(msg *pbft.Message, src pbft.Validator) error {
+func (c *core) handle(msg *message, src pbft.Validator) error {
 	logger := c.logger.New("address", c.address.Hex(), "from", src.Address().Hex())
 
 	testBacklog := func(err error) error {
@@ -129,16 +136,16 @@ func (c *core) handle(msg *pbft.Message, src pbft.Validator) error {
 	}
 
 	switch msg.Code {
-	case pbft.MsgPreprepare:
+	case msgPreprepare:
 		return testBacklog(c.handlePreprepare(msg, src))
-	case pbft.MsgPrepare:
+	case msgPrepare:
 		return testBacklog(c.handlePrepare(msg, src))
-	case pbft.MsgCommit:
+	case msgCommit:
 		return testBacklog(c.handleCommit(msg, src))
-	case pbft.MsgCheckpoint:
+	case msgCheckpoint:
 		return c.handleCheckpoint(msg, src)
-	case pbft.MsgViewChange:
-	case pbft.MsgNewView:
+	case msgViewChange:
+	case msgNewView:
 	default:
 		logger.Error("Invalid message", "msg", msg)
 	}

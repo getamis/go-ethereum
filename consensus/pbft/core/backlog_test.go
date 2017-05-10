@@ -35,7 +35,7 @@ func TestIsFutureMessage(t *testing.T) {
 	c := &core{
 		state:    StateAcceptRequest,
 		sequence: big.NewInt(0)}
-	r := c.isFutureMessage(pbft.MsgPreprepare, nil)
+	r := c.isFutureMessage(msgPreprepare, nil)
 	if r {
 		t.Error("Should return false if nil view")
 	}
@@ -43,7 +43,7 @@ func TestIsFutureMessage(t *testing.T) {
 		ViewNumber: big.NewInt(10),
 		Sequence:   big.NewInt(10),
 	}
-	r = c.isFutureMessage(pbft.MsgPreprepare, v)
+	r = c.isFutureMessage(msgPreprepare, v)
 	if r {
 		t.Error("Should return false if nil subject")
 	}
@@ -57,35 +57,35 @@ func TestIsFutureMessage(t *testing.T) {
 	c.state = StateAcceptRequest
 	c.completed = true
 	nextSeq := c.nextSequence()
-	r = c.isFutureMessage(pbft.MsgPreprepare, nextSeq)
+	r = c.isFutureMessage(msgPreprepare, nextSeq)
 	if r {
 		t.Error("Should false because we can execute it now")
 	}
-	r = c.isFutureMessage(pbft.MsgPrepare, nextSeq)
+	r = c.isFutureMessage(msgPrepare, nextSeq)
 	if !r {
 		t.Error("Should return true because it's a future sequence")
 	}
 	nextViewNumber := c.nextViewNumber()
-	r = c.isFutureMessage(pbft.MsgPreprepare, nextViewNumber)
+	r = c.isFutureMessage(msgPreprepare, nextViewNumber)
 	if r {
 		t.Error("Should false because we can execute it now")
 	}
-	r = c.isFutureMessage(pbft.MsgPrepare, nextViewNumber)
+	r = c.isFutureMessage(msgPrepare, nextViewNumber)
 	if !r {
 		t.Error("Should return true because it's a future number")
 	}
-	r = c.isFutureMessage(pbft.MsgCommit, v)
+	r = c.isFutureMessage(msgCommit, v)
 	if r {
 		t.Error("Should return false because this round is completed")
 	}
 
 	// for non-completed
 	c.completed = false
-	r = c.isFutureMessage(pbft.MsgPreprepare, nextSeq)
+	r = c.isFutureMessage(msgPreprepare, nextSeq)
 	if !r {
 		t.Error("Should true because of next sequence")
 	}
-	r = c.isFutureMessage(pbft.MsgPreprepare, nextViewNumber)
+	r = c.isFutureMessage(msgPreprepare, nextViewNumber)
 	if !r {
 		t.Error("Should false because of next view")
 	}
@@ -115,8 +115,8 @@ func TestStoreBacklog(t *testing.T) {
 			Signatures:   [][]byte{[]byte("sig1")},
 		},
 	}
-	m := &pbft.Message{
-		Code: pbft.MsgPreprepare,
+	m := &message{
+		Code: msgPreprepare,
 		Msg:  preprepare,
 	}
 	c.storeBacklog(m, p)
@@ -129,8 +129,8 @@ func TestStoreBacklog(t *testing.T) {
 		View:   v,
 		Digest: []byte("digest"),
 	}
-	m = &pbft.Message{
-		Code: pbft.MsgPrepare,
+	m = &message{
+		Code: msgPrepare,
 		Msg:  subject,
 	}
 	c.storeBacklog(m, p)
@@ -139,8 +139,8 @@ func TestStoreBacklog(t *testing.T) {
 	}
 
 	// push commit msg
-	m = &pbft.Message{
-		Code: pbft.MsgCommit,
+	m = &message{
+		Code: msgCommit,
 		Msg:  subject,
 	}
 	c.storeBacklog(m, p)
@@ -173,8 +173,8 @@ func TestProcessFutureBacklog(t *testing.T) {
 		View:   v,
 		Digest: []byte("digest"),
 	}
-	m := &pbft.Message{
-		Code: pbft.MsgCommit,
+	m := &message{
+		Code: msgCommit,
 		Msg:  subject,
 	}
 	c.storeBacklog(m, p)
@@ -213,17 +213,17 @@ func TestProcessBacklog(t *testing.T) {
 		Digest: []byte("digest"),
 	}
 
-	msgs := []*pbft.Message{
-		&pbft.Message{
-			Code: pbft.MsgPreprepare,
+	msgs := []*message{
+		&message{
+			Code: msgPreprepare,
 			Msg:  preprepare,
 		},
-		&pbft.Message{
-			Code: pbft.MsgPrepare,
+		&message{
+			Code: msgPrepare,
 			Msg:  subject,
 		},
-		&pbft.Message{
-			Code: pbft.MsgCommit,
+		&message{
+			Code: msgCommit,
 			Msg:  subject,
 		},
 	}
@@ -232,7 +232,7 @@ func TestProcessBacklog(t *testing.T) {
 	}
 }
 
-func testProcessBacklog(t *testing.T, msg *pbft.Message) {
+func testProcessBacklog(t *testing.T, msg *message) {
 	vset := newTestValidatorSet(1)
 	backend := &testSystemBackend{
 		events: new(event.TypeMux),

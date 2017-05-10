@@ -38,7 +38,7 @@ func (c *core) isFutureMessage(msgCode uint64, view *pbft.View) bool {
 
 	if c.subject == nil {
 		// only in initial state
-		if msgCode == pbft.MsgPreprepare {
+		if msgCode == msgPreprepare {
 			return false
 		}
 		return true
@@ -48,7 +48,7 @@ func (c *core) isFutureMessage(msgCode uint64, view *pbft.View) bool {
 	if c.completed {
 		// check the next round
 		newPriority = toPriority(msgCode, view)
-		if c.state == StateAcceptRequest && msgCode == pbft.MsgPreprepare {
+		if c.state == StateAcceptRequest && msgCode == msgPreprepare {
 			// next sequence
 			if toPriority(msgCode, c.nextSequence()) == newPriority {
 				return false
@@ -67,7 +67,7 @@ func (c *core) isFutureMessage(msgCode uint64, view *pbft.View) bool {
 	return priority > newPriority
 }
 
-func (c *core) storeBacklog(msg *pbft.Message, src pbft.Validator) {
+func (c *core) storeBacklog(msg *message, src pbft.Validator) {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 
 	if src.Address() == c.Address() {
@@ -85,7 +85,7 @@ func (c *core) storeBacklog(msg *pbft.Message, src pbft.Validator) {
 		backlog = prque.New()
 	}
 	switch msg.Code {
-	case pbft.MsgPreprepare:
+	case msgPreprepare:
 		m, ok := msg.Msg.(*pbft.Preprepare)
 		if ok {
 			backlog.Push(msg, toPriority(msg.Code, m.View))
@@ -117,10 +117,10 @@ func (c *core) processBacklog() {
 		//   2. The first message in queue is a future message
 		for !(backlog.Empty() || isFuture) {
 			m, prio := backlog.Pop()
-			msg := m.(*pbft.Message)
+			msg := m.(*message)
 			var view *pbft.View
 			switch msg.Code {
-			case pbft.MsgPreprepare:
+			case msgPreprepare:
 				m, ok := msg.Msg.(*pbft.Preprepare)
 				if ok {
 					view = m.View

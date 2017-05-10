@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package pbft
+package core
 
 import (
 	"math/big"
@@ -22,21 +22,22 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/pbft"
 )
 
 func testPreprepare(t *testing.T) {
-	pp := &Preprepare{
-		View: &View{
+	pp := &pbft.Preprepare{
+		View: &pbft.View{
 			ViewNumber: big.NewInt(1),
 			Sequence:   big.NewInt(2),
 		},
-		Proposal: &Proposal{
-			Header: &ProposalHeader{
+		Proposal: &pbft.Proposal{
+			Header: &pbft.ProposalHeader{
 				Sequence:   big.NewInt(10),
 				ParentHash: common.HexToHash("0x1234567890"),
 				DataHash:   common.HexToHash("0x9876543210"),
 			},
-			BlockContext: NewBlockContext([]byte{0x02}, big.NewInt(2)),
+			BlockContext: pbft.NewBlockContext([]byte{0x02}, big.NewInt(2)),
 			Signatures: [][]byte{
 				[]byte{0x01},
 				[]byte{0x02},
@@ -44,8 +45,8 @@ func testPreprepare(t *testing.T) {
 		},
 	}
 
-	m := &Message{
-		Code:    MsgPreprepare,
+	m := &message{
+		Code:    msgPreprepare,
 		Msg:     pp,
 		Address: common.HexToAddress("0x1234567890"),
 	}
@@ -55,14 +56,14 @@ func testPreprepare(t *testing.T) {
 		t.Error(err)
 	}
 
-	decodedMsg := new(Message)
+	decodedMsg := new(message)
 	err = decodedMsg.FromPayload(msgPayload, nil)
 	if err != nil {
 		t.Error(err)
 	}
 
-	var decodedPP *Preprepare
-	decodedPP = decodedMsg.Msg.(*Preprepare)
+	var decodedPP *pbft.Preprepare
+	decodedPP = decodedMsg.Msg.(*pbft.Preprepare)
 	if err != nil {
 		t.Error(err)
 	}
@@ -73,16 +74,16 @@ func testPreprepare(t *testing.T) {
 }
 
 func testSubject(t *testing.T) {
-	s := &Subject{
-		View: &View{
+	s := &pbft.Subject{
+		View: &pbft.View{
 			ViewNumber: big.NewInt(1),
 			Sequence:   big.NewInt(2),
 		},
 		Digest: []byte{0x01, 0x02},
 	}
 
-	m := &Message{
-		Code:    MsgPreprepare,
+	m := &message{
+		Code:    msgPreprepare,
 		Msg:     s,
 		Address: common.HexToAddress("0x1234567890"),
 	}
@@ -92,14 +93,14 @@ func testSubject(t *testing.T) {
 		t.Error(err)
 	}
 
-	decodedMsg := new(Message)
+	decodedMsg := new(message)
 	err = decodedMsg.FromPayload(msgPayload, nil)
 	if err != nil {
 		t.Error(err)
 	}
 
-	var decodedSub *Subject
-	decodedSub = decodedMsg.Msg.(*Subject)
+	var decodedSub *pbft.Subject
+	decodedSub = decodedMsg.Msg.(*pbft.Subject)
 	if err != nil {
 		t.Error(err)
 	}
@@ -110,8 +111,8 @@ func testSubject(t *testing.T) {
 }
 
 func testWithSignature(t *testing.T) {
-	s := &Subject{
-		View: &View{
+	s := &pbft.Subject{
+		View: &pbft.View{
 			ViewNumber: big.NewInt(1),
 			Sequence:   big.NewInt(2),
 		},
@@ -120,8 +121,8 @@ func testWithSignature(t *testing.T) {
 	expectedSig := []byte{0x01}
 
 	// 1. Encode test
-	m := &Message{
-		Code:      MsgPreprepare,
+	m := &message{
+		Code:      msgPreprepare,
 		Msg:       s,
 		Address:   common.HexToAddress("0x1234567890"),
 		Signature: expectedSig,
@@ -134,7 +135,7 @@ func testWithSignature(t *testing.T) {
 
 	// 2. Decode test
 	// 2.1 Test normal validate func
-	decodedMsg := new(Message)
+	decodedMsg := new(message)
 	err = decodedMsg.FromPayload(msgPayload, func(data []byte, sig []byte) (common.Address, error) {
 		return common.Address{}, nil
 	})
@@ -147,7 +148,7 @@ func testWithSignature(t *testing.T) {
 	}
 
 	// 2.2 Test nil validate func
-	decodedMsg = new(Message)
+	decodedMsg = new(message)
 	err = decodedMsg.FromPayload(msgPayload, nil)
 	if err != nil {
 		t.Error(err)
@@ -158,11 +159,11 @@ func testWithSignature(t *testing.T) {
 	}
 
 	// 2.3 Test failed validate func
-	decodedMsg = new(Message)
+	decodedMsg = new(message)
 	err = decodedMsg.FromPayload(msgPayload, func(data []byte, sig []byte) (common.Address, error) {
-		return common.Address{}, ErrNoMatchingValidator
+		return common.Address{}, pbft.ErrNoMatchingValidator
 	})
-	if err != ErrNoMatchingValidator {
+	if err != pbft.ErrNoMatchingValidator {
 		t.Errorf("Expect ErrNoMatchingValidator error, but got: %v", err)
 	}
 }

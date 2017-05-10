@@ -167,7 +167,11 @@ OUTER:
 			}
 
 			// run each backends and verify handlePreprepare function.
-			if err := c.handlePreprepare(preprepare, v0.Validators().GetByAddress(v0.Address())); err != nil {
+			if err := c.handlePreprepare(&message{
+				Code:    msgPreprepare,
+				Msg:     preprepare,
+				Address: v0.Address(),
+			}, v0.Validators().GetByAddress(v0.Address())); err != nil {
 				if err != test.expectedErr {
 					t.Error("unexpected error: ", err)
 				}
@@ -186,12 +190,13 @@ OUTER:
 				t.Error("should not complete")
 			}
 			// verify prepare messages
-			decodedMsg, err := pbft.Decode(v.sentMsgs[0], nil)
+			decodedMsg := new(message)
+			err := decodedMsg.FromPayload(v.sentMsgs[0], nil)
 			if err != nil {
 				t.Error("failed to parse")
 			}
 
-			if decodedMsg.Code != pbft.MsgPrepare {
+			if decodedMsg.Code != msgPrepare {
 				t.Error("message code is not the same")
 			}
 			m, ok := decodedMsg.Msg.(*pbft.Subject)

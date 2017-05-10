@@ -87,15 +87,6 @@ func (sb *simpleBackend) Validators() pbft.ValidatorSet {
 }
 
 func (sb *simpleBackend) Send(payload []byte, target common.Address) error {
-	pbftMsg := pbft.MessageEvent{
-		Address: sb.Address(),
-		Payload: payload,
-	}
-	pbftByte, err := Encode(&pbftMsg)
-	if err != nil {
-		return err
-	}
-
 	peer := sb.peerSet.GetByAddress(target)
 	if peer == nil {
 		return errInvalidPeer
@@ -103,7 +94,7 @@ func (sb *simpleBackend) Send(payload []byte, target common.Address) error {
 
 	go sb.eventMux.Post(pbft.ConsensusDataEvent{
 		PeerID: peer.ID(),
-		Data:   pbftByte,
+		Data:   payload,
 	})
 	return nil
 }
@@ -111,12 +102,7 @@ func (sb *simpleBackend) Send(payload []byte, target common.Address) error {
 // Broadcast implements pbft.Backend.Send
 func (sb *simpleBackend) Broadcast(payload []byte) error {
 	pbftMsg := pbft.MessageEvent{
-		Address: sb.Address(),
 		Payload: payload,
-	}
-	pbftByte, err := Encode(&pbftMsg)
-	if err != nil {
-		return err
 	}
 
 	// send to self
@@ -126,7 +112,7 @@ func (sb *simpleBackend) Broadcast(payload []byte) error {
 	for _, peer := range sb.peerSet.List() {
 		go sb.eventMux.Post(pbft.ConsensusDataEvent{
 			PeerID: peer.ID(),
-			Data:   pbftByte,
+			Data:   payload,
 		})
 	}
 	return nil

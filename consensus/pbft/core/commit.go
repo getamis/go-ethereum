@@ -25,13 +25,13 @@ import (
 func (c *core) sendCommit() {
 	logger := c.logger.New("state", c.state)
 	logger.Debug("sendCommit")
-	c.broadcast(&pbft.Message{
-		Code: pbft.MsgCommit,
+	c.broadcast(&message{
+		Code: msgCommit,
 		Msg:  c.subject,
 	})
 }
 
-func (c *core) handleCommit(msg *pbft.Message, src pbft.Validator) error {
+func (c *core) handleCommit(msg *message, src pbft.Validator) error {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 	logger.Debug("handleCommit")
 
@@ -40,7 +40,7 @@ func (c *core) handleCommit(msg *pbft.Message, src pbft.Validator) error {
 		return errFailedDecodeCommit
 	}
 
-	if c.isFutureMessage(pbft.MsgCommit, commit.View) {
+	if c.isFutureMessage(msgCommit, commit.View) {
 		return errFutureMessage
 	}
 

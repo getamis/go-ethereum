@@ -142,7 +142,12 @@ OUTER:
 		r0 := v0.engine.(*core)
 
 		for i, v := range test.system.backends {
-			if err := r0.handlePrepare(v.engine.(*core).subject, v.Validators().GetByIndex(uint64(i))); err != nil {
+			validator := v.Validators().GetByIndex(uint64(i))
+			if err := r0.handlePrepare(&message{
+				Code:    msgPrepare,
+				Msg:     v.engine.(*core).subject,
+				Address: validator.Address(),
+			}, validator); err != nil {
 				if err != test.expectedErr {
 					t.Error("unexpected error: ", err)
 				}
@@ -174,12 +179,13 @@ OUTER:
 		}
 
 		// verify commit messages
-		decodedMsg, err := pbft.Decode(v0.sentMsgs[0], nil)
+		decodedMsg := new(message)
+		err := decodedMsg.FromPayload(v0.sentMsgs[0], nil)
 		if err != nil {
 			t.Error("failed to parse")
 		}
 
-		if decodedMsg.Code != pbft.MsgCommit {
+		if decodedMsg.Code != msgCommit {
 			t.Error("message code is not the same")
 		}
 		m, ok := decodedMsg.Msg.(*pbft.Subject)

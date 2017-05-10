@@ -141,7 +141,12 @@ OUTER:
 		r0 := v0.engine.(*core)
 
 		for i, v := range test.system.backends {
-			if err := r0.handlePrepare(v.engine.(*core).subject, v.Validators().GetByIndex(uint64(i))); err != nil {
+			validator := v.Validators().GetByIndex(uint64(i))
+			if err := r0.handlePrepare(&message{
+				Code:    msgPrepare,
+				Msg:     v.engine.(*core).subject,
+				Address: validator.Address(),
+			}, validator); err != nil {
 				if err != test.expectedErr {
 					t.Error("unexpected error: ", err)
 				}

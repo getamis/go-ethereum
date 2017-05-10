@@ -97,7 +97,7 @@ type core struct {
 	snapshotsMu *sync.RWMutex
 }
 
-func (c *core) finalizeMessage(msg *pbft.Message) ([]byte, error) {
+func (c *core) finalizeMessage(msg *message) ([]byte, error) {
 	// Add sender address
 	msg.Address = c.Address()
 
@@ -120,7 +120,7 @@ func (c *core) finalizeMessage(msg *pbft.Message) ([]byte, error) {
 	return payload, nil
 }
 
-func (c *core) broadcast(msg *pbft.Message) {
+func (c *core) broadcast(msg *message) {
 	logger := c.logger.New("state", c.state)
 
 	payload, err := c.finalizeMessage(msg)
