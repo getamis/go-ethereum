@@ -192,7 +192,7 @@ func (sb *simpleBackend) EventMux() *event.TypeMux {
 func (sb *simpleBackend) Verify(proposal *pbft.Proposal) error {
 	// decode the proposal to block
 	block := &types.Block{}
-	err := rlp.DecodeBytes(proposal.Payload, block)
+	err := rlp.DecodeBytes(proposal.BlockContext.Payload(), block)
 	if err != nil {
 		log.Warn("decode block error", "err", err)
 		return err
