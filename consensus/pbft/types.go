@@ -36,7 +36,7 @@ type State struct {
 // BlockContexter supports retrieving height and serialized block to be used during PBFT consensus.
 type BlockContexter interface {
 	// Number retrieves block height.
-	Height() *big.Int
+	Number() *big.Int
 
 	// Payload returns a serialized block
 	Payload() []byte
@@ -48,21 +48,21 @@ type BlockContexter interface {
 // TODO: Wrapper is not needed.
 // We wrap the block by BlockContext struct since the gob cannot encode/decode private fields (like types.Block.header).
 // So a custom encoder/decoder is needed. The go-ethereum rlp encoder/decoder is recommended here.
-func NewBlockContext(payload []byte, number *big.Int) *BlockContext {
+func NewBlockContext(payload []byte, height *big.Int) *BlockContext {
 	return &BlockContext{
 		RawData: payload,
-		Number:  number,
+		Height:  height,
 	}
 }
 
 // BlockContext expose their members which allow the struct can be marshal/unmarshal by gob.
 type BlockContext struct {
 	RawData []byte
-	Number  *big.Int
+	Height  *big.Int
 }
 
-func (b *BlockContext) Height() *big.Int {
-	return b.Number
+func (b *BlockContext) Number() *big.Int {
+	return b.Height
 }
 
 func (b *BlockContext) Payload() []byte {
