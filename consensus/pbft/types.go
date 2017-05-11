@@ -40,6 +40,10 @@ type BlockContexter interface {
 
 	// Payload returns a serialized block
 	Payload() []byte
+
+	EncodeRLP(w io.Writer) error
+
+	DecodeRLP(s *rlp.Stream) error
 }
 
 // NewBlockContext returns a BlockContext using the given payload and number.
@@ -67,6 +71,23 @@ func (b *BlockContext) Number() *big.Int {
 
 func (b *BlockContext) Payload() []byte {
 	return b.RawData
+}
+
+func (b *BlockContext) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, []interface{}{b.Height,b.RawData})
+}
+
+func (b *BlockContext) DecodeRLP(s *rlp.Stream) error {
+	var proposal struct {
+		RawData []byte
+		Height *big.Int
+	}
+
+	if err := s.Decode(&proposal); err != nil {
+		return err
+	}
+	b.RawData, b.Height = b.RawData, proposal.Height
+	return nil
 }
 
 type Request struct {
