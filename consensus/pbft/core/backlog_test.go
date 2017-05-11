@@ -111,7 +111,7 @@ func TestStoreBacklog(t *testing.T) {
 				ParentHash: common.HexToHash("0x1234567890"),
 				DataHash:   common.HexToHash("0x9876543210"),
 			},
-			BlockContext: makeBlock(1),
+			RequestContext: makeBlock(1),
 			Signatures:   [][]byte{[]byte("sig1")},
 		},
 	}
@@ -208,7 +208,7 @@ func TestProcessBacklog(t *testing.T) {
 				ParentHash: common.HexToHash("0x1234567890"),
 				DataHash:   common.HexToHash("0x9876543210"),
 			},
-			BlockContext: makeBlock(1),
+			RequestContext: makeBlock(1),
 			Signatures:   [][]byte{[]byte("sig1")},
 		},
 	}

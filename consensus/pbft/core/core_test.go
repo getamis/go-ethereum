@@ -67,10 +67,10 @@ func TestNewRequest(t *testing.T) {
 		if len(backend.commitMsgs) != 2 {
 			t.Error("expected execution of requests should be 2")
 		}
-		if !reflect.DeepEqual(request1.Number(), backend.commitMsgs[0].BlockContext.Number()) {
+		if !reflect.DeepEqual(request1.Number(), backend.commitMsgs[0].RequestContext.Number()) {
 			t.Error("payload is not the same (1)")
 		}
-		if !reflect.DeepEqual(request2.Number(), backend.commitMsgs[1].BlockContext.Number()) {
+		if !reflect.DeepEqual(request2.Number(), backend.commitMsgs[1].RequestContext.Number()) {
 			t.Error("payload is not the same (2)")
 		}
 	}

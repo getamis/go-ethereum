@@ -35,7 +35,7 @@ type State struct {
 }
 
 // BlockContexter supports retrieving height and serialized block to be used during PBFT consensus.
-type BlockContexter interface {
+type RequestContexter interface {
 	// Number retrieves block height.
 	Number() *big.Int
 
@@ -45,7 +45,7 @@ type BlockContexter interface {
 }
 
 type Request struct {
-	BlockContext BlockContexter
+	BlockContext RequestContexter
 }
 
 type View struct {
@@ -60,28 +60,28 @@ type ProposalHeader struct {
 }
 
 type Proposal struct {
-	Header       *ProposalHeader
-	BlockContext BlockContexter
-	Signatures   [][]byte
+	Header         *ProposalHeader
+	RequestContext RequestContexter
+	Signatures     [][]byte
 }
 
 // EncodeRLP serializes b into the Ethereum RLP View format.
 func (b *Proposal) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, []interface{}{b.Header, b.BlockContext, b.Signatures})
+	return rlp.Encode(w, []interface{}{b.Header, b.RequestContext, b.Signatures})
 }
 
 // DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
 func (b *Proposal) DecodeRLP(s *rlp.Stream) error {
 	var proposal struct {
-		Header       *ProposalHeader
-		BlockContext *types.Block
-		Signatures   [][]byte
+		Header         *ProposalHeader
+		RequestContext *types.Block
+		Signatures     [][]byte
 	}
 
 	if err := s.Decode(&proposal); err != nil {
 		return err
 	}
-	b.Header, b.BlockContext, b.Signatures = proposal.Header, proposal.BlockContext, proposal.Signatures
+	b.Header, b.RequestContext, b.Signatures = proposal.Header, proposal.RequestContext, proposal.Signatures
 	return nil
 }
 

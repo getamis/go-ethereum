@@ -49,7 +49,7 @@ func TestHandleMsg(t *testing.T) {
 				ParentHash: common.HexToHash("0x1234567890"),
 				DataHash:   common.HexToHash("0x9876543210"),
 			},
-			BlockContext: makeBlock(1),
+			RequestContext: makeBlock(1),
 			Signatures: [][]byte{
 				[]byte{0x01},
 				[]byte{0x02},
@@ -78,7 +78,7 @@ func TestHandleMsg(t *testing.T) {
 				ParentHash: common.HexToHash("0x1234567890"),
 				DataHash:   common.HexToHash("0x9876543210"),
 			},
-			BlockContext: makeBlock(2),
+			RequestContext: makeBlock(2),
 			Signatures: [][]byte{
 				[]byte{0x01},
 				[]byte{0x02},
@@ -107,7 +107,7 @@ func TestHandleMsg(t *testing.T) {
 				ParentHash: common.HexToHash("0x1234567890"),
 				DataHash:   common.HexToHash("0x9876543210"),
 			},
-			BlockContext: makeBlock(2),
+			RequestContext: makeBlock(2),
 			Signatures: [][]byte{
 				[]byte{0x01},
 				[]byte{0x02},

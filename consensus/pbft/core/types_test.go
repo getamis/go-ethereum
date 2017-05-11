@@ -38,7 +38,7 @@ func testPreprepare(t *testing.T) {
 				ParentHash: common.HexToHash("0x1234567890"),
 				DataHash:   common.HexToHash("0x9876543210"),
 			},
-			BlockContext: block,
+			RequestContext: block,
 			Signatures: [][]byte{
 				[]byte{0x01},
 				[]byte{0x02},
@@ -84,7 +84,7 @@ func testPreprepare(t *testing.T) {
 		t.Errorf("View are different, expected '%+v', got '%+v'", pp.View, decodedPP.View)
 	}
 
-	if !reflect.DeepEqual(pp.Proposal.BlockContext.Number(), decodedPP.Proposal.BlockContext.Number()) {
+	if !reflect.DeepEqual(pp.Proposal.RequestContext.Number(), decodedPP.Proposal.RequestContext.Number()) {
 		t.Errorf("Block number are different, expected '%+v', got '%+v'", pp, decodedPP)
 	}
 }

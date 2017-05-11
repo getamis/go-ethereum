@@ -58,7 +58,7 @@ func TestMessageSetWithPreprepare(t *testing.T) {
 				ParentHash: common.HexToHash("0x1234567890"),
 				DataHash:   common.HexToHash("0x9876543210"),
 			},
-			BlockContext: makeBlock(1),
+			RequestContext: makeBlock(1),
 			Signatures: [][]byte{
 				[]byte{0x01, 0x03},
 				[]byte{0x02, 0x04},
@@ -133,7 +133,7 @@ func TestMessageSetWithSubject(t *testing.T) {
 				ParentHash: common.HexToHash("0x1234567890"),
 				DataHash:   common.HexToHash("0x9876543210"),
 			},
-			BlockContext: makeBlock(1),
+			RequestContext: makeBlock(1),
 			Signatures: [][]byte{
 				[]byte{0x01, 0x03},
 				[]byte{0x02, 0x04},

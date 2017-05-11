@@ -125,7 +125,7 @@ func (sb *simpleBackend) Commit(proposal *pbft.Proposal) error {
 	// step1: update validator set from extra data of block
 	// step2: insert chain
 	block := &types.Block{}
-	block, ok := proposal.BlockContext.(*types.Block)
+	block, ok := proposal.RequestContext.(*types.Block)
 	if !ok {
 		return fmt.Errorf("failed to decode block...")
 	}
@@ -178,7 +178,7 @@ func (sb *simpleBackend) EventMux() *event.TypeMux {
 func (sb *simpleBackend) Verify(proposal *pbft.Proposal) error {
 	// decode the proposal to block
 	block := &types.Block{}
-	block, ok := proposal.BlockContext.(*types.Block)
+	block, ok := proposal.RequestContext.(*types.Block)
 	if !ok {
 		return fmt.Errorf("failed to decode block...")
 	}

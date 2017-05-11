@@ -163,8 +163,8 @@ func (c *core) makeProposal(seq *big.Int, request *pbft.Request) *pbft.Proposal 
 	}
 
 	return &pbft.Proposal{
-		Header:       header,
-		BlockContext: request.BlockContext,
+		Header:         header,
+		RequestContext: request.BlockContext,
 	}
 }
 
