@@ -17,10 +17,11 @@
 package pbft
 
 import (
-	"encoding/gob"
+	"io"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // TODO: under cooking
@@ -89,9 +90,49 @@ type Proposal struct {
 	Signatures   [][]byte
 }
 
+// EncodeRLP serializes b into the Ethereum RLP View format.
+func (b *Proposal) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, []interface{}{b.Header, b.BlockContext, b.Signatures})
+}
+
+// DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
+func (b *Proposal) DecodeRLP(s *rlp.Stream) error {
+	var proposal struct {
+		Header       *ProposalHeader
+		BlockContext *BlockContext
+		Signatures   [][]byte
+	}
+
+	if err := s.Decode(&proposal); err != nil {
+		return err
+	}
+	b.Header, b.BlockContext, b.Signatures = proposal.Header, proposal.BlockContext, proposal.Signatures
+	return nil
+}
+
 type Preprepare struct {
 	View     *View
 	Proposal *Proposal
+}
+
+// EncodeRLP serializes b into the Ethereum RLP View format.
+func (b *Preprepare) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, []interface{}{b.View, b.Proposal})
+}
+
+// DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
+func (b *Preprepare) DecodeRLP(s *rlp.Stream) error {
+	var preprepare struct {
+		View     *View
+		Proposal *Proposal
+	}
+
+	if err := s.Decode(&preprepare); err != nil {
+		return err
+	}
+	b.View, b.Proposal = preprepare.View, preprepare.Proposal
+
+	return nil
 }
 
 type Subject struct {
@@ -99,11 +140,51 @@ type Subject struct {
 	Digest []byte
 }
 
+// EncodeRLP serializes b into the Ethereum RLP View format.
+func (b *Subject) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, []interface{}{b.View, b.Digest})
+}
+
+// DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
+func (b *Subject) DecodeRLP(s *rlp.Stream) error {
+	var subject struct {
+		View   *View
+		Digest []byte
+	}
+
+	if err := s.Decode(&subject); err != nil {
+		return err
+	}
+	b.View, b.Digest = subject.View, subject.Digest
+	return nil
+}
+
 type ViewChange struct {
 	ViewNumber *big.Int
 	PSet       []*Subject
 	QSet       []*Subject
 	Proposal   *Proposal
+}
+
+// EncodeRLP serializes b into the Ethereum RLP View format.
+func (b *ViewChange) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, []interface{}{b.ViewNumber, b.PSet, b.QSet, b.Proposal})
+}
+
+// DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
+func (b *ViewChange) DecodeRLP(s *rlp.Stream) error {
+	var viewChange struct {
+		ViewNumber *big.Int
+		PSet       []*Subject
+		QSet       []*Subject
+		Proposal   *Proposal
+	}
+
+	if err := s.Decode(&viewChange); err != nil {
+		return err
+	}
+	b.ViewNumber, b.PSet, b.QSet, b.Proposal = viewChange.ViewNumber, viewChange.PSet, viewChange.QSet, viewChange.Proposal
+	return nil
 }
 
 type SignedViewChange struct {
@@ -118,8 +199,29 @@ type NewView struct {
 	Proposal   *Proposal
 }
 
-func init() {
-	gob.Register(&Preprepare{})
-	gob.Register(&Subject{})
-	gob.Register(&BlockContext{})
+// EncodeRLP serializes b into the Ethereum RLP View format.
+func (b *NewView) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, []interface{}{b.ViewNumber, b.VSet, b.XSet, b.Proposal})
+}
+
+// DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
+func (b *NewView) DecodeRLP(s *rlp.Stream) error {
+	var newView struct {
+		ViewNumber *big.Int
+		VSet       *SignedViewChange
+		XSet       *Subject
+		Proposal   *Proposal
+	}
+
+	if err := s.Decode(&newView); err != nil {
+		return err
+	}
+	b.ViewNumber, b.VSet, b.XSet, b.Proposal = newView.ViewNumber, newView.VSet, newView.XSet, newView.Proposal
+	return nil
+}
+
+type Checkpoint struct {
+	Sequence  *big.Int
+	Digest    []byte
+	Signature []byte
 }

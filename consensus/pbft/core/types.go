@@ -17,10 +17,10 @@
 package core
 
 import (
-	"bytes"
-	"encoding/gob"
+	"io"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 const (
@@ -35,14 +35,43 @@ const (
 
 type message struct {
 	Code      uint64
-	Msg       interface{}
+	Msg       []byte
 	Address   common.Address
 	Signature []byte
 }
 
+// ==============================================
+//
+// define the functions that needs to be provided for rlp Encoder/Decoder.
+
+// EncodeRLP serializes b into the Ethereum RLP View format.
+func (m *message) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, []interface{}{m.Code, m.Msg, m.Address, m.Signature})
+}
+
+// DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
+func (m *message) DecodeRLP(s *rlp.Stream) error {
+	var msg struct {
+		Code      uint64
+		Msg       []byte
+		Address   common.Address
+		Signature []byte
+	}
+
+	if err := s.Decode(&msg); err != nil {
+		return err
+	}
+	m.Code, m.Msg, m.Address, m.Signature = msg.Code, msg.Msg, msg.Address, msg.Signature
+	return nil
+}
+
+// ==============================================
+//
+// define the functions that needs to be provided for core.
+
 func (m *message) FromPayload(b []byte, validateFn func([]byte, []byte) (common.Address, error)) error {
 	// Decode message
-	err := gob.NewDecoder(bytes.NewBuffer(b)).Decode(m)
+	err := rlp.DecodeBytes(b, &m)
 	if err != nil {
 		return err
 	}
@@ -62,23 +91,25 @@ func (m *message) FromPayload(b []byte, validateFn func([]byte, []byte) (common.
 }
 
 func (m *message) Payload() ([]byte, error) {
-	var buf bytes.Buffer
-	err := gob.NewEncoder(&buf).Encode(m)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return rlp.EncodeToBytes(m)
 }
 
 func (m *message) PayloadNoSig() ([]byte, error) {
-	var buf bytes.Buffer
-	err := gob.NewEncoder(&buf).Encode(&message{
+	return rlp.EncodeToBytes(&message{
 		Code:    m.Code,
 		Msg:     m.Msg,
 		Address: m.Address,
 	})
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+}
+
+func (m *message) Decode(val interface{}) error {
+	return rlp.DecodeBytes(m.Msg, val)
+}
+
+// ==============================================
+//
+// helper functions
+
+func Encode(val interface{}) ([]byte, error) {
+	return rlp.EncodeToBytes(val)
 }
