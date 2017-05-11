@@ -115,9 +115,10 @@ func TestStoreBacklog(t *testing.T) {
 			Signatures:   [][]byte{[]byte("sig1")},
 		},
 	}
+	prepreparePayload, _ := Encode(preprepare)
 	m := &message{
 		Code: msgPreprepare,
-		Msg:  preprepare,
+		Msg:  prepreparePayload,
 	}
 	c.storeBacklog(m, p)
 	if !reflect.DeepEqual(c.backlogs[p].PopItem(), m) {
@@ -129,9 +130,11 @@ func TestStoreBacklog(t *testing.T) {
 		View:   v,
 		Digest: []byte("digest"),
 	}
+	subjectPayload, _ := Encode(subject)
+
 	m = &message{
 		Code: msgPrepare,
-		Msg:  subject,
+		Msg:  subjectPayload,
 	}
 	c.storeBacklog(m, p)
 	if !reflect.DeepEqual(c.backlogs[p].PopItem(), m) {
@@ -141,7 +144,7 @@ func TestStoreBacklog(t *testing.T) {
 	// push commit msg
 	m = &message{
 		Code: msgCommit,
-		Msg:  subject,
+		Msg:  subjectPayload,
 	}
 	c.storeBacklog(m, p)
 	if !reflect.DeepEqual(c.backlogs[p].PopItem(), m) {
@@ -173,9 +176,10 @@ func TestProcessFutureBacklog(t *testing.T) {
 		View:   v,
 		Digest: []byte("digest"),
 	}
+	subjectPayload, _ := Encode(subject)
 	m := &message{
 		Code: msgCommit,
-		Msg:  subject,
+		Msg:  subjectPayload,
 	}
 	c.storeBacklog(m, p)
 	c.processBacklog()
@@ -208,23 +212,26 @@ func TestProcessBacklog(t *testing.T) {
 			Signatures:   [][]byte{[]byte("sig1")},
 		},
 	}
+	prepreparePayload, _ := Encode(preprepare)
+
 	subject := &pbft.Subject{
 		View:   v,
 		Digest: []byte("digest"),
 	}
+	subjectPayload, _ := Encode(subject)
 
 	msgs := []*message{
 		&message{
 			Code: msgPreprepare,
-			Msg:  preprepare,
+			Msg:  prepreparePayload,
 		},
 		&message{
 			Code: msgPrepare,
-			Msg:  subject,
+			Msg:  subjectPayload,
 		},
 		&message{
 			Code: msgCommit,
-			Msg:  subject,
+			Msg:  subjectPayload,
 		},
 	}
 	for i := 0; i < len(msgs); i++ {

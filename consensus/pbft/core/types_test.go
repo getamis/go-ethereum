@@ -44,10 +44,11 @@ func testPreprepare(t *testing.T) {
 			},
 		},
 	}
+	prepreparePayload, _ := Encode(pp)
 
 	m := &message{
 		Code:    msgPreprepare,
-		Msg:     pp,
+		Msg:     prepreparePayload,
 		Address: common.HexToAddress("0x1234567890"),
 	}
 
@@ -63,7 +64,7 @@ func testPreprepare(t *testing.T) {
 	}
 
 	var decodedPP *pbft.Preprepare
-	decodedPP = decodedMsg.Msg.(*pbft.Preprepare)
+	err = decodedMsg.Decode(&decodedPP)
 	if err != nil {
 		t.Error(err)
 	}
@@ -82,9 +83,11 @@ func testSubject(t *testing.T) {
 		Digest: []byte{0x01, 0x02},
 	}
 
+	subjectPayload, _ := Encode(s)
+
 	m := &message{
 		Code:    msgPreprepare,
-		Msg:     s,
+		Msg:     subjectPayload,
 		Address: common.HexToAddress("0x1234567890"),
 	}
 
@@ -100,7 +103,7 @@ func testSubject(t *testing.T) {
 	}
 
 	var decodedSub *pbft.Subject
-	decodedSub = decodedMsg.Msg.(*pbft.Subject)
+	err = decodedMsg.Decode(&decodedSub)
 	if err != nil {
 		t.Error(err)
 	}
@@ -120,10 +123,11 @@ func testWithSignature(t *testing.T) {
 	}
 	expectedSig := []byte{0x01}
 
+	subjectPayload, _ := Encode(s)
 	// 1. Encode test
 	m := &message{
 		Code:      msgPreprepare,
-		Msg:       s,
+		Msg:       subjectPayload,
 		Address:   common.HexToAddress("0x1234567890"),
 		Signature: expectedSig,
 	}

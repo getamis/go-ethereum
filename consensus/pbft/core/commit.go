@@ -25,9 +25,14 @@ import (
 func (c *core) sendCommit() {
 	logger := c.logger.New("state", c.state)
 	logger.Debug("sendCommit")
+
+	subject, err := Encode(c.subject)
+	if err != nil {
+		logger.Error("Failed to encode...")
+	}
 	c.broadcast(&message{
 		Code: msgCommit,
-		Msg:  c.subject,
+		Msg:  subject,
 	})
 }
 
@@ -35,8 +40,9 @@ func (c *core) handleCommit(msg *message, src pbft.Validator) error {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 	logger.Debug("handleCommit")
 
-	commit, ok := msg.Msg.(*pbft.Subject)
-	if !ok {
+	var commit *pbft.Subject
+	err := msg.Decode(&commit)
+	if err != nil {
 		return errFailedDecodeCommit
 	}
 

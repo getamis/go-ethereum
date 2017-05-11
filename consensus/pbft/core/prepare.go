@@ -25,9 +25,14 @@ import (
 func (c *core) sendPrepare() {
 	logger := c.logger.New("state", c.state)
 	logger.Debug("sendPrepare")
+
+	subject, err := Encode(c.subject)
+	if err != nil {
+		logger.Error("Failed to encode...")
+	}
 	c.broadcast(&message{
 		Code: msgPrepare,
-		Msg:  c.subject,
+		Msg:  subject,
 	})
 }
 
@@ -35,8 +40,9 @@ func (c *core) handlePrepare(msg *message, src pbft.Validator) error {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 	logger.Debug("handlePrepare")
 
-	prepare, ok := msg.Msg.(*pbft.Subject)
-	if !ok {
+	var prepare *pbft.Subject
+	err := msg.Decode(&prepare)
+	if err != nil {
 		return errFailedDecodePrepare
 	}
 
