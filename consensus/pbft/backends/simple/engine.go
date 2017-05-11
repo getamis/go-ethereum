@@ -21,6 +21,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
@@ -301,6 +302,8 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 		BlockContext: block,
 	})
 
+	// compensation for a few milliseconds of consensus runtime
+	<-time.After(100 * time.Millisecond)
 	for {
 		select {
 		case needNewProposal := <-sb.viewChange:
