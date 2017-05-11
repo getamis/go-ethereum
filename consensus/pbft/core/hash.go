@@ -17,27 +17,15 @@
 package core
 
 import (
-	"math/big"
-
-	"github.com/ethereum/go-ethereum/consensus/pbft"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto/sha3"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
-func newSnapshot(preprepare *pbft.Preprepare, validatorSet pbft.ValidatorSet) *snapshot {
-	return &snapshot{
-		ViewNumber:  preprepare.View.ViewNumber,
-		Sequence:    preprepare.View.Sequence,
-		Preprepare:  preprepare,
-		Prepares:    newMessageSet(validatorSet),
-		Commits:     newMessageSet(validatorSet),
-		Checkpoints: newMessageSet(validatorSet),
-	}
-}
+func hash(v interface{}) (h common.Hash) {
+	hw := sha3.NewKeccak256()
+	rlp.Encode(hw, v)
+	hw.Sum(h[:0])
 
-type snapshot struct {
-	ViewNumber  *big.Int
-	Sequence    *big.Int
-	Preprepare  *pbft.Preprepare
-	Prepares    *messageSet
-	Commits     *messageSet
-	Checkpoints *messageSet
+	return
 }
