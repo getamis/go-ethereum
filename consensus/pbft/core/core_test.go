@@ -22,9 +22,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/consensus/pbft"
+	"github.com/ethereum/go-ethereum/core/types"
 	elog "github.com/ethereum/go-ethereum/log"
 )
+
+func makeBlock(number int64) *types.Block {
+	header := &types.Header{
+		Difficulty: big.NewInt(0),
+		Number:     big.NewInt(number),
+		GasLimit:   big.NewInt(0),
+		GasUsed:    big.NewInt(0),
+		Time:       big.NewInt(0),
+	}
+	block := &types.Block{}
+	return block.WithSeal(header)
+}
 
 func TestNewRequest(t *testing.T) {
 	testLogger.SetHandler(elog.StdoutHandler)
@@ -37,15 +49,15 @@ func TestNewRequest(t *testing.T) {
 	close := sys.Run(true)
 	defer close()
 
-	request1 := []byte("request 1")
-	sys.backends[0].NewRequest(pbft.NewBlockContext(request1, big.NewInt(1)))
+	request1 := makeBlock(1)
+	sys.backends[0].NewRequest(request1)
 
 	select {
 	case <-time.After(1 * time.Second):
 	}
 
-	request2 := []byte("request 2")
-	sys.backends[0].NewRequest(pbft.NewBlockContext(request2, big.NewInt(1)))
+	request2 := makeBlock(2)
+	sys.backends[0].NewRequest(request2)
 
 	select {
 	case <-time.After(1 * time.Second):
@@ -55,10 +67,10 @@ func TestNewRequest(t *testing.T) {
 		if len(backend.commitMsgs) != 2 {
 			t.Error("expected execution of requests should be 2")
 		}
-		if !reflect.DeepEqual(request1, backend.commitMsgs[0].BlockContext.Payload()) {
+		if !reflect.DeepEqual(request1.Number(), backend.commitMsgs[0].BlockContext.Number()) {
 			t.Error("payload is not the same (1)")
 		}
-		if !reflect.DeepEqual(request2, backend.commitMsgs[1].BlockContext.Payload()) {
+		if !reflect.DeepEqual(request2.Number(), backend.commitMsgs[1].BlockContext.Number()) {
 			t.Error("payload is not the same (2)")
 		}
 	}

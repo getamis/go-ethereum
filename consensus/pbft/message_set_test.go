@@ -22,9 +22,22 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 
 	set "gopkg.in/fatih/set.v0"
 )
+
+func makeBlock(number int64) *types.Block {
+	header := &types.Header{
+		Difficulty: big.NewInt(0),
+		Number:     big.NewInt(number),
+		GasLimit:   big.NewInt(0),
+		GasUsed:    big.NewInt(0),
+		Time:       big.NewInt(0),
+	}
+	block := &types.Block{}
+	return block.WithSeal(header)
+}
 
 func TestMessageSetWithPreprepare(t *testing.T) {
 	view := &View{
@@ -45,7 +58,7 @@ func TestMessageSetWithPreprepare(t *testing.T) {
 				ParentHash: common.HexToHash("0x1234567890"),
 				DataHash:   common.HexToHash("0x9876543210"),
 			},
-			BlockContext: NewBlockContext([]byte{0x02}, big.NewInt(2)),
+			BlockContext: makeBlock(1),
 			Signatures: [][]byte{
 				[]byte{0x01, 0x03},
 				[]byte{0x02, 0x04},
@@ -120,7 +133,7 @@ func TestMessageSetWithSubject(t *testing.T) {
 				ParentHash: common.HexToHash("0x1234567890"),
 				DataHash:   common.HexToHash("0x9876543210"),
 			},
-			BlockContext: NewBlockContext([]byte{0x02}, big.NewInt(2)),
+			BlockContext: makeBlock(1),
 			Signatures: [][]byte{
 				[]byte{0x01, 0x03},
 				[]byte{0x02, 0x04},

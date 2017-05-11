@@ -21,6 +21,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -38,56 +39,9 @@ type BlockContexter interface {
 	// Number retrieves block height.
 	Number() *big.Int
 
-	// Payload returns a serialized block
-	Payload() []byte
-
 	EncodeRLP(w io.Writer) error
 
 	DecodeRLP(s *rlp.Stream) error
-}
-
-// NewBlockContext returns a BlockContext using the given payload and number.
-// payload is serialized block, number is block height.
-//
-// TODO: Wrapper is not needed.
-// We wrap the block by BlockContext struct since the gob cannot encode/decode private fields (like types.Block.header).
-// So a custom encoder/decoder is needed. The go-ethereum rlp encoder/decoder is recommended here.
-func NewBlockContext(payload []byte, height *big.Int) *BlockContext {
-	return &BlockContext{
-		RawData: payload,
-		Height:  height,
-	}
-}
-
-// BlockContext expose their members which allow the struct can be marshal/unmarshal by gob.
-type BlockContext struct {
-	RawData []byte
-	Height  *big.Int
-}
-
-func (b *BlockContext) Number() *big.Int {
-	return b.Height
-}
-
-func (b *BlockContext) Payload() []byte {
-	return b.RawData
-}
-
-func (b *BlockContext) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, []interface{}{b.Height,b.RawData})
-}
-
-func (b *BlockContext) DecodeRLP(s *rlp.Stream) error {
-	var proposal struct {
-		RawData []byte
-		Height *big.Int
-	}
-
-	if err := s.Decode(&proposal); err != nil {
-		return err
-	}
-	b.RawData, b.Height = b.RawData, proposal.Height
-	return nil
 }
 
 type Request struct {
@@ -120,7 +74,7 @@ func (b *Proposal) EncodeRLP(w io.Writer) error {
 func (b *Proposal) DecodeRLP(s *rlp.Stream) error {
 	var proposal struct {
 		Header       *ProposalHeader
-		BlockContext *BlockContext
+		BlockContext *types.Block
 		Signatures   [][]byte
 	}
 

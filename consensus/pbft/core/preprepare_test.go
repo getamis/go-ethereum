@@ -48,7 +48,7 @@ func TestHandlePreprepare(t *testing.T) {
 				}
 				return sys
 			}(),
-			pbft.NewBlockContext([]byte("normal case"), big.NewInt(1)),
+			makeBlock(1),
 			nil,
 		},
 		{
@@ -75,7 +75,7 @@ func TestHandlePreprepare(t *testing.T) {
 				}
 				return sys
 			}(),
-			pbft.NewBlockContext([]byte("future message"), big.NewInt(1)),
+			makeBlock(1),
 			errFutureMessage,
 		},
 		{
@@ -96,7 +96,7 @@ func TestHandlePreprepare(t *testing.T) {
 				}
 				return sys
 			}(),
-			pbft.NewBlockContext([]byte("not from proposer"), big.NewInt(1)),
+			makeBlock(1),
 			pbft.ErrNotFromProposer,
 		},
 		{
@@ -115,7 +115,7 @@ func TestHandlePreprepare(t *testing.T) {
 				}
 				return sys
 			}(),
-			pbft.NewBlockContext([]byte("invalid message"), big.NewInt(1)),
+			makeBlock(1),
 			pbft.ErrInvalidMessage,
 		},
 		{
@@ -134,7 +134,7 @@ func TestHandlePreprepare(t *testing.T) {
 				}
 				return sys
 			}(),
-			pbft.NewBlockContext([]byte("nil proposal"), big.NewInt(1)),
+			makeBlock(1),
 			pbft.ErrNilProposal,
 		},
 	}

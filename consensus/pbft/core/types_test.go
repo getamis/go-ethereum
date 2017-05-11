@@ -26,6 +26,7 @@ import (
 )
 
 func testPreprepare(t *testing.T) {
+	block := makeBlock(1)
 	pp := &pbft.Preprepare{
 		View: &pbft.View{
 			ViewNumber: big.NewInt(1),
@@ -37,7 +38,7 @@ func testPreprepare(t *testing.T) {
 				ParentHash: common.HexToHash("0x1234567890"),
 				DataHash:   common.HexToHash("0x9876543210"),
 			},
-			BlockContext: pbft.NewBlockContext([]byte{0x02}, big.NewInt(2)),
+			BlockContext: block,
 			Signatures: [][]byte{
 				[]byte{0x01},
 				[]byte{0x02},
@@ -69,8 +70,22 @@ func testPreprepare(t *testing.T) {
 		t.Error(err)
 	}
 
-	if !reflect.DeepEqual(pp, decodedPP) {
-		t.Errorf("messages are different, expected '%+v', got '%+v'", pp, decodedPP)
+	// if block is encoded/decoded by rlp, we cannot to compare interface data type using reflect.DeepEqual. (like BlockContext)
+	// so individual comparison here.
+	if !reflect.DeepEqual(pp.Proposal.Header, decodedPP.Proposal.Header) {
+		t.Errorf("Header are different, expected '%+v', got '%+v'", pp.Proposal, decodedPP.Proposal)
+	}
+
+	if !reflect.DeepEqual(pp.Proposal.Signatures, decodedPP.Proposal.Signatures) {
+		t.Errorf("Signatures are different, expected '%+v', got '%+v'", pp.Proposal.Signatures, decodedPP.Proposal.Signatures)
+	}
+
+	if !reflect.DeepEqual(pp.View, decodedPP.View) {
+		t.Errorf("View are different, expected '%+v', got '%+v'", pp.View, decodedPP.View)
+	}
+
+	if !reflect.DeepEqual(pp.Proposal.BlockContext.Number(), decodedPP.Proposal.BlockContext.Number()) {
+		t.Errorf("Block number are different, expected '%+v', got '%+v'", pp, decodedPP)
 	}
 }
 

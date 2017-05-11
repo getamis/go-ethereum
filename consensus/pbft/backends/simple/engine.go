@@ -296,13 +296,9 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 	}
 	copy(header.Extra[len(header.Extra)-extraSeal:], sighash)
 	block = block.WithSeal(header)
-	// step 2. feed block into PBFT engine
-	b, e := rlp.EncodeToBytes(block)
-	if e != nil {
-		return nil, e
-	}
+	// step 2. post block into PBFT engine
 	go sb.EventMux().Post(pbft.RequestEvent{
-		BlockContext: pbft.NewBlockContext(b, block.Number()),
+		BlockContext: block,
 	})
 
 	for {
