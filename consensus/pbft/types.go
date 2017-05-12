@@ -52,8 +52,8 @@ type Request struct {
 }
 
 type View struct {
-	ViewNumber *big.Int
-	Sequence   *big.Int
+	Round    *big.Int
+	Sequence *big.Int
 }
 
 type ProposalHeader struct {

@@ -31,8 +31,8 @@ import (
 func newMessageSet(valSet pbft.ValidatorSet) *messageSet {
 	return &messageSet{
 		view: &pbft.View{
-			ViewNumber: new(big.Int),
-			Sequence:   new(big.Int),
+			Round:    new(big.Int),
+			Sequence: new(big.Int),
 		},
 		messagesMu: new(sync.Mutex),
 		messages:   make(map[common.Hash]*message),

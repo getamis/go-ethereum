@@ -74,7 +74,7 @@ func New(backend pbft.Backend, config *pbft.Config) Engine {
 		logger:      log.New("address", backend.Address().Hex()),
 		backend:     backend,
 		sequence:    new(big.Int),
-		viewNumber:  new(big.Int),
+		round:       new(big.Int),
 		internalMux: new(event.TypeMux),
 		backlogs:    make(map[pbft.Validator]*prque.Prque),
 		backlogsMu:  new(sync.Mutex),
@@ -98,9 +98,9 @@ type core struct {
 	internalMux    *event.TypeMux
 	internalEvents *event.TypeMuxSubscription
 
-	sequence   *big.Int
-	viewNumber *big.Int
-	completed  bool
+	sequence  *big.Int
+	round     *big.Int
+	completed bool
 
 	subject *pbft.Subject
 
@@ -153,15 +153,15 @@ func (c *core) broadcast(msg *message) {
 
 func (c *core) nextSequence() *pbft.View {
 	return &pbft.View{
-		ViewNumber: c.viewNumber,
-		Sequence:   new(big.Int).Add(c.sequence, common.Big1),
+		Round:    c.round,
+		Sequence: new(big.Int).Add(c.sequence, common.Big1),
 	}
 }
 
-func (c *core) nextViewNumber() *pbft.View {
+func (c *core) nextRound() *pbft.View {
 	return &pbft.View{
-		ViewNumber: new(big.Int).Add(c.viewNumber, common.Big1),
-		Sequence:   c.sequence,
+		Round:    new(big.Int).Add(c.round, common.Big1),
+		Sequence: c.sequence,
 	}
 }
 

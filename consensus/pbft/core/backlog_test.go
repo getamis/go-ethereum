@@ -37,11 +37,11 @@ func TestIsFutureMessage(t *testing.T) {
 		sequence: big.NewInt(0)}
 	r := c.isFutureMessage(msgPreprepare, nil)
 	if r {
-		t.Error("Should return false if nil view")
+		t.Error("Should return false if nil round")
 	}
 	v := &pbft.View{
-		ViewNumber: big.NewInt(10),
-		Sequence:   big.NewInt(10),
+		Round:    big.NewInt(10),
+		Sequence: big.NewInt(10),
 	}
 	r = c.isFutureMessage(msgPreprepare, v)
 	if r {
@@ -53,7 +53,7 @@ func TestIsFutureMessage(t *testing.T) {
 		View: v,
 	}
 	c.sequence = big.NewInt(10)
-	c.viewNumber = big.NewInt(10)
+	c.round = big.NewInt(10)
 	c.state = StateAcceptRequest
 	c.completed = true
 	nextSeq := c.nextSequence()
@@ -65,14 +65,14 @@ func TestIsFutureMessage(t *testing.T) {
 	if !r {
 		t.Error("Should return true because it's a future sequence")
 	}
-	nextViewNumber := c.nextViewNumber()
-	r = c.isFutureMessage(msgPreprepare, nextViewNumber)
+	nextRound := c.nextRound()
+	r = c.isFutureMessage(msgPreprepare, nextRound)
 	if r {
 		t.Error("Should false because we can execute it now")
 	}
-	r = c.isFutureMessage(msgPrepare, nextViewNumber)
+	r = c.isFutureMessage(msgPrepare, nextRound)
 	if !r {
-		t.Error("Should return true because it's a future number")
+		t.Error("Should return true because it's a future round")
 	}
 	r = c.isFutureMessage(msgCommit, v)
 	if r {
@@ -85,9 +85,9 @@ func TestIsFutureMessage(t *testing.T) {
 	if !r {
 		t.Error("Should true because of next sequence")
 	}
-	r = c.isFutureMessage(msgPreprepare, nextViewNumber)
+	r = c.isFutureMessage(msgPreprepare, nextRound)
 	if !r {
-		t.Error("Should false because of next view")
+		t.Error("Should false because of next round")
 	}
 }
 
@@ -98,8 +98,8 @@ func TestStoreBacklog(t *testing.T) {
 		backlogsMu: new(sync.Mutex),
 	}
 	v := &pbft.View{
-		ViewNumber: big.NewInt(10),
-		Sequence:   big.NewInt(10),
+		Round:    big.NewInt(10),
+		Sequence: big.NewInt(10),
 	}
 	p := validator.New(common.StringToAddress("12345667890"))
 	// push preprepare msg
@@ -167,8 +167,8 @@ func TestProcessFutureBacklog(t *testing.T) {
 	defer c.unsubscribeEvents()
 
 	v := &pbft.View{
-		ViewNumber: big.NewInt(10),
-		Sequence:   big.NewInt(10),
+		Round:    big.NewInt(10),
+		Sequence: big.NewInt(10),
 	}
 	p := validator.New(common.StringToAddress("12345667890"))
 	// push a future msg
@@ -197,8 +197,8 @@ func TestProcessFutureBacklog(t *testing.T) {
 
 func TestProcessBacklog(t *testing.T) {
 	v := &pbft.View{
-		ViewNumber: big.NewInt(0),
-		Sequence:   big.NewInt(1),
+		Round:    big.NewInt(0),
+		Sequence: big.NewInt(1),
 	}
 	preprepare := &pbft.Preprepare{
 		View: v,
@@ -255,8 +255,8 @@ func testProcessBacklog(t *testing.T, msg *message) {
 		sequence:    big.NewInt(1),
 		subject: &pbft.Subject{
 			View: &pbft.View{
-				Sequence:   big.NewInt(1),
-				ViewNumber: big.NewInt(0),
+				Sequence: big.NewInt(1),
+				Round:    big.NewInt(0),
 			},
 		},
 	}

@@ -4,8 +4,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/pbft"
 )
 
 // notice: the normal case have been tested in integration tests.
@@ -22,15 +22,15 @@ func TestHandleMsg(t *testing.T) {
 
 	m, _ := Encode(&pbft.Subject{
 		View: &pbft.View{
-			Sequence:   big.NewInt(0),
-			ViewNumber: big.NewInt(0),
+			Sequence: big.NewInt(0),
+			Round:    big.NewInt(0),
 		},
 		Digest: []byte{1},
 	})
 	// with a matched payload. msgPreprepare should match with *pbft.Preprepare in normal case.
 	msg := &message{
-		Code: msgPreprepare,
-		Msg: m,
+		Code:    msgPreprepare,
+		Msg:     m,
 		Address: v0.Address(),
 	}
 
@@ -40,8 +40,8 @@ func TestHandleMsg(t *testing.T) {
 
 	m, _ = Encode(&pbft.Preprepare{
 		View: &pbft.View{
-			Sequence:   big.NewInt(0),
-			ViewNumber: big.NewInt(0),
+			Sequence: big.NewInt(0),
+			Round:    big.NewInt(0),
 		},
 		Proposal: &pbft.Proposal{
 			Header: &pbft.ProposalHeader{
@@ -58,8 +58,8 @@ func TestHandleMsg(t *testing.T) {
 	})
 	// with a unmatched payload. msgPrepare should match with *pbft.Subject in normal case.
 	msg = &message{
-		Code: msgPrepare,
-		Msg: m,
+		Code:    msgPrepare,
+		Msg:     m,
 		Address: v0.Address(),
 	}
 
@@ -69,8 +69,8 @@ func TestHandleMsg(t *testing.T) {
 
 	m, _ = Encode(&pbft.Preprepare{
 		View: &pbft.View{
-			Sequence:   big.NewInt(0),
-			ViewNumber: big.NewInt(0),
+			Sequence: big.NewInt(0),
+			Round:    big.NewInt(0),
 		},
 		Proposal: &pbft.Proposal{
 			Header: &pbft.ProposalHeader{
@@ -87,8 +87,8 @@ func TestHandleMsg(t *testing.T) {
 	})
 	// with a unmatched payload. pbft.MsgCommit should match with *pbft.Subject in normal case.
 	msg = &message{
-		Code: msgCommit,
-		Msg: m,
+		Code:    msgCommit,
+		Msg:     m,
 		Address: v0.Address(),
 	}
 
@@ -98,8 +98,8 @@ func TestHandleMsg(t *testing.T) {
 
 	m, _ = Encode(&pbft.Preprepare{
 		View: &pbft.View{
-			Sequence:   big.NewInt(0),
-			ViewNumber: big.NewInt(0),
+			Sequence: big.NewInt(0),
+			Round:    big.NewInt(0),
 		},
 		Proposal: &pbft.Proposal{
 			Header: &pbft.ProposalHeader{
@@ -116,8 +116,8 @@ func TestHandleMsg(t *testing.T) {
 	})
 	// invalid message code. message code is not exists in list
 	msg = &message{
-		Code: uint64(99),
-		Msg: m,
+		Code:    uint64(99),
+		Msg:     m,
 		Address: v0.Address(),
 	}
 

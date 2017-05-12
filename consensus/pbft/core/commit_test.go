@@ -30,12 +30,12 @@ func TestHandleCommit(t *testing.T) {
 	F := uint64(1)
 
 	toPreprepare := func(c *core) {
-		nextSeqView := c.nextSequence()
+		curView := c.currentView()
 
-		proposal := c.makeProposal(nextSeqView.Sequence, &pbft.Request{BlockContext: makeBlock(1)})
+		proposal := c.makeProposal(curView.Sequence, &pbft.Request{BlockContext: makeBlock(1)})
 		proposal.Signatures = [][]byte{}
 		preprepare := &pbft.Preprepare{
-			View:     nextSeqView,
+			View:     curView,
 			Proposal: proposal,
 		}
 		c.acceptPreprepare(preprepare)
@@ -77,7 +77,7 @@ func TestHandleCommit(t *testing.T) {
 					c.state = StatePrepared
 
 					if i != 0 {
-						c.subject.View.ViewNumber = big.NewInt(2)
+						c.subject.View.Round = big.NewInt(2)
 						c.subject.View.Sequence = big.NewInt(3)
 					}
 				}
@@ -175,7 +175,7 @@ OUTER:
 	}
 }
 
-// view number is not checked for now
+// round is not checked for now
 func TestVerifyCommit(t *testing.T) {
 	// for log purpose
 	privateKey, _ := crypto.GenerateKey()
@@ -193,11 +193,11 @@ func TestVerifyCommit(t *testing.T) {
 			// normal case
 			expected: nil,
 			commit: &pbft.Subject{
-				View:   &pbft.View{ViewNumber: big.NewInt(0), Sequence: big.NewInt(0)},
+				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
 				Digest: []byte{1},
 			},
 			self: &pbft.Subject{
-				View:   &pbft.View{ViewNumber: big.NewInt(0), Sequence: big.NewInt(0)},
+				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
 				Digest: []byte{1},
 			},
 		},
@@ -205,35 +205,35 @@ func TestVerifyCommit(t *testing.T) {
 			// malicious package(lack of sequence)
 			expected: pbft.ErrSubjectNotMatched,
 			commit: &pbft.Subject{
-				View:   &pbft.View{ViewNumber: big.NewInt(0), Sequence: nil},
+				View:   &pbft.View{Round: big.NewInt(0), Sequence: nil},
 				Digest: []byte{1},
 			},
 			self: &pbft.Subject{
-				View:   &pbft.View{ViewNumber: big.NewInt(1), Sequence: big.NewInt(1)},
+				View:   &pbft.View{Round: big.NewInt(1), Sequence: big.NewInt(1)},
 				Digest: []byte{1},
 			},
 		},
 		{
-			// wrong commit message with same sequence but different view number
+			// wrong commit message with same sequence but different round
 			expected: pbft.ErrSubjectNotMatched,
 			commit: &pbft.Subject{
-				View:   &pbft.View{ViewNumber: big.NewInt(1), Sequence: big.NewInt(0)},
+				View:   &pbft.View{Round: big.NewInt(1), Sequence: big.NewInt(0)},
 				Digest: []byte{1},
 			},
 			self: &pbft.Subject{
-				View:   &pbft.View{ViewNumber: big.NewInt(0), Sequence: big.NewInt(0)},
+				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
 				Digest: []byte{1},
 			},
 		},
 		{
-			// wrong commit message with same view number but different sequence
+			// wrong commit message with same round but different sequence
 			expected: pbft.ErrSubjectNotMatched,
 			commit: &pbft.Subject{
-				View:   &pbft.View{ViewNumber: big.NewInt(0), Sequence: big.NewInt(1)},
+				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(1)},
 				Digest: []byte{1},
 			},
 			self: &pbft.Subject{
-				View:   &pbft.View{ViewNumber: big.NewInt(0), Sequence: big.NewInt(0)},
+				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
 				Digest: []byte{1},
 			},
 		},

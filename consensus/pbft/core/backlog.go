@@ -32,7 +32,7 @@ import (
 // if this round is not completed, we compute current state and the message priority.
 // It's a future message if the message priority is smaller than current priority
 func (c *core) isFutureMessage(msgCode uint64, view *pbft.View) bool {
-	if view == nil || view.Sequence == nil || view.ViewNumber == nil {
+	if view == nil || view.Sequence == nil || view.Round == nil {
 		return false
 	}
 
@@ -54,7 +54,7 @@ func (c *core) isFutureMessage(msgCode uint64, view *pbft.View) bool {
 				return false
 			}
 			// next view
-			if toPriority(msgCode, c.nextViewNumber()) == newPriority {
+			if toPriority(msgCode, c.nextRound()) == newPriority {
 				return false
 			}
 		}
@@ -160,5 +160,5 @@ func (c *core) processBacklog() {
 
 func toPriority(msgCode uint64, view *pbft.View) float32 {
 	// In our case, sequence and view number will never reset to zero
-	return -float32((view.Sequence.Uint64()+view.ViewNumber.Uint64())*10 + msgCode)
+	return -float32((view.Sequence.Uint64()+view.Round.Uint64())*10 + msgCode)
 }

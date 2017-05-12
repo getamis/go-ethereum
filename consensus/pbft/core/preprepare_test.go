@@ -64,8 +64,8 @@ func TestHandlePreprepare(t *testing.T) {
 						// hack: force set subject that future message can be simulated
 						c.subject = &pbft.Subject{
 							View: &pbft.View{
-								Sequence:   big.NewInt(0),
-								ViewNumber: big.NewInt(0),
+								Sequence: big.NewInt(0),
+								Round:    big.NewInt(0),
 							},
 							Digest: []byte{1},
 						}
@@ -110,7 +110,7 @@ func TestHandlePreprepare(t *testing.T) {
 					if i != 0 {
 						c.state = StatePreprepared
 						c.sequence = big.NewInt(10)
-						c.viewNumber = big.NewInt(10)
+						c.round = big.NewInt(10)
 					}
 				}
 				return sys

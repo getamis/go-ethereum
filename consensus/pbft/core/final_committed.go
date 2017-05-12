@@ -34,8 +34,8 @@ func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validato
 		// send out the checkpoint
 		c.sendCheckpoint(&pbft.Subject{
 			View: &pbft.View{
-				Sequence:   ev.BlockNumber,
-				ViewNumber: c.viewNumber,
+				Sequence: ev.BlockNumber,
+				Round:    c.round,
 			},
 			Digest: ev.BlockHash.Bytes(),
 		})
@@ -43,7 +43,7 @@ func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validato
 		c.snapshots = append(c.snapshots, c.current)
 		c.snapshotsMu.Unlock()
 
-		c.viewNumber = new(big.Int).Set(c.current.ViewNumber)
+		c.round = new(big.Int).Set(c.current.Round)
 		c.sequence = new(big.Int).Set(c.current.Sequence)
 		c.completed = true
 		c.setState(StateAcceptRequest)
@@ -51,7 +51,7 @@ func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validato
 	} else {
 		logger.Debug("handleFinalCommitted from geth sync", "height", ev.BlockNumber, "hash", ev.BlockHash)
 		// reset view number to 0
-		c.viewNumber = common.Big0
+		c.round = common.Big0
 		c.sequence = new(big.Int).Set(ev.BlockNumber)
 		c.completed = true
 		c.setState(StateAcceptRequest)

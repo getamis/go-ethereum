@@ -24,7 +24,7 @@ import (
 
 func newSnapshot(preprepare *pbft.Preprepare, validatorSet pbft.ValidatorSet) *snapshot {
 	return &snapshot{
-		ViewNumber:  preprepare.View.ViewNumber,
+		Round:       preprepare.View.Round,
 		Sequence:    preprepare.View.Sequence,
 		Preprepare:  preprepare,
 		Prepares:    newMessageSet(validatorSet),
@@ -34,7 +34,7 @@ func newSnapshot(preprepare *pbft.Preprepare, validatorSet pbft.ValidatorSet) *s
 }
 
 type snapshot struct {
-	ViewNumber  *big.Int
+	Round       *big.Int
 	Sequence    *big.Int
 	Preprepare  *pbft.Preprepare
 	Prepares    *messageSet
