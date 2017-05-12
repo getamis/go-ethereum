@@ -121,13 +121,15 @@ func (sb *simpleBackend) Broadcast(payload []byte) error {
 
 // Commit implements pbft.Backend.Commit
 func (sb *simpleBackend) Commit(proposal *pbft.Proposal) error {
-	log.Info("Committed", "address", sb.Address().Hex(), "proposal", proposal)
+	sb.logger.Info("Committed", "address", sb.Address().Hex(), "proposal", proposal)
 	// step1: update validator set from extra data of block
 	// step2: insert chain
 	block := &types.Block{}
 	block, ok := proposal.RequestContext.(*types.Block)
 	if !ok {
-		return fmt.Errorf("failed to decode block...")
+		errStr := "Failed to commit proposal since RequestContext cannot cast to *types.Block"
+		sb.logger.Error(errStr)
+		return fmt.Errorf(errStr)
 	}
 	// it's a proposer
 	if sb.commit != nil {
@@ -180,7 +182,9 @@ func (sb *simpleBackend) Verify(proposal *pbft.Proposal) error {
 	block := &types.Block{}
 	block, ok := proposal.RequestContext.(*types.Block)
 	if !ok {
-		return fmt.Errorf("failed to decode block...")
+		errStr := "Failed to commit proposal since RequestContext cannot cast to *types.Block"
+		sb.logger.Error(errStr)
+		return fmt.Errorf(errStr)
 	}
 	// verify the header of proposed block
 	return sb.VerifyHeader(sb.chain, block.Header(), false)

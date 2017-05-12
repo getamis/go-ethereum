@@ -36,8 +36,11 @@ type State struct {
 
 // BlockContexter supports retrieving height and serialized block to be used during PBFT consensus.
 type RequestContexter interface {
-	// Number retrieves block height.
+	// Number retrieves number of sequence.
 	Number() *big.Int
+
+	// Hash retrieves hash of request.
+	Hash() common.Hash
 
 	EncodeRLP(w io.Writer) error
 
@@ -65,7 +68,7 @@ type Proposal struct {
 	Signatures     [][]byte
 }
 
-// EncodeRLP serializes b into the Ethereum RLP View format.
+// EncodeRLP serializes b into the Ethereum RLP format.
 func (b *Proposal) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, []interface{}{b.Header, b.RequestContext, b.Signatures})
 }
@@ -90,7 +93,7 @@ type Preprepare struct {
 	Proposal *Proposal
 }
 
-// EncodeRLP serializes b into the Ethereum RLP View format.
+// EncodeRLP serializes b into the Ethereum RLP format.
 func (b *Preprepare) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, []interface{}{b.View, b.Proposal})
 }
@@ -115,7 +118,7 @@ type Subject struct {
 	Digest []byte
 }
 
-// EncodeRLP serializes b into the Ethereum RLP View format.
+// EncodeRLP serializes b into the Ethereum RLP format.
 func (b *Subject) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, []interface{}{b.View, b.Digest})
 }
@@ -141,7 +144,7 @@ type ViewChange struct {
 	Proposal   *Proposal
 }
 
-// EncodeRLP serializes b into the Ethereum RLP View format.
+// EncodeRLP serializes b into the Ethereum RLP format.
 func (b *ViewChange) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, []interface{}{b.ViewNumber, b.PSet, b.QSet, b.Proposal})
 }
@@ -174,7 +177,7 @@ type NewView struct {
 	Proposal   *Proposal
 }
 
-// EncodeRLP serializes b into the Ethereum RLP View format.
+// EncodeRLP serializes b into the Ethereum RLP format.
 func (b *NewView) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, []interface{}{b.ViewNumber, b.VSet, b.XSet, b.Proposal})
 }
@@ -193,10 +196,4 @@ func (b *NewView) DecodeRLP(s *rlp.Stream) error {
 	}
 	b.ViewNumber, b.VSet, b.XSet, b.Proposal = newView.ViewNumber, newView.VSet, newView.XSet, newView.Proposal
 	return nil
-}
-
-type Checkpoint struct {
-	Sequence  *big.Int
-	Digest    []byte
-	Signature []byte
 }

@@ -289,6 +289,10 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 	sb.newChannels()
 	defer sb.closeChannels()
 
+	// TODO: config delay time, like PoA
+	// compensation for a few milliseconds of consensus runtime
+	<-time.After(100 * time.Millisecond)
+
 	// step 1. sign the hash
 	header := block.Header()
 	sighash, err := sb.Sign(sigHash(header).Bytes())
@@ -302,8 +306,6 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 		BlockContext: block,
 	})
 
-	// compensation for a few milliseconds of consensus runtime
-	<-time.After(100 * time.Millisecond)
 	for {
 		select {
 		case needNewProposal := <-sb.viewChange:
