@@ -29,11 +29,16 @@ func TestHandleCommit(t *testing.T) {
 	N := uint64(4)
 	F := uint64(1)
 
-	expectedSubject := &pbft.Subject{
-		View: &pbft.View{
-			ViewNumber: big.NewInt(0),
-			Sequence:   big.NewInt(0)},
-		Digest: []byte{1},
+	toPreprepare := func(c *core) {
+		nextSeqView := c.nextSequence()
+
+		proposal := c.makeProposal(nextSeqView.Sequence, &pbft.Request{BlockContext: makeBlock(1)})
+		proposal.Signatures = [][]byte{}
+		preprepare := &pbft.Preprepare{
+			View:     nextSeqView,
+			Proposal: proposal,
+		}
+		c.acceptPreprepare(preprepare)
 	}
 
 	testCases := []struct {
@@ -46,14 +51,13 @@ func TestHandleCommit(t *testing.T) {
 			func() *testSystem {
 				sys := NewTestSystemWithBackend(N, F)
 
-				for i, backend := range sys.backends {
+				for _, backend := range sys.backends {
 					c := backend.engine.(*core)
-					c.subject = expectedSubject
 
-					if i == 0 {
-						// replica 0 is primary
-						c.state = StatePrepared
-					}
+					toPreprepare(c)
+
+					// change to prepared
+					c.state = StatePrepared
 				}
 				return sys
 			}(),
@@ -67,17 +71,14 @@ func TestHandleCommit(t *testing.T) {
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
 
-					if i == 0 {
-						// replica 0 is primary
-						c.subject = expectedSubject
-						c.state = StatePrepared
-					} else {
-						c.subject = &pbft.Subject{
-							View: &pbft.View{
-								ViewNumber: big.NewInt(2),
-								Sequence:   big.NewInt(3)},
-							Digest: []byte{1},
-						}
+					toPreprepare(c)
+
+					// change to prepared
+					c.state = StatePrepared
+
+					if i != 0 {
+						c.subject.View.ViewNumber = big.NewInt(2)
+						c.subject.View.Sequence = big.NewInt(3)
 					}
 				}
 				return sys
@@ -92,17 +93,13 @@ func TestHandleCommit(t *testing.T) {
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
 
-					if i == 0 {
-						// replica 0 is primary
-						c.subject = expectedSubject
-						c.state = StatePrepared
-					} else {
-						c.subject = &pbft.Subject{
-							View: &pbft.View{
-								ViewNumber: big.NewInt(0),
-								Sequence:   big.NewInt(0)},
-							Digest: []byte{2, 3, 4},
-						}
+					toPreprepare(c)
+
+					// change to prepared
+					c.state = StatePrepared
+
+					if i != 0 {
+						c.subject.Digest = []byte{2, 3, 4}
 					}
 				}
 				return sys
@@ -117,14 +114,13 @@ func TestHandleCommit(t *testing.T) {
 				// save less than 2*F+1 replica
 				sys.backends = sys.backends[2*int(F)+1:]
 
-				for i, backend := range sys.backends {
+				for _, backend := range sys.backends {
 					c := backend.engine.(*core)
-					c.subject = expectedSubject
 
-					if i == 0 {
-						// replica 0 is primary
-						c.state = StatePrepared
-					}
+					toPreprepare(c)
+
+					// change to prepared
+					c.state = StatePrepared
 				}
 				return sys
 			}(),
@@ -143,8 +139,8 @@ OUTER:
 		for i, v := range test.system.backends {
 			validator := v.Validators().GetByIndex(uint64(i))
 			m, _ := Encode(v.engine.(*core).subject)
-			if err := r0.handlePrepare(&message{
-				Code:    msgPrepare,
+			if err := r0.handleCommit(&message{
+				Code:    msgCommit,
 				Msg:     m,
 				Address: validator.Address(),
 			}, validator); err != nil {
@@ -190,8 +186,9 @@ OUTER:
 			t.Error("expected default view number should be 0")
 		}
 
-		if r0.sequence.Uint64() != uint64(0) {
-			t.Error("expected default sequence number should be 0")
+		// default sequence is 1
+		if r0.sequence.Uint64() != uint64(1) {
+			t.Error("expected default sequence number should be 1")
 		}
 	}
 }
