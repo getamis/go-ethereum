@@ -19,7 +19,6 @@ package simple
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
@@ -127,9 +126,8 @@ func (sb *simpleBackend) Commit(proposal *pbft.Proposal) error {
 	block := &types.Block{}
 	block, ok := proposal.RequestContext.(*types.Block)
 	if !ok {
-		errStr := "Failed to commit proposal since RequestContext cannot cast to *types.Block"
-		sb.logger.Error(errStr)
-		return fmt.Errorf(errStr)
+		sb.logger.Error("Failed to commit proposal since RequestContext cannot cast to *types.Block")
+		return errCastingRequest
 	}
 	// it's a proposer
 	if sb.commit != nil {
@@ -182,9 +180,8 @@ func (sb *simpleBackend) Verify(proposal *pbft.Proposal) error {
 	block := &types.Block{}
 	block, ok := proposal.RequestContext.(*types.Block)
 	if !ok {
-		errStr := "Failed to commit proposal since RequestContext cannot cast to *types.Block"
-		sb.logger.Error(errStr)
-		return fmt.Errorf(errStr)
+		sb.logger.Error("Failed to commit proposal since RequestContext cannot cast to *types.Block")
+		return errCastingRequest
 	}
 	// verify the header of proposed block
 	return sb.VerifyHeader(sb.chain, block.Header(), false)

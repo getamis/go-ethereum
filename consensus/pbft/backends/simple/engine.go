@@ -61,6 +61,8 @@ var (
 	errInvalidUncleHash = errors.New("non empty uncle hash")
 	// errInconsistentValidatorSet is returned if the validator set is inconsistent
 	errInconsistentValidatorSet = errors.New("non empty uncle hash")
+	// errCastingRequest is returned if request cannot cast specific type
+	errCastingRequest = errors.New("failed to cast the request")
 )
 var (
 	defaultDifficulty = big.NewInt(1)
