@@ -29,6 +29,7 @@ func (c *core) sendPrepare() {
 	subject, err := Encode(c.subject)
 	if err != nil {
 		logger.Error("Failed to encode", "subject", c.subject)
+		return
 	}
 	c.broadcast(&message{
 		Code: msgPrepare,

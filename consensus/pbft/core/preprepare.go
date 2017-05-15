@@ -33,13 +33,14 @@ func (c *core) sendPreprepare(request *pbft.Request) {
 			Proposal: c.makeProposal(nextSeqView.Sequence, request),
 		})
 		if err != nil {
-			logger.Error("Failed to encode...")
+			logger.Error("Failed to encode", "view", nextSeqView)
+			return
 		}
 
 		logger.Debug("sendPreprepare")
 		c.broadcast(&message{
 			Code: msgPreprepare,
-			Msg: preprepare,
+			Msg:  preprepare,
 		})
 	}
 }
@@ -50,7 +51,7 @@ func (c *core) handlePreprepare(msg *message, src pbft.Validator) error {
 
 	var preprepare *pbft.Preprepare
 	err := msg.Decode(&preprepare)
-	if err != nil  {
+	if err != nil {
 		return errFailedDecodePreprepare
 	}
 

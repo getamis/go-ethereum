@@ -29,6 +29,7 @@ func (c *core) sendCheckpoint(cp *pbft.Subject) {
 	newCp, err := Encode(cp)
 	if err != nil {
 		logger.Error("Failed to encode", "subject", cp)
+		return
 	}
 
 	c.broadcast(&message{
