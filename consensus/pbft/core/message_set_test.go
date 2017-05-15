@@ -18,6 +18,7 @@ package core
 
 import (
 	"math/big"
+	"reflect"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -115,5 +116,65 @@ func TestMessageSetWithSubject(t *testing.T) {
 
 	if ms.Size() != 1 {
 		t.Error("There should be exactly one message in set")
+	}
+}
+
+func TestMessageSetEncodeDecode(t *testing.T) {
+	valSet := newTestValidatorSet(10)
+	valSet.CalcProposer(0)
+
+	ms := newMessageSet(valSet)
+
+	for i := 0; i < 10; i++ {
+		view := &pbft.View{
+			ViewNumber: new(big.Int),
+			Sequence:   new(big.Int),
+		}
+		pp := &pbft.Preprepare{
+			View: view,
+			Proposal: &pbft.Proposal{
+				Header: &pbft.ProposalHeader{
+					Sequence:   big.NewInt(int64(i)),
+					ParentHash: common.HexToHash("0x1234567890"),
+					DataHash:   common.HexToHash("0x9876543210"),
+				},
+				RequestContext: makeBlock(int64(i)),
+				Signatures: [][]byte{
+					[]byte{0x01, 0x03},
+					[]byte{0x02, 0x04},
+				},
+			},
+		}
+
+		rawPP, err := rlp.EncodeToBytes(pp)
+		if err != nil {
+			t.Errorf("Failed to encode preprepare %v, err: %v", pp, err)
+		}
+		msg := &message{
+			Code:      msgPreprepare,
+			Msg:       rawPP,
+			Address:   valSet.GetProposer().Address(),
+			Signature: []byte{0x01, 0x02},
+		}
+
+		err = ms.Add(msg)
+		if err != nil {
+			t.Errorf("Failed to add message %v, err: %v", msg, err)
+		}
+	}
+
+	rawMessageSet, err := rlp.EncodeToBytes(ms)
+	if err != nil {
+		t.Errorf("Failed to encode message set %v, err: %v", ms, err)
+	}
+
+	var decodedMsgSet *messageSet
+	err = rlp.DecodeBytes(rawMessageSet, &decodedMsgSet)
+	if err != nil {
+		t.Errorf("Failed to decode message set, err: %v", err)
+	}
+
+	if !reflect.DeepEqual(decodedMsgSet, ms) {
+		t.Errorf("Decoded message set must equal to the original one\nexpected: %+v\ngot: %+v\n", ms, decodedMsgSet)
 	}
 }

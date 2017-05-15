@@ -18,16 +18,22 @@ package core
 
 import (
 	"io"
+	"math/big"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
+	"github.com/ethereum/go-ethereum/consensus/pbft/validator"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // Constructs a new messageSet to accumulate messages for given sequence/view number.
 func newMessageSet(valSet pbft.ValidatorSet) *messageSet {
 	return &messageSet{
+		view: &pbft.View{
+			ViewNumber: new(big.Int),
+			Sequence:   new(big.Int),
+		},
 		messagesMu: new(sync.Mutex),
 		messages:   make(map[common.Hash]*message),
 		valSet:     valSet,
@@ -41,6 +47,13 @@ type messageSet struct {
 	valSet     pbft.ValidatorSet
 	messagesMu *sync.Mutex
 	messages   map[common.Hash]*message
+}
+
+type storageMessageSet struct {
+	View       pbft.View
+	Validators []common.Address
+	Keys       []common.Hash
+	Messages   [][]byte
 }
 
 func (ms *messageSet) View() *pbft.View {
@@ -79,8 +92,28 @@ func (ms *messageSet) Size() int {
 // Stream. It is not forbidden to read less or more, but it might
 // be confusing.
 func (ms *messageSet) DecodeRLP(s *rlp.Stream) error {
-	// TODO
-	return nil
+	var sms storageMessageSet
+	err := s.Decode(&sms)
+	if err == nil {
+		ms.valSet = validator.NewSet(sms.Validators)
+		ms.view = &sms.View
+		ms.messagesMu = new(sync.Mutex)
+		ms.messages = make(map[common.Hash]*message)
+
+		if len(sms.Keys) != len(sms.Messages) {
+			return errFailedDecodeMessageSet
+		}
+
+		for i, k := range sms.Keys {
+			m := new(message)
+			if err := m.FromPayload(sms.Messages[i], nil); err != nil {
+				return err
+			}
+
+			ms.messages[k] = m
+		}
+	}
+	return err
 }
 
 // EncodeRLP should write the RLP encoding of its receiver to w.
@@ -92,8 +125,31 @@ func (ms *messageSet) DecodeRLP(s *rlp.Stream) error {
 // recommended to write only a single value but writing multiple
 // values or no value at all is also permitted.
 func (ms *messageSet) EncodeRLP(w io.Writer) error {
-	// TODO
-	return nil
+	ms.messagesMu.Lock()
+	defer ms.messagesMu.Unlock()
+
+	var addrs []common.Address
+	for _, val := range ms.valSet.List() {
+		addrs = append(addrs, val.Address())
+	}
+
+	var keys []common.Hash
+	var msgs [][]byte
+	for k, v := range ms.messages {
+		keys = append(keys, k)
+		b, err := v.Payload()
+		if err != nil {
+			return err
+		}
+		msgs = append(msgs, b)
+	}
+
+	return rlp.Encode(w, storageMessageSet{
+		View:       *ms.view,
+		Validators: addrs,
+		Keys:       keys,
+		Messages:   msgs,
+	})
 }
 
 // ----------------------------------------------------------------------------
