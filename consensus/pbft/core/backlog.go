@@ -86,15 +86,17 @@ func (c *core) storeBacklog(msg *message, src pbft.Validator) {
 	}
 	switch msg.Code {
 	case msgPreprepare:
-		m, ok := msg.Msg.(*pbft.Preprepare)
-		if ok {
-			backlog.Push(msg, toPriority(msg.Code, m.View))
+		var p *pbft.Preprepare
+		err := msg.Decode(&p)
+		if err == nil {
+			backlog.Push(msg, toPriority(msg.Code, p.View))
 		}
 		// for pbft.MsgPrepare and pbft.MsgCommit cases
 	default:
-		sub, ok := msg.Msg.(*pbft.Subject)
-		if ok {
-			backlog.Push(msg, toPriority(msg.Code, sub.View))
+		var p *pbft.Subject
+		err := msg.Decode(&p)
+		if err == nil {
+			backlog.Push(msg, toPriority(msg.Code, p.View))
 		}
 	}
 	c.backlogs[src] = backlog
@@ -121,14 +123,16 @@ func (c *core) processBacklog() {
 			var view *pbft.View
 			switch msg.Code {
 			case msgPreprepare:
-				m, ok := msg.Msg.(*pbft.Preprepare)
-				if ok {
+				var m *pbft.Preprepare
+				err := msg.Decode(&m)
+				if err == nil {
 					view = m.View
 				}
 				// for pbft.MsgPrepare and pbft.MsgCommit cases
 			default:
-				sub, ok := msg.Msg.(*pbft.Subject)
-				if ok {
+				var sub *pbft.Subject
+				err := msg.Decode(&sub)
+				if err == nil {
 					view = sub.View
 				}
 			}

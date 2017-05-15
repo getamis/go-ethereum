@@ -21,6 +21,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
@@ -60,10 +61,15 @@ var (
 	errInvalidUncleHash = errors.New("non empty uncle hash")
 	// errInconsistentValidatorSet is returned if the validator set is inconsistent
 	errInconsistentValidatorSet = errors.New("non empty uncle hash")
+	// errCastingRequest is returned if request cannot cast specific type
+	errCastingRequest = errors.New("failed to cast the request")
 )
 var (
 	defaultDifficulty = big.NewInt(1)
 	nilUncleHash      = types.CalcUncleHash(nil) // Always Keccak256(RLP([])) as uncles are meaningless outside of PoW.
+
+	// Default minimum difference between two consecutive block's timestamps
+	blockPeriod = 100 * time.Millisecond
 )
 
 // Author retrieves the Ethereum address of the account that minted the given
@@ -288,6 +294,10 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 	sb.newChannels()
 	defer sb.closeChannels()
 
+	// TODO: config delay time, like PoA
+	// compensation for a few milliseconds of consensus runtime
+	<-time.After(blockPeriod)
+
 	// step 1. sign the hash
 	header := block.Header()
 	sighash, err := sb.Sign(sigHash(header).Bytes())
@@ -296,13 +306,9 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 	}
 	copy(header.Extra[len(header.Extra)-extraSeal:], sighash)
 	block = block.WithSeal(header)
-	// step 2. feed block into PBFT engine
-	b, e := rlp.EncodeToBytes(block)
-	if e != nil {
-		return nil, e
-	}
+	// step 2. post block into PBFT engine
 	go sb.EventMux().Post(pbft.RequestEvent{
-		BlockContext: pbft.NewBlockContext(b, block.Number()),
+		BlockContext: block,
 	})
 
 	for {

@@ -17,10 +17,12 @@
 package pbft
 
 import (
-	"encoding/gob"
+	"io"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // TODO: under cooking
@@ -33,43 +35,20 @@ type State struct {
 }
 
 // BlockContexter supports retrieving height and serialized block to be used during PBFT consensus.
-type BlockContexter interface {
-	// Number retrieves block height.
-	Height() *big.Int
+type RequestContexter interface {
+	// Number retrieves number of sequence.
+	Number() *big.Int
 
-	// Payload returns a serialized block
-	Payload() []byte
-}
+	// Hash retrieves hash of request.
+	Hash() common.Hash
 
-// NewBlockContext returns a BlockContext using the given payload and number.
-// payload is serialized block, number is block height.
-//
-// TODO: Wrapper is not needed.
-// We wrap the block by BlockContext struct since the gob cannot encode/decode private fields (like types.Block.header).
-// So a custom encoder/decoder is needed. The go-ethereum rlp encoder/decoder is recommended here.
-func NewBlockContext(payload []byte, number *big.Int) *BlockContext {
-	return &BlockContext{
-		RawData: payload,
-		Number:  number,
-	}
-}
+	EncodeRLP(w io.Writer) error
 
-// BlockContext expose their members which allow the struct can be marshal/unmarshal by gob.
-type BlockContext struct {
-	RawData []byte
-	Number  *big.Int
-}
-
-func (b *BlockContext) Height() *big.Int {
-	return b.Number
-}
-
-func (b *BlockContext) Payload() []byte {
-	return b.RawData
+	DecodeRLP(s *rlp.Stream) error
 }
 
 type Request struct {
-	BlockContext BlockContexter
+	BlockContext RequestContexter
 }
 
 type View struct {
@@ -84,9 +63,29 @@ type ProposalHeader struct {
 }
 
 type Proposal struct {
-	Header       *ProposalHeader
-	BlockContext BlockContexter
-	Signatures   [][]byte
+	Header         *ProposalHeader
+	RequestContext RequestContexter
+	Signatures     [][]byte
+}
+
+// EncodeRLP serializes b into the Ethereum RLP format.
+func (b *Proposal) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, []interface{}{b.Header, b.RequestContext, b.Signatures})
+}
+
+// DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
+func (b *Proposal) DecodeRLP(s *rlp.Stream) error {
+	var proposal struct {
+		Header         *ProposalHeader
+		RequestContext *types.Block
+		Signatures     [][]byte
+	}
+
+	if err := s.Decode(&proposal); err != nil {
+		return err
+	}
+	b.Header, b.RequestContext, b.Signatures = proposal.Header, proposal.RequestContext, proposal.Signatures
+	return nil
 }
 
 type Preprepare struct {
@@ -94,9 +93,48 @@ type Preprepare struct {
 	Proposal *Proposal
 }
 
+// EncodeRLP serializes b into the Ethereum RLP format.
+func (b *Preprepare) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, []interface{}{b.View, b.Proposal})
+}
+
+// DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
+func (b *Preprepare) DecodeRLP(s *rlp.Stream) error {
+	var preprepare struct {
+		View     *View
+		Proposal *Proposal
+	}
+
+	if err := s.Decode(&preprepare); err != nil {
+		return err
+	}
+	b.View, b.Proposal = preprepare.View, preprepare.Proposal
+
+	return nil
+}
+
 type Subject struct {
 	View   *View
 	Digest []byte
+}
+
+// EncodeRLP serializes b into the Ethereum RLP format.
+func (b *Subject) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, []interface{}{b.View, b.Digest})
+}
+
+// DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
+func (b *Subject) DecodeRLP(s *rlp.Stream) error {
+	var subject struct {
+		View   *View
+		Digest []byte
+	}
+
+	if err := s.Decode(&subject); err != nil {
+		return err
+	}
+	b.View, b.Digest = subject.View, subject.Digest
+	return nil
 }
 
 type ViewChange struct {
@@ -104,6 +142,27 @@ type ViewChange struct {
 	PSet       []*Subject
 	QSet       []*Subject
 	Proposal   *Proposal
+}
+
+// EncodeRLP serializes b into the Ethereum RLP format.
+func (b *ViewChange) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, []interface{}{b.ViewNumber, b.PSet, b.QSet, b.Proposal})
+}
+
+// DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
+func (b *ViewChange) DecodeRLP(s *rlp.Stream) error {
+	var viewChange struct {
+		ViewNumber *big.Int
+		PSet       []*Subject
+		QSet       []*Subject
+		Proposal   *Proposal
+	}
+
+	if err := s.Decode(&viewChange); err != nil {
+		return err
+	}
+	b.ViewNumber, b.PSet, b.QSet, b.Proposal = viewChange.ViewNumber, viewChange.PSet, viewChange.QSet, viewChange.Proposal
+	return nil
 }
 
 type SignedViewChange struct {
@@ -118,8 +177,23 @@ type NewView struct {
 	Proposal   *Proposal
 }
 
-func init() {
-	gob.Register(&Preprepare{})
-	gob.Register(&Subject{})
-	gob.Register(&BlockContext{})
+// EncodeRLP serializes b into the Ethereum RLP format.
+func (b *NewView) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, []interface{}{b.ViewNumber, b.VSet, b.XSet, b.Proposal})
+}
+
+// DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
+func (b *NewView) DecodeRLP(s *rlp.Stream) error {
+	var newView struct {
+		ViewNumber *big.Int
+		VSet       *SignedViewChange
+		XSet       *Subject
+		Proposal   *Proposal
+	}
+
+	if err := s.Decode(&newView); err != nil {
+		return err
+	}
+	b.ViewNumber, b.VSet, b.XSet, b.Proposal = newView.ViewNumber, newView.VSet, newView.XSet, newView.Proposal
+	return nil
 }

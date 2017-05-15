@@ -158,13 +158,13 @@ func (c *core) makeProposal(seq *big.Int, request *pbft.Request) *pbft.Proposal 
 	header := &pbft.ProposalHeader{
 		Sequence: seq,
 		// FIXME: use actual parent hash
-		ParentHash: c.backend.Hash(request.BlockContext.Payload()),
-		DataHash:   c.backend.Hash(request.BlockContext.Payload()),
+		ParentHash: c.backend.Hash(request.BlockContext.Number()),
+		DataHash:   c.backend.Hash(request.BlockContext.Number()),
 	}
 
 	return &pbft.Proposal{
-		Header:       header,
-		BlockContext: request.BlockContext,
+		Header:         header,
+		RequestContext: request.BlockContext,
 	}
 }
 

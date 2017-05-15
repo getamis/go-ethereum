@@ -25,17 +25,25 @@ import (
 func (c *core) sendCheckpoint(cp *pbft.Subject) {
 	logger := c.logger.New("state", c.state)
 	logger.Debug("sendCheckpoint")
+
+	newCp, err := Encode(cp)
+	if err != nil {
+		logger.Error("Failed to encode", "subject", cp)
+		return
+	}
+
 	c.broadcast(&message{
 		Code: msgCheckpoint,
-		Msg:  cp,
+		Msg:  newCp,
 	})
 }
 
 func (c *core) handleCheckpoint(msg *message, src pbft.Validator) error {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 
-	cp, ok := msg.Msg.(*pbft.Subject)
-	if !ok {
+	var cp *pbft.Subject
+	err := msg.Decode(&cp)
+	if err != nil {
 		logger.Error("Invalid checkpoint message", "msg", msg)
 		return pbft.ErrInvalidMessage
 	}

@@ -142,9 +142,10 @@ OUTER:
 
 		for i, v := range test.system.backends {
 			validator := v.Validators().GetByIndex(uint64(i))
+			m, _ := Encode(v.engine.(*core).subject)
 			if err := r0.handlePrepare(&message{
 				Code:    msgPrepare,
-				Msg:     v.engine.(*core).subject,
+				Msg:     m,
 				Address: validator.Address(),
 			}, validator); err != nil {
 				if err != test.expectedErr {

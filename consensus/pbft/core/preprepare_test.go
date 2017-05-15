@@ -30,7 +30,7 @@ func TestHandlePreprepare(t *testing.T) {
 
 	testCases := []struct {
 		system          *testSystem
-		expectedRequest pbft.BlockContexter
+		expectedRequest pbft.RequestContexter
 
 		expectedErr error
 	}{
@@ -48,7 +48,7 @@ func TestHandlePreprepare(t *testing.T) {
 				}
 				return sys
 			}(),
-			pbft.NewBlockContext([]byte("normal case"), big.NewInt(1)),
+			makeBlock(1),
 			nil,
 		},
 		{
@@ -75,7 +75,7 @@ func TestHandlePreprepare(t *testing.T) {
 				}
 				return sys
 			}(),
-			pbft.NewBlockContext([]byte("future message"), big.NewInt(1)),
+			makeBlock(1),
 			errFutureMessage,
 		},
 		{
@@ -96,7 +96,7 @@ func TestHandlePreprepare(t *testing.T) {
 				}
 				return sys
 			}(),
-			pbft.NewBlockContext([]byte("not from proposer"), big.NewInt(1)),
+			makeBlock(1),
 			pbft.ErrNotFromProposer,
 		},
 		{
@@ -115,7 +115,7 @@ func TestHandlePreprepare(t *testing.T) {
 				}
 				return sys
 			}(),
-			pbft.NewBlockContext([]byte("invalid message"), big.NewInt(1)),
+			makeBlock(1),
 			pbft.ErrInvalidMessage,
 		},
 		{
@@ -134,7 +134,7 @@ func TestHandlePreprepare(t *testing.T) {
 				}
 				return sys
 			}(),
-			pbft.NewBlockContext([]byte("nil proposal"), big.NewInt(1)),
+			makeBlock(1),
 			pbft.ErrNilProposal,
 		},
 	}
@@ -162,14 +162,16 @@ OUTER:
 			c := v.engine.(*core)
 
 			// for case: proposal is not included, hack the variable to nil
-			if test.expectedErr == pbft.ErrNilProposal {
-				preprepare.Proposal = nil
-			}
+			// FIXME: nil variable is not supported by rlp Encode/Decode
+			//if test.expectedErr == pbft.ErrNilProposal {
+			//	preprepare.Proposal = nil
+			//}
 
+			m, _ := Encode(preprepare)
 			// run each backends and verify handlePreprepare function.
 			if err := c.handlePreprepare(&message{
 				Code:    msgPreprepare,
-				Msg:     preprepare,
+				Msg:     m,
 				Address: v0.Address(),
 			}, v0.Validators().GetByAddress(v0.Address())); err != nil {
 				if err != test.expectedErr {
@@ -199,11 +201,12 @@ OUTER:
 			if decodedMsg.Code != msgPrepare {
 				t.Error("message code is not the same")
 			}
-			m, ok := decodedMsg.Msg.(*pbft.Subject)
-			if !ok {
+			var subject *pbft.Subject
+			err = decodedMsg.Decode(&subject)
+			if err != nil {
 				t.Error("failed to decode Prepare")
 			}
-			if !reflect.DeepEqual(m, c.subject) {
+			if !reflect.DeepEqual(subject, c.subject) {
 				t.Error("subject should be the same")
 			}
 		}

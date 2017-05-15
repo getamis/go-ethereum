@@ -111,13 +111,14 @@ func TestStoreBacklog(t *testing.T) {
 				ParentHash: common.HexToHash("0x1234567890"),
 				DataHash:   common.HexToHash("0x9876543210"),
 			},
-			BlockContext: pbft.NewBlockContext([]byte("payload"), big.NewInt(1)),
+			RequestContext: makeBlock(1),
 			Signatures:   [][]byte{[]byte("sig1")},
 		},
 	}
+	prepreparePayload, _ := Encode(preprepare)
 	m := &message{
 		Code: msgPreprepare,
-		Msg:  preprepare,
+		Msg:  prepreparePayload,
 	}
 	c.storeBacklog(m, p)
 	if !reflect.DeepEqual(c.backlogs[p].PopItem(), m) {
@@ -129,9 +130,11 @@ func TestStoreBacklog(t *testing.T) {
 		View:   v,
 		Digest: []byte("digest"),
 	}
+	subjectPayload, _ := Encode(subject)
+
 	m = &message{
 		Code: msgPrepare,
-		Msg:  subject,
+		Msg:  subjectPayload,
 	}
 	c.storeBacklog(m, p)
 	if !reflect.DeepEqual(c.backlogs[p].PopItem(), m) {
@@ -141,7 +144,7 @@ func TestStoreBacklog(t *testing.T) {
 	// push commit msg
 	m = &message{
 		Code: msgCommit,
-		Msg:  subject,
+		Msg:  subjectPayload,
 	}
 	c.storeBacklog(m, p)
 	if !reflect.DeepEqual(c.backlogs[p].PopItem(), m) {
@@ -173,9 +176,10 @@ func TestProcessFutureBacklog(t *testing.T) {
 		View:   v,
 		Digest: []byte("digest"),
 	}
+	subjectPayload, _ := Encode(subject)
 	m := &message{
 		Code: msgCommit,
-		Msg:  subject,
+		Msg:  subjectPayload,
 	}
 	c.storeBacklog(m, p)
 	c.processBacklog()
@@ -204,27 +208,30 @@ func TestProcessBacklog(t *testing.T) {
 				ParentHash: common.HexToHash("0x1234567890"),
 				DataHash:   common.HexToHash("0x9876543210"),
 			},
-			BlockContext: pbft.NewBlockContext([]byte("payload"), big.NewInt(1)),
+			RequestContext: makeBlock(1),
 			Signatures:   [][]byte{[]byte("sig1")},
 		},
 	}
+	prepreparePayload, _ := Encode(preprepare)
+
 	subject := &pbft.Subject{
 		View:   v,
 		Digest: []byte("digest"),
 	}
+	subjectPayload, _ := Encode(subject)
 
 	msgs := []*message{
 		&message{
 			Code: msgPreprepare,
-			Msg:  preprepare,
+			Msg:  prepreparePayload,
 		},
 		&message{
 			Code: msgPrepare,
-			Msg:  subject,
+			Msg:  subjectPayload,
 		},
 		&message{
 			Code: msgCommit,
-			Msg:  subject,
+			Msg:  subjectPayload,
 		},
 	}
 	for i := 0; i < len(msgs); i++ {

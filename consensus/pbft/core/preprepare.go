@@ -28,13 +28,19 @@ func (c *core) sendPreprepare(request *pbft.Request) {
 	nextSeqView := c.nextSequence()
 
 	if c.isPrimary() {
+		preprepare, err := Encode(&pbft.Preprepare{
+			View:     nextSeqView,
+			Proposal: c.makeProposal(nextSeqView.Sequence, request),
+		})
+		if err != nil {
+			logger.Error("Failed to encode", "view", nextSeqView)
+			return
+		}
+
 		logger.Debug("sendPreprepare")
 		c.broadcast(&message{
 			Code: msgPreprepare,
-			Msg: &pbft.Preprepare{
-				View:     nextSeqView,
-				Proposal: c.makeProposal(nextSeqView.Sequence, request),
-			},
+			Msg:  preprepare,
 		})
 	}
 }
@@ -43,8 +49,9 @@ func (c *core) handlePreprepare(msg *message, src pbft.Validator) error {
 	logger := log.New("from", src.Address().Hex(), "state", c.state)
 	logger.Debug("handlePreprepare")
 
-	preprepare, ok := msg.Msg.(*pbft.Preprepare)
-	if !ok {
+	var preprepare *pbft.Preprepare
+	err := msg.Decode(&preprepare)
+	if err != nil {
 		return errFailedDecodePreprepare
 	}
 

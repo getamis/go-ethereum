@@ -26,6 +26,7 @@ import (
 )
 
 func testPreprepare(t *testing.T) {
+	block := makeBlock(1)
 	pp := &pbft.Preprepare{
 		View: &pbft.View{
 			ViewNumber: big.NewInt(1),
@@ -37,17 +38,18 @@ func testPreprepare(t *testing.T) {
 				ParentHash: common.HexToHash("0x1234567890"),
 				DataHash:   common.HexToHash("0x9876543210"),
 			},
-			BlockContext: pbft.NewBlockContext([]byte{0x02}, big.NewInt(2)),
+			RequestContext: block,
 			Signatures: [][]byte{
 				[]byte{0x01},
 				[]byte{0x02},
 			},
 		},
 	}
+	prepreparePayload, _ := Encode(pp)
 
 	m := &message{
 		Code:    msgPreprepare,
-		Msg:     pp,
+		Msg:     prepreparePayload,
 		Address: common.HexToAddress("0x1234567890"),
 	}
 
@@ -63,13 +65,27 @@ func testPreprepare(t *testing.T) {
 	}
 
 	var decodedPP *pbft.Preprepare
-	decodedPP = decodedMsg.Msg.(*pbft.Preprepare)
+	err = decodedMsg.Decode(&decodedPP)
 	if err != nil {
 		t.Error(err)
 	}
 
-	if !reflect.DeepEqual(pp, decodedPP) {
-		t.Errorf("messages are different, expected '%+v', got '%+v'", pp, decodedPP)
+	// if block is encoded/decoded by rlp, we cannot to compare interface data type using reflect.DeepEqual. (like BlockContext)
+	// so individual comparison here.
+	if !reflect.DeepEqual(pp.Proposal.Header, decodedPP.Proposal.Header) {
+		t.Errorf("Header are different, expected '%+v', got '%+v'", pp.Proposal, decodedPP.Proposal)
+	}
+
+	if !reflect.DeepEqual(pp.Proposal.Signatures, decodedPP.Proposal.Signatures) {
+		t.Errorf("Signatures are different, expected '%+v', got '%+v'", pp.Proposal.Signatures, decodedPP.Proposal.Signatures)
+	}
+
+	if !reflect.DeepEqual(pp.View, decodedPP.View) {
+		t.Errorf("View are different, expected '%+v', got '%+v'", pp.View, decodedPP.View)
+	}
+
+	if !reflect.DeepEqual(pp.Proposal.RequestContext.Number(), decodedPP.Proposal.RequestContext.Number()) {
+		t.Errorf("Block number are different, expected '%+v', got '%+v'", pp, decodedPP)
 	}
 }
 
@@ -82,9 +98,11 @@ func testSubject(t *testing.T) {
 		Digest: []byte{0x01, 0x02},
 	}
 
+	subjectPayload, _ := Encode(s)
+
 	m := &message{
 		Code:    msgPreprepare,
-		Msg:     s,
+		Msg:     subjectPayload,
 		Address: common.HexToAddress("0x1234567890"),
 	}
 
@@ -100,7 +118,7 @@ func testSubject(t *testing.T) {
 	}
 
 	var decodedSub *pbft.Subject
-	decodedSub = decodedMsg.Msg.(*pbft.Subject)
+	err = decodedMsg.Decode(&decodedSub)
 	if err != nil {
 		t.Error(err)
 	}
@@ -120,10 +138,11 @@ func testWithSignature(t *testing.T) {
 	}
 	expectedSig := []byte{0x01}
 
+	subjectPayload, _ := Encode(s)
 	// 1. Encode test
 	m := &message{
 		Code:      msgPreprepare,
-		Msg:       s,
+		Msg:       subjectPayload,
 		Address:   common.HexToAddress("0x1234567890"),
 		Signature: expectedSig,
 	}
