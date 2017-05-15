@@ -67,6 +67,9 @@ var (
 var (
 	defaultDifficulty = big.NewInt(1)
 	nilUncleHash      = types.CalcUncleHash(nil) // Always Keccak256(RLP([])) as uncles are meaningless outside of PoW.
+
+	// Default minimum difference between two consecutive block's timestamps
+	blockPeriod = 100 * time.Millisecond
 )
 
 // Author retrieves the Ethereum address of the account that minted the given
@@ -293,7 +296,7 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 
 	// TODO: config delay time, like PoA
 	// compensation for a few milliseconds of consensus runtime
-	<-time.After(100 * time.Millisecond)
+	<-time.After(blockPeriod)
 
 	// step 1. sign the hash
 	header := block.Header()
