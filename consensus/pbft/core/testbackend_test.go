@@ -91,6 +91,12 @@ func (self *testSystemBackend) ViewChanged(needNewProposal bool) error {
 func (self *testSystemBackend) Commit(proposal *pbft.Proposal) error {
 	testLogger.Info("commit message", "address", self.Address())
 	self.commitMsgs = append(self.commitMsgs, proposal)
+
+	// fake new head events
+	go self.events.Post(pbft.FinalCommittedEvent{
+		BlockNumber: proposal.RequestContext.Number(),
+		BlockHash:   proposal.RequestContext.Hash(),
+	})
 	return nil
 }
 

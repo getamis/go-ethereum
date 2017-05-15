@@ -41,7 +41,7 @@ type MessageEvent struct {
 	Payload []byte
 }
 
-type CheckpointEvent struct {
+type FinalCommittedEvent struct {
 	BlockNumber *big.Int
 	BlockHash   common.Hash
 }

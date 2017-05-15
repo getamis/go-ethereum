@@ -21,12 +21,11 @@ import (
 	"math/big"
 	"sync"
 
-	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
 const (
@@ -172,29 +171,16 @@ func (c *core) commit() {
 	c.setState(StateCommitted)
 	logger := c.logger.New("state", c.state)
 	logger.Debug("Ready to commit", "view", c.current.Preprepare.View)
-	c.backend.Commit(c.current.Preprepare.Proposal)
-
-	c.snapshotsMu.Lock()
-	c.snapshots = append(c.snapshots, c.current)
-	c.snapshotsMu.Unlock()
-
-	c.viewNumber = c.current.ViewNumber
-	c.sequence = c.current.Sequence
-	c.completed = true
-	c.setState(StateAcceptRequest)
-
-	// We build stable checkpoint every 100 requests
-	// FIXME: this should be passed by configuration
-	if new(big.Int).Mod(c.sequence, big.NewInt(100)).Int64() == 0 {
-		go c.sendInternalEvent(buildCheckpointEvent{})
+	if err := c.backend.Commit(c.current.Preprepare.Proposal); err != nil {
+		// TODO: fire a view change immediately
 	}
 }
 
 func (c *core) setState(state State) {
 	if c.state != state {
 		c.state = state
-		c.processBacklog()
 	}
+	c.processBacklog()
 }
 
 func (c *core) Address() common.Address {

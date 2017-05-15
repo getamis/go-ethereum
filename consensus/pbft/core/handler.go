@@ -16,11 +16,7 @@
 
 package core
 
-import (
-	"math/big"
-
-	"github.com/ethereum/go-ethereum/consensus/pbft"
-)
+import "github.com/ethereum/go-ethereum/consensus/pbft"
 
 // Start implements core.Engine.Start
 func (c *core) Start() error {
@@ -47,7 +43,7 @@ func (c *core) subscribeEvents() {
 		pbft.RequestEvent{},
 		pbft.ConnectionEvent{},
 		pbft.MessageEvent{},
-		pbft.CheckpointEvent{},
+		pbft.FinalCommittedEvent{},
 	)
 
 	c.internalEvents = c.internalMux.Subscribe(
@@ -65,22 +61,14 @@ func (c *core) handleExternalEvent() {
 	for event := range c.events.Chan() {
 		// A real event arrived, process interesting content
 		switch ev := event.Data.(type) {
-		case pbft.CheckpointEvent:
-			// TODO: we only implement sequence and digest now
-			// TODO: might have to handle error
-			c.sendCheckpoint(&pbft.Subject{
-				View: &pbft.View{
-					Sequence:   ev.BlockNumber,
-					ViewNumber: new(big.Int),
-				},
-				Digest: ev.BlockHash.Bytes(),
-			})
+		case pbft.FinalCommittedEvent:
+			c.handleFinalCommitted(ev, c.backend.Validators().GetByAddress(c.Address()))
 		case pbft.ConnectionEvent:
 
 		case pbft.RequestEvent:
 			c.handleRequest(&pbft.Request{
 				BlockContext: ev.BlockContext,
-			}, c.backend.Validators().GetByAddress(c.address))
+			}, c.backend.Validators().GetByAddress(c.Address()))
 		case pbft.MessageEvent:
 			c.handleMsg(ev.Payload)
 		}

@@ -109,14 +109,15 @@ func (c *core) buildStableCheckpoint() {
 	if stableCheckpointIndex != -1 {
 		// Remove old snapshots
 		c.snapshots = c.snapshots[stableCheckpointIndex+1:]
+		logger.Debug("Build a stable checkpoint", "checkpoint", stableCheckpoint)
+
+		if err := c.backend.Save(keyStableCheckpoint, stableCheckpoint); err != nil {
+			logger.Crit("Failed to save stable checkpoint", "error", err)
+		}
+	} else {
+		logger.Debug("Cannot build a stable checkpoint")
 	}
 
 	// Release the lock as soon as possible
 	c.snapshotsMu.Unlock()
-
-	logger.Debug("Stable checkpoint", "checkpoint", stableCheckpoint)
-
-	if err := c.backend.Save(keyStableCheckpoint, stableCheckpoint); err != nil {
-		logger.Crit("Failed to save stable checkpoint", "error", err)
-	}
 }

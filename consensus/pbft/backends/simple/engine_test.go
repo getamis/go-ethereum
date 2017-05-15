@@ -294,7 +294,7 @@ func TestVerifyHeader(t *testing.T) {
 	}
 
 	// non zero coinbase
-	block = makeBlock(chain, engine, chain.Genesis())
+	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	header = block.Header()
 	header.Coinbase = common.StringToAddress("123456789")
 	block = block.WithSeal(header)
@@ -304,7 +304,7 @@ func TestVerifyHeader(t *testing.T) {
 	}
 
 	// non zero MixDigest
-	block = makeBlock(chain, engine, chain.Genesis())
+	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	header = block.Header()
 	header.MixDigest = common.StringToHash("123456789")
 	block = block.WithSeal(header)
@@ -314,7 +314,7 @@ func TestVerifyHeader(t *testing.T) {
 	}
 
 	// invalid uncles hash
-	block = makeBlock(chain, engine, chain.Genesis())
+	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	header = block.Header()
 	header.UncleHash = common.StringToHash("123456789")
 	block = block.WithSeal(header)
@@ -324,7 +324,7 @@ func TestVerifyHeader(t *testing.T) {
 	}
 
 	// invalid difficulty
-	block = makeBlock(chain, engine, chain.Genesis())
+	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	header = block.Header()
 	header.Difficulty = big.NewInt(2)
 	block = block.WithSeal(header)
@@ -343,18 +343,17 @@ func TestVerifySeal(t *testing.T) {
 		t.Errorf("unexpected error comes, got: %v, expected: errUnknownBlock", err)
 	}
 
-	// change block content
 	block := makeBlock(chain, engine, genesis)
+	// change block content
 	header := block.Header()
 	header.Number = big.NewInt(4)
-	block = block.WithSeal(header)
-	err = engine.VerifySeal(chain, block.Header())
+	block1 := block.WithSeal(header)
+	err = engine.VerifySeal(chain, block1.Header())
 	if err != errUnauthorized {
 		t.Errorf("unexpected error comes, got: %v, expected: errUnauthorized", err)
 	}
 
 	// unauthorized users but still can get correct signer address
-	block = makeBlock(chain, engine, genesis)
 	engine.privateKey, _ = crypto.GenerateKey()
 	err = engine.VerifySeal(chain, block.Header())
 	if err != nil {
