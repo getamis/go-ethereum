@@ -52,15 +52,16 @@ func testNewValidatorSet(t *testing.T) {
 	}
 
 	// Create ValidatorSet
-	validatorSet, r := NewSet(b)
-	if !r {
+	valSet := NewSet(ExtractValidators(b))
+	if valSet == nil {
 		t.Errorf("Cannot parse the validator byte array")
+		t.FailNow()
 	}
 
 	// Check validators sorting: should be in ascending order
 	for i := 0; i < ValCnt-1; i++ {
-		val := validatorSet.GetByIndex(uint64(i))
-		nextVal := validatorSet.GetByIndex(uint64(i + 1))
+		val := valSet.GetByIndex(uint64(i))
+		nextVal := valSet.GetByIndex(uint64(i + 1))
 		if strings.Compare(val.Address().Hex(), nextVal.Address().Hex()) >= 0 {
 			t.Errorf("Validator set is not sorted in sorted in ascending order")
 		}
@@ -75,9 +76,10 @@ func testNormalValSet(t *testing.T) {
 	val1 := New(addr1)
 	val2 := New(addr2)
 
-	valSet, r := NewSet(append(b1, b2...))
-	if !r {
+	valSet := NewSet(ExtractValidators(append(b1, b2...)))
+	if valSet == nil {
 		t.Errorf("invalid validator set format")
+		t.FailNow()
 	}
 
 	// check size
@@ -113,32 +115,8 @@ func testNormalValSet(t *testing.T) {
 }
 
 func testEmptyValSet(t *testing.T) {
-	valSet, r := NewSet([]byte{})
-	if !r {
-		t.Errorf("invalid validator set format")
-	}
-
-	// check size
-	if size := valSet.Size(); size != 0 {
-		t.Errorf("wrong peer set size, got: %v, expected: 0", size)
-
-	}
-	// test get by index
-	if val := valSet.GetByIndex(uint64(0)); val != nil {
-		t.Errorf("get wrong validator, got: %v, expected: nil", val)
-	}
-	// test get by invalid address
-	invalidAddr := common.HexToAddress("0x9535b2e7faaba5288511d89341d94a38063a349b")
-	if val := valSet.GetByAddress(invalidAddr); val != nil {
-		t.Errorf("get wrong validator, got: %v, expected: nil", val)
-	}
-	// test get proposer
-	if val := valSet.GetProposer(); val != nil {
-		t.Errorf("get wrong proposer, got: %v, expected: nil", val)
-	}
-	// test calculate proposer
-	valSet.CalcProposer(uint64(3))
-	if val := valSet.GetProposer(); val != nil {
-		t.Errorf("get wrong proposer, got: %v, expected: nil", val)
+	valSet := NewSet(ExtractValidators([]byte{}))
+	if valSet != nil {
+		t.Errorf("validator set should be nil")
 	}
 }

@@ -108,7 +108,7 @@ func (sb *simpleBackend) verifyHeader(chain consensus.ChainReader, header *types
 	if length < extraVanity+extraSeal {
 		return errInvalidExtraDataFormat
 	}
-	if !sb.valSet.CheckFormat(sb.getValidatorBytes(header)) {
+	if !validator.ValidExtraData(sb.getValidatorBytes(header)) {
 		return errInvalidExtraDataFormat
 	}
 
@@ -196,9 +196,11 @@ func (sb *simpleBackend) verifySigner(chain consensus.ChainReader, header *types
 	if err != nil {
 		return err
 	}
+
+	validatorAddresses := validator.ExtractValidators(sb.getValidatorBytes(parent))
 	// ensure the signer is in parent's validator set
-	parentValSet, r := validator.NewSet(sb.getValidatorBytes(parent))
-	if !r || parentValSet == nil {
+	parentValSet := validator.NewSet(validatorAddresses)
+	if parentValSet == nil {
 		return errInvalidExtraDataFormat
 	}
 	if v := parentValSet.GetByAddress(signer); v == nil {
@@ -408,8 +410,9 @@ func (sb *simpleBackend) Stop() error {
 func (sb *simpleBackend) initValidatorSet(chain consensus.ChainReader) error {
 	header := chain.CurrentHeader()
 	// get the validator byte array and feed into validator set
-	valSet, r := validator.NewSet(sb.getValidatorBytes(header))
-	if !r || valSet == nil {
+	validatorAddresses := validator.ExtractValidators(sb.getValidatorBytes(header))
+	valSet := validator.NewSet(validatorAddresses)
+	if valSet == nil {
 		return errInvalidExtraDataFormat
 	}
 	sb.valSet = valSet

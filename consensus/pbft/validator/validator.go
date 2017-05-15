@@ -27,6 +27,27 @@ func New(addr common.Address) pbft.Validator {
 	}
 }
 
-func NewSet(extraData []byte) (pbft.ValidatorSet, bool) {
-	return newDefaultSet(extraData)
+func NewSet(addrs []common.Address) pbft.ValidatorSet {
+	if len(addrs) == 0 {
+		return nil
+	}
+	return newDefaultSet(addrs)
+}
+
+func ExtractValidators(extraData []byte) []common.Address {
+	if !ValidExtraData(extraData) {
+		return nil
+	}
+	// get the validator addresses
+	addrs := make([]common.Address, (len(extraData) / common.AddressLength))
+	for i := 0; i < len(addrs); i++ {
+		copy(addrs[i][:], extraData[i*common.AddressLength:])
+	}
+
+	return addrs
+}
+
+// Check whether the extraData is presented in prescribed form
+func ValidExtraData(extraData []byte) bool {
+	return len(extraData)%common.AddressLength == 0
 }
