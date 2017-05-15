@@ -185,6 +185,7 @@ func newTestValidatorSet(n int) pbft.ValidatorSet {
 		validators[i] = validator.New(crypto.PubkeyToAddress(privateKey.PublicKey))
 		b = append(b, validators[i].Address().Bytes()...)
 	}
+
 	vset := validator.NewSet(validator.ExtractValidators(b))
 
 	return vset
