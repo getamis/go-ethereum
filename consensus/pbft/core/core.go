@@ -141,6 +141,22 @@ func (c *core) finalizeMessage(msg *message) ([]byte, error) {
 	return payload, nil
 }
 
+func (c *core) send(msg *message, target common.Address) {
+	logger := c.logger.New("state", c.state)
+
+	payload, err := c.finalizeMessage(msg)
+	if err != nil {
+		logger.Error("Failed to finalize message", "msg", msg, "error", err)
+		return
+	}
+
+	// Broadcast payload
+	if err = c.backend.Send(payload, target); err != nil {
+		logger.Error("Failed to broadcast message", "msg", msg, "error", err)
+		return
+	}
+}
+
 func (c *core) broadcast(msg *message) {
 	logger := c.logger.New("state", c.state)
 
