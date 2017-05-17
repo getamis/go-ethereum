@@ -42,6 +42,20 @@ const (
 
 type State uint64
 
+func (s State) String() string {
+	if s == StateAcceptRequest {
+		return "Accept request"
+	} else if s == StatePreprepared {
+		return "Preprepared"
+	} else if s == StatePrepared {
+		return "Prepared"
+	} else if s == StateCommitted {
+		return "Committed"
+	} else {
+		return "Unknown"
+	}
+}
+
 type Engine interface {
 	Start() error
 	Stop() error
