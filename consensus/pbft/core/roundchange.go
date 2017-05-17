@@ -82,6 +82,7 @@ func (c *core) handleRoundChange(msg *message, src pbft.Validator) error {
 	if num == int(c.F+1) {
 		if c.round.Cmp(rc.Round) < 0 {
 			c.round = rc.Round
+			c.newRoundChangeTimer()
 		}
 	}
 

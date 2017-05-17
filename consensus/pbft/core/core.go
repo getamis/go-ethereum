@@ -20,6 +20,7 @@ import (
 	"math"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
@@ -38,6 +39,8 @@ const (
 
 const (
 	keyStableCheckpoint = "StableCheckpoint"
+
+	roundChangeTimeout = 10 * time.Second
 )
 
 type State uint64
@@ -120,8 +123,9 @@ type core struct {
 	snapshots   []*snapshot
 	snapshotsMu *sync.RWMutex
 
-	roundChangeSet *roundChangeSet
-	rouncChangeMu  *sync.RWMutex
+	roundChangeSet   *roundChangeSet
+	rouncChangeMu    *sync.RWMutex
+	roundChangeTimer *time.Timer
 }
 
 func (c *core) finalizeMessage(msg *message) ([]byte, error) {
@@ -213,6 +217,8 @@ func (c *core) enterNewView(newView *pbft.View) {
 	// Calculate new proposer
 	c.backend.Validators().CalcProposer(newView.Round.Uint64())
 
+	c.newRoundChangeTimer()
+
 	c.round = newView.Round
 	c.sequence = newView.Sequence
 	c.current = nil
@@ -249,4 +255,13 @@ func (c *core) Snapshot() (State, *snapshot) {
 
 func (c *core) Backlog() map[pbft.Validator]*prque.Prque {
 	return c.backlogs
+}
+
+func (c *core) newRoundChangeTimer() {
+	if c.roundChangeTimer != nil {
+		c.roundChangeTimer.Stop()
+	}
+	c.roundChangeTimer = time.AfterFunc(roundChangeTimeout, func() {
+		c.sendRoundChange()
+	})
 }
