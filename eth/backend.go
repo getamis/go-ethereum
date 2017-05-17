@@ -33,6 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/eth/gasprice"
@@ -121,6 +122,11 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		netVersionId:   config.NetworkId,
 		etherbase:      config.Etherbase,
 		MinerThreads:   config.MinerThreads,
+	}
+
+	// force to set the pbft etherbase to node key address
+	if chainConfig.PBFT != nil {
+		eth.etherbase = crypto.PubkeyToAddress(ctx.NodeKey().PublicKey)
 	}
 
 	if err := addMipmapBloomBins(chainDb); err != nil {
@@ -311,6 +317,10 @@ func (s *Ethereum) Etherbase() (eb common.Address, err error) {
 
 // set in js console via admin interface or wrapper from cli flags
 func (self *Ethereum) SetEtherbase(etherbase common.Address) {
+	if _, ok := self.engine.(consensus.PBFT); ok {
+		log.Error("Cannot set etherbase in PBFT consensus")
+		return
+	}
 	self.etherbase = etherbase
 	self.miner.SetEtherbase(etherbase)
 }
