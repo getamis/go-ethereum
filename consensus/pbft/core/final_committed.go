@@ -43,19 +43,13 @@ func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validato
 		c.snapshots = append(c.snapshots, c.current)
 		c.snapshotsMu.Unlock()
 
-		c.round = new(big.Int).Set(c.current.Round)
-		c.sequence = new(big.Int).Set(c.current.Sequence)
-		c.completed = true
-		c.setState(StateAcceptRequest)
-		// this block is from geth sync
 	} else {
+		// this block is from geth sync
 		logger.Debug("handleFinalCommitted from geth sync", "height", ev.BlockNumber, "hash", ev.BlockHash)
-		// reset view number to 0
-		c.round = common.Big0
-		c.sequence = new(big.Int).Set(ev.BlockNumber)
-		c.completed = true
-		c.setState(StateAcceptRequest)
 	}
+	c.sequence = new(big.Int).Add(c.backend.LastCommitSequence(), common.Big1)
+	c.round = common.Big0
+	c.setState(StateAcceptRequest)
 	// We build stable checkpoint every 100 blocks
 	// FIXME: this should be passed by configuration
 	if new(big.Int).Mod(c.sequence, big.NewInt(100)).Int64() == 0 {

@@ -20,6 +20,8 @@ import "github.com/ethereum/go-ethereum/consensus/pbft"
 
 // Start implements core.Engine.Start
 func (c *core) Start() error {
+	// restore last commit sequence
+	c.initSequence()
 	// Tests will handle events itself, so we have to make subscribeEvents()
 	// be able to call in test.
 	c.subscribeEvents()

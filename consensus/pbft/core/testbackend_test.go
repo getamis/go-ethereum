@@ -18,6 +18,7 @@ package core
 
 import (
 	"crypto/ecdsa"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
@@ -44,6 +45,8 @@ type testSystemBackend struct {
 
 	address common.Address
 	db      ethdb.Database
+
+	curBlockNumber *big.Int
 }
 
 // ==============================================
@@ -94,6 +97,7 @@ func (self *testSystemBackend) ViewChanged(needNewProposal bool) error {
 func (self *testSystemBackend) Commit(proposal *pbft.Proposal) error {
 	testLogger.Info("commit message", "address", self.Address())
 	self.commitMsgs = append(self.commitMsgs, proposal)
+	self.curBlockNumber = new(big.Int).Add(self.curBlockNumber, common.Big1)
 
 	// fake new head events
 	go self.events.Post(pbft.FinalCommittedEvent{
@@ -128,15 +132,12 @@ func (self *testSystemBackend) IsProposer() bool {
 	return self.Address() == self.sys.backends[0].Address()
 }
 
+func (self *testSystemBackend) LastCommitSequence() *big.Int {
+	return self.curBlockNumber
+}
+
 func (self *testSystemBackend) Hash(b interface{}) common.Hash {
 	return common.StringToHash("Test")
-}
-func (self *testSystemBackend) Encode(b interface{}) ([]byte, error) {
-	return []byte(""), nil
-
-}
-func (self *testSystemBackend) Decode([]byte, interface{}) error {
-	return nil
 }
 
 func (self *testSystemBackend) NewRequest(request pbft.RequestContexter) {
@@ -215,6 +216,7 @@ func NewTestSystemWithBackend(n, f uint64) *testSystem {
 		backend := sys.NewBackend(i)
 		backend.peers = vset
 		backend.address = vset.GetByIndex(i).Address()
+		backend.curBlockNumber = common.Big1
 
 		core := New(backend, config).(*core)
 		core.current = newSnapshot(&pbft.Preprepare{

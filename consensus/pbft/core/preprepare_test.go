@@ -146,11 +146,11 @@ OUTER:
 		v0 := test.system.backends[0]
 		r0 := v0.engine.(*core)
 
-		nextSeqView := r0.nextSequence()
+		curView := r0.currentView()
 
 		preprepare := &pbft.Preprepare{
-			View:     nextSeqView,
-			Proposal: r0.makeProposal(nextSeqView.Sequence, &pbft.Request{BlockContext: test.expectedRequest}),
+			View:     curView,
+			Proposal: r0.makeProposal(curView.Sequence, &pbft.Request{BlockContext: test.expectedRequest}),
 		}
 
 		for i, v := range test.system.backends {
@@ -184,13 +184,10 @@ OUTER:
 				t.Error("state should be preprepared")
 			}
 
-			if !reflect.DeepEqual(c.subject.View, nextSeqView) {
+			if !reflect.DeepEqual(c.subject.View, curView) {
 				t.Error("view should be the same")
 			}
 
-			if c.completed {
-				t.Error("should not complete")
-			}
 			// verify prepare messages
 			decodedMsg := new(message)
 			err := decodedMsg.FromPayload(v.sentMsgs[0], nil)

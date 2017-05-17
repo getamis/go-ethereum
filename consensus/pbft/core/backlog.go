@@ -21,49 +21,30 @@ import (
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
+var (
+	waitFor = map[State]uint64{
+		StateAcceptRequest: msgPreprepare,
+		StatePreprepared:   msgPrepare,
+		StatePrepared:      msgCommit,
+		StateCommitted:     msgNewView,
+	}
+)
+
 // check whether it's a future message
-// if this round is completed,
-// - if the current state is StateAcceptRequest (waiting for a new MsgPreprepare message)
-//   and the message is MsgPreprepare, we will check whether the view is next sequence or
-//   view number. If so, it's not a future message because we can process it now and enter
-//   the next round.
-// - Otherwise, we ignore the msg code, because this round is completed. We only compute
-//   the message priority by its sequence and view number
-// if this round is not completed, we compute current state and the message priority.
 // It's a future message if the message priority is smaller than current priority
 func (c *core) isFutureMessage(msgCode uint64, view *pbft.View) bool {
 	if view == nil || view.Sequence == nil || view.Round == nil {
 		return false
 	}
 
-	if c.subject == nil {
-		// only in initial state
-		if msgCode == msgPreprepare {
-			return false
-		}
-		return true
+	waitMsgCode, ok := waitFor[c.state]
+	// don't check if not in pre-defined state
+	if !ok {
+		return false
 	}
+	priority := toPriority(waitMsgCode, c.currentView())
+	newPriority := toPriority(msgCode, view)
 
-	var priority, newPriority float32
-	if c.completed {
-		// check the next round
-		newPriority = toPriority(msgCode, view)
-		if c.state == StateAcceptRequest && msgCode == msgPreprepare {
-			// next sequence
-			if toPriority(msgCode, c.nextSequence()) == newPriority {
-				return false
-			}
-			// next view
-			if toPriority(msgCode, c.nextRound()) == newPriority {
-				return false
-			}
-		}
-		// if completed, skip the message code because this round is completed
-		priority = toPriority(msgCode, c.subject.View)
-	} else {
-		priority = toPriority(uint64(c.state), c.subject.View)
-		newPriority = toPriority(msgCode, view)
-	}
 	return priority > newPriority
 }
 
@@ -159,6 +140,8 @@ func (c *core) processBacklog() {
 }
 
 func toPriority(msgCode uint64, view *pbft.View) float32 {
-	// In our case, sequence and view number will never reset to zero
-	return -float32((view.Sequence.Uint64()+view.Round.Uint64())*10 + msgCode)
+	// FIXME: round will be reset as 0 while new sequence
+	// 10 * Round limits the range of message code is from 0 to 9
+	// 1000 * Sequence limits the range of round is from 0 to 99
+	return -float32(view.Sequence.Uint64()*1000 + view.Round.Uint64()*10 + msgCode)
 }

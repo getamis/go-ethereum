@@ -19,6 +19,7 @@ package simple
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
@@ -248,4 +249,11 @@ func (sb *simpleBackend) IsProposer() bool {
 		return false
 	}
 	return sb.valSet.IsProposer(sb.address)
+}
+
+func (sb *simpleBackend) LastCommitSequence() *big.Int {
+	if sb.chain == nil {
+		return common.Big0
+	}
+	return new(big.Int).Set(sb.chain.CurrentHeader().Number)
 }

@@ -17,6 +17,8 @@
 package pbft
 
 import (
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 )
@@ -61,6 +63,9 @@ type Backend interface {
 
 	// CheckValidatorSignature verifies if the data is signed by one of the validators
 	CheckValidatorSignature(data []byte, sig []byte) (common.Address, error)
+
+	// LastCommitSequence returns latest block number
+	LastCommitSequence() *big.Int
 
 	// FIXME: Hash, Encode, Decode and SetHandler are workaround functions for developing
 	Hash(b interface{}) common.Hash

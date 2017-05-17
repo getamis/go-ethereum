@@ -34,61 +34,107 @@ import (
 func TestIsFutureMessage(t *testing.T) {
 	c := &core{
 		state:    StateAcceptRequest,
-		sequence: big.NewInt(0)}
+		sequence: big.NewInt(1),
+		round:    big.NewInt(0),
+	}
+
+	// invalid view format
 	r := c.isFutureMessage(msgPreprepare, nil)
 	if r {
-		t.Error("Should return false if nil round")
+		t.Error("Should return false if nil view")
 	}
+
+	testStates := []State{StateAcceptRequest, StatePreprepared, StatePrepared, StateCommitted}
+	testCode := []uint64{msgPreprepare, msgPrepare, msgCommit}
+
+	// future sequence
 	v := &pbft.View{
-		Round:    big.NewInt(10),
-		Sequence: big.NewInt(10),
+		Sequence: big.NewInt(2),
+		Round:    big.NewInt(0),
 	}
-	r = c.isFutureMessage(msgPreprepare, v)
-	if r {
-		t.Error("Should return false if nil subject")
+	for i := 0; i < len(testStates); i++ {
+		c.state = testStates[i]
+		for j := 0; j < len(testCode); j++ {
+			r = c.isFutureMessage(testCode[j], v)
+			if !r {
+				t.Error("Should return true because it's a future sequence")
+			}
+		}
 	}
 
-	// for completed
-	c.subject = &pbft.Subject{
-		View: v,
+	// future round
+	v = &pbft.View{
+		Sequence: big.NewInt(1),
+		Round:    big.NewInt(1),
 	}
-	c.sequence = big.NewInt(10)
-	c.round = big.NewInt(10)
+	for i := 0; i < len(testStates); i++ {
+		c.state = testStates[i]
+		for j := 0; j < len(testCode); j++ {
+			r = c.isFutureMessage(testCode[j], v)
+			if !r {
+				t.Error("Should return true because it's a future round")
+			}
+		}
+	}
+
+	v = c.currentView()
+	// current view, state = StateAcceptRequest
 	c.state = StateAcceptRequest
-	c.completed = true
-	nextSeq := c.nextSequence()
-	r = c.isFutureMessage(msgPreprepare, nextSeq)
-	if r {
-		t.Error("Should false because we can execute it now")
-	}
-	r = c.isFutureMessage(msgPrepare, nextSeq)
-	if !r {
-		t.Error("Should return true because it's a future sequence")
-	}
-	nextRound := c.nextRound()
-	r = c.isFutureMessage(msgPreprepare, nextRound)
-	if r {
-		t.Error("Should false because we can execute it now")
-	}
-	r = c.isFutureMessage(msgPrepare, nextRound)
-	if !r {
-		t.Error("Should return true because it's a future round")
-	}
-	r = c.isFutureMessage(msgCommit, v)
-	if r {
-		t.Error("Should return false because this round is completed")
+	for i := 0; i < len(testCode); i++ {
+		r = c.isFutureMessage(testCode[i], v)
+		if testCode[i] == msgPreprepare {
+			if r {
+				t.Error("Should return false because we can execute it now")
+			}
+
+		} else {
+			if !r {
+				t.Error("Should return true because it's a future round")
+			}
+		}
 	}
 
-	// for non-completed
-	c.completed = false
-	r = c.isFutureMessage(msgPreprepare, nextSeq)
-	if !r {
-		t.Error("Should true because of next sequence")
+	// current view, state = StatePreprepared
+	c.state = StatePreprepared
+	for i := 0; i < len(testCode); i++ {
+		r = c.isFutureMessage(testCode[i], v)
+		if testCode[i] <= msgPrepare {
+			if r {
+				t.Error("Should return false because we can execute it now")
+			}
+
+		} else {
+			if !r {
+				t.Error("Should return true because it's a future round")
+			}
+		}
 	}
-	r = c.isFutureMessage(msgPreprepare, nextRound)
-	if !r {
-		t.Error("Should false because of next round")
+
+	// current view, state = StatePrepared
+	c.state = StatePrepared
+	for i := 0; i < len(testCode); i++ {
+		r = c.isFutureMessage(testCode[i], v)
+		if testCode[i] <= msgCommit {
+			if r {
+				t.Error("Should return false because we can execute it now")
+			}
+
+		} else {
+			if !r {
+				t.Error("Should return true because it's a future round")
+			}
+		}
 	}
+
+	// current view, state = StateCommitted
+	c.state = StateCommitted
+	for i := 0; i < len(testCode); i++ {
+		r = c.isFutureMessage(testCode[i], v)
+		if r {
+			t.Error("Should return false because we can execute it now")
+		}
+	}
+
 }
 
 func TestStoreBacklog(t *testing.T) {
@@ -112,7 +158,7 @@ func TestStoreBacklog(t *testing.T) {
 				DataHash:   common.HexToHash("0x9876543210"),
 			},
 			RequestContext: makeBlock(1),
-			Signatures:   [][]byte{[]byte("sig1")},
+			Signatures:     [][]byte{[]byte("sig1")},
 		},
 	}
 	prepreparePayload, _ := Encode(preprepare)
@@ -161,6 +207,9 @@ func TestProcessFutureBacklog(t *testing.T) {
 		backlogs:    make(map[pbft.Validator]*prque.Prque),
 		backlogsMu:  new(sync.Mutex),
 		backend:     backend,
+		sequence:    big.NewInt(1),
+		round:       big.NewInt(0),
+		state:       StateAcceptRequest,
 		internalMux: new(event.TypeMux),
 	}
 	c.subscribeEvents()
@@ -209,7 +258,7 @@ func TestProcessBacklog(t *testing.T) {
 				DataHash:   common.HexToHash("0x9876543210"),
 			},
 			RequestContext: makeBlock(1),
-			Signatures:   [][]byte{[]byte("sig1")},
+			Signatures:     [][]byte{[]byte("sig1")},
 		},
 	}
 	prepreparePayload, _ := Encode(preprepare)
@@ -253,6 +302,7 @@ func testProcessBacklog(t *testing.T, msg *message) {
 		internalMux: new(event.TypeMux),
 		state:       State(msg.Code),
 		sequence:    big.NewInt(1),
+		round:       big.NewInt(0),
 		subject: &pbft.Subject{
 			View: &pbft.View{
 				Sequence: big.NewInt(1),

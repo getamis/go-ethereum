@@ -65,6 +65,7 @@ func New(backend pbft.Backend, config *pbft.Config) Engine {
 	// update n and f
 	n := int64(backend.Validators().Size())
 	f := int64(math.Ceil(float64(n)/3) - 1)
+
 	return &core{
 		config:      config,
 		address:     backend.Address(),
@@ -151,17 +152,23 @@ func (c *core) broadcast(msg *message) {
 	}
 }
 
-func (c *core) nextSequence() *pbft.View {
+// initSequence initializes the current sequence and round
+func (c *core) initSequence() {
+	c.sequence = new(big.Int).Add(c.backend.LastCommitSequence(), common.Big1)
+	c.round = common.Big0
+}
+
+func (c *core) currentView() *pbft.View {
 	return &pbft.View{
-		Round:    c.round,
-		Sequence: new(big.Int).Add(c.sequence, common.Big1),
+		Sequence: new(big.Int).Set(c.sequence),
+		Round:    new(big.Int).Set(c.round),
 	}
 }
 
 func (c *core) nextRound() *pbft.View {
 	return &pbft.View{
+		Sequence: new(big.Int).Set(c.sequence),
 		Round:    new(big.Int).Add(c.round, common.Big1),
-		Sequence: c.sequence,
 	}
 }
 
