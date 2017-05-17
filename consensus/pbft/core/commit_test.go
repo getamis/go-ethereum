@@ -152,7 +152,7 @@ OUTER:
 		}
 
 		// StateAcceptRequest is normal case
-		if r0.state != StateAcceptRequest {
+		if r0.state != StateCommitted {
 			// There are not enough prepared messages in core
 			if r0.state != StatePrepared {
 				t.Error("state should be prepared")
@@ -170,25 +170,7 @@ OUTER:
 		}
 
 		if len(v0.commitMsgs) != 1 {
-			t.Error("expected length of commit messages should be 1")
-		}
-
-		if len(r0.snapshots) != 1 {
-			t.Error("expected length of consensus logs should be 1")
-		}
-
-		// status should be completed
-		if !r0.completed {
-			t.Error("completed should be true")
-		}
-
-		if r0.viewNumber.Uint64() != uint64(0) {
-			t.Error("expected default view number should be 0")
-		}
-
-		// default sequence is 1
-		if r0.sequence.Uint64() != uint64(1) {
-			t.Error("expected default sequence number should be 1")
+			t.Error("backend Commit() function should be called once, but got:", len(v0.commitMsgs))
 		}
 	}
 }
