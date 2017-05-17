@@ -39,8 +39,9 @@ const (
 	extraSeal   = 65 // Fixed number of extra-data suffix bytes reserved for signer seal
 )
 
-func New(timeout int, eventMux *event.TypeMux, privateKey *ecdsa.PrivateKey, db ethdb.Database) consensus.PBFT {
+func New(config *pbft.Config, eventMux *event.TypeMux, privateKey *ecdsa.PrivateKey, db ethdb.Database) consensus.PBFT {
 	backend := &simpleBackend{
+		config:       config,
 		peerSet:      newPeerSet(),
 		eventMux:     eventMux,
 		pbftEventMux: new(event.TypeMux),
@@ -48,13 +49,13 @@ func New(timeout int, eventMux *event.TypeMux, privateKey *ecdsa.PrivateKey, db 
 		address:      crypto.PubkeyToAddress(privateKey.PublicKey),
 		logger:       log.New("backend", "simple"),
 		db:           db,
-		timeout:      uint64(timeout),
 	}
 	return backend
 }
 
 // ----------------------------------------------------------------------------
 type simpleBackend struct {
+	config         *pbft.Config
 	peerSet        *peerSet
 	valSet         pbft.ValidatorSet
 	eventMux       *event.TypeMux

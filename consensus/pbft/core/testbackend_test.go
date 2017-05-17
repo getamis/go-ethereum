@@ -200,13 +200,14 @@ func NewTestSystemWithBackend(n, f uint64) *testSystem {
 
 	vset := newTestValidatorSet(int(n))
 	sys := newTestSystem(n)
+	config := pbft.DefaultConfig
 
 	for i := uint64(0); i < n; i++ {
 		backend := sys.NewBackend(i)
 		backend.peers = vset
 		backend.address = vset.GetByIndex(i).Address()
 
-		core := New(backend).(*core)
+		core := New(backend, config.BlockPeriod).(*core)
 		core.current = newSnapshot(&pbft.Preprepare{
 			View:     &pbft.View{},
 			Proposal: &pbft.Proposal{},
