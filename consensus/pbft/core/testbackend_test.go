@@ -189,7 +189,7 @@ func newTestValidatorSet(n int) pbft.ValidatorSet {
 		validators[i] = validator.New(crypto.PubkeyToAddress(privateKey.PublicKey))
 		b = append(b, validators[i].Address().Bytes()...)
 	}
-	vset, _ := validator.NewSet(b)
+	vset := validator.NewSet(validator.ExtractValidators(b))
 
 	return vset
 }
@@ -210,7 +210,7 @@ func NewTestSystemWithBackend(n, f uint64) *testSystem {
 		core.current = newSnapshot(&pbft.Preprepare{
 			View:     &pbft.View{},
 			Proposal: &pbft.Proposal{},
-		})
+		}, vset)
 		core.logger = testLogger
 		core.N = int64(n)
 		core.F = int64(f)

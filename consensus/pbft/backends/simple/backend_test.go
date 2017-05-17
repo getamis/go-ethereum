@@ -139,7 +139,7 @@ func newTestValidatorSet(n int) (pbft.ValidatorSet, []*ecdsa.PrivateKey) {
 		validators[i] = validator.New(crypto.PubkeyToAddress(privateKey.PublicKey))
 		b = append(b, validators[i].Address().Bytes()...)
 	}
-	vset, _ := validator.NewSet(b)
+	vset := validator.NewSet(validator.ExtractValidators(b))
 	sort.Sort(keys) //Keys need to be sorted by its public key address
 	return vset, keys
 }

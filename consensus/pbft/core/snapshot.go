@@ -18,19 +18,18 @@ package core
 
 import (
 	"math/big"
-	"reflect"
 
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 )
 
-func newSnapshot(preprepare *pbft.Preprepare) *snapshot {
+func newSnapshot(preprepare *pbft.Preprepare, validatorSet pbft.ValidatorSet) *snapshot {
 	return &snapshot{
 		ViewNumber:  preprepare.View.ViewNumber,
 		Sequence:    preprepare.View.Sequence,
 		Preprepare:  preprepare,
-		Prepares:    pbft.NewMessageSet(preprepare.View, reflect.TypeOf(&message{})),
-		Commits:     pbft.NewMessageSet(preprepare.View, reflect.TypeOf(&message{})),
-		Checkpoints: pbft.NewMessageSet(preprepare.View, reflect.TypeOf(&message{})),
+		Prepares:    newMessageSet(validatorSet),
+		Commits:     newMessageSet(validatorSet),
+		Checkpoints: newMessageSet(validatorSet),
 	}
 }
 
@@ -38,7 +37,7 @@ type snapshot struct {
 	ViewNumber  *big.Int
 	Sequence    *big.Int
 	Preprepare  *pbft.Preprepare
-	Prepares    pbft.MessageSet
-	Commits     pbft.MessageSet
-	Checkpoints pbft.MessageSet
+	Prepares    *messageSet
+	Commits     *messageSet
+	Checkpoints *messageSet
 }

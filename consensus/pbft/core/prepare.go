@@ -88,7 +88,7 @@ func (c *core) acceptPrepare(msg *message, src pbft.Validator) {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 
 	// we check signature in Add
-	if _, err := c.current.Prepares.Add(msg, src); err != nil {
+	if err := c.current.Prepares.Add(msg); err != nil {
 		logger.Error("Failed to record prepare message", "msg", msg, "error", err)
 	}
 }

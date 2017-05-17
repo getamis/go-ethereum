@@ -96,6 +96,6 @@ func (c *core) acceptPreprepare(preprepare *pbft.Preprepare) {
 	}
 
 	c.subject = subject
-	c.current = newSnapshot(preprepare)
+	c.current = newSnapshot(preprepare, c.backend.Validators())
 	c.completed = false
 }

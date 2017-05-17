@@ -24,8 +24,6 @@ type Validator interface {
 }
 
 type ValidatorSet interface {
-	// Check whether the extraData is presented in correct format
-	CheckFormat(extraData []byte) bool
 	// Calculate the proposer
 	CalcProposer(seed uint64)
 	// Return the validator size

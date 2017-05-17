@@ -79,7 +79,7 @@ func (c *core) acceptCommit(msg *message, src pbft.Validator) {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 
 	// We check signature in Add
-	if _, err := c.current.Commits.Add(msg, src); err != nil {
+	if err := c.current.Commits.Add(msg); err != nil {
 		logger.Error("Failed to record commit message", "msg", msg, "error", err)
 	}
 }

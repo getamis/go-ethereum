@@ -51,17 +51,8 @@ type defaultSet struct {
 	proposer   pbft.Validator
 }
 
-func newDefaultSet(extraData []byte) (*defaultSet, bool) {
+func newDefaultSet(addrs []common.Address) *defaultSet {
 	valSet := &defaultSet{}
-	if !valSet.CheckFormat(extraData) {
-		return nil, false
-	}
-
-	// get the validator addresses
-	addrs := make([]common.Address, (len(extraData) / common.AddressLength))
-	for i := 0; i < len(addrs); i++ {
-		copy(addrs[i][:], extraData[i*common.AddressLength:])
-	}
 
 	// init validators
 	valSet.validators = make([]pbft.Validator, len(addrs))
@@ -73,7 +64,7 @@ func newDefaultSet(extraData []byte) (*defaultSet, bool) {
 	// init proposer
 	valSet.CalcProposer(0)
 
-	return valSet, true
+	return valSet
 }
 
 func (valSet *defaultSet) Size() int              { return len(valSet.validators) }
@@ -101,11 +92,6 @@ func (valSet *defaultSet) GetProposer() pbft.Validator {
 
 func (valSet *defaultSet) IsProposer(address common.Address) bool {
 	return reflect.DeepEqual(valSet.GetProposer(), valSet.GetByAddress(address))
-}
-
-// Check whether the extraData is presented in prescribed form
-func (valSet *defaultSet) CheckFormat(extraData []byte) bool {
-	return len(extraData)%common.AddressLength == 0
 }
 
 func (valSet *defaultSet) CalcProposer(seed uint64) {

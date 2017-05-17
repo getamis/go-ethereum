@@ -16,13 +16,16 @@
 
 package core
 
-import "errors"
-
-var (
-	errFutureMessage          = errors.New("future message")
-	errFailedDecodePreprepare = errors.New("failed to decode Preprepare")
-	errFailedDecodePrepare    = errors.New("failed to decode Prepare")
-	errFailedDecodeCommit     = errors.New("failed to decode Commit")
-	errFailedDecodeCheckpoint = errors.New("failed to decode Checkpoint")
-	errFailedDecodeMessageSet = errors.New("failed to decode message set")
+import (
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto/sha3"
+	"github.com/ethereum/go-ethereum/rlp"
 )
+
+func hash(v interface{}) (h common.Hash) {
+	hw := sha3.NewKeccak256()
+	rlp.Encode(hw, v)
+	hw.Sum(h[:0])
+
+	return
+}
