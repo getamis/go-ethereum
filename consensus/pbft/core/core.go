@@ -72,19 +72,21 @@ func New(backend pbft.Backend, config *pbft.Config) Engine {
 	f := int64(math.Ceil(float64(n)/3) - 1)
 
 	return &core{
-		config:      config,
-		address:     backend.Address(),
-		N:           n,
-		F:           f,
-		state:       StateAcceptRequest,
-		logger:      log.New("address", backend.Address().Hex()),
-		backend:     backend,
-		sequence:    common.Big0,
-		round:       common.Big0,
-		internalMux: new(event.TypeMux),
-		backlogs:    make(map[pbft.Validator]*prque.Prque),
-		backlogsMu:  new(sync.Mutex),
-		snapshotsMu: new(sync.RWMutex),
+		config:         config,
+		address:        backend.Address(),
+		N:              n,
+		F:              f,
+		state:          StateAcceptRequest,
+		logger:         log.New("address", backend.Address().Hex()),
+		backend:        backend,
+		sequence:       common.Big0,
+		round:          common.Big0,
+		internalMux:    new(event.TypeMux),
+		backlogs:       make(map[pbft.Validator]*prque.Prque),
+		backlogsMu:     new(sync.Mutex),
+		snapshotsMu:    new(sync.RWMutex),
+		roundChangeSet: newRoundChangeSet(backend.Validators()),
+		rouncChangeMu:  new(sync.RWMutex),
 	}
 }
 
@@ -104,9 +106,10 @@ type core struct {
 	internalMux    *event.TypeMux
 	internalEvents *event.TypeMuxSubscription
 
-	sequence     *big.Int
-	round        *big.Int
-	lastProposer common.Address
+	sequence              *big.Int
+	round                 *big.Int
+	lastProposer          common.Address
+	waitingForRoundChange bool
 
 	subject *pbft.Subject
 
@@ -116,6 +119,9 @@ type core struct {
 	current     *snapshot
 	snapshots   []*snapshot
 	snapshotsMu *sync.RWMutex
+
+	roundChangeSet *roundChangeSet
+	rouncChangeMu  *sync.RWMutex
 }
 
 func (c *core) finalizeMessage(msg *message) ([]byte, error) {
@@ -196,8 +202,22 @@ func (c *core) commit() {
 	logger := c.logger.New("state", c.state)
 	logger.Debug("Ready to commit", "view", c.current.Preprepare.View)
 	if err := c.backend.Commit(c.current.Preprepare.Proposal); err != nil {
-		// TODO: fire a view change immediately
+		c.sendRoundChange()
 	}
+}
+
+func (c *core) enterNewView(newView *pbft.View) {
+	// Clear invalid RoundChange messages
+	c.roundChangeSet.Clear(newView)
+
+	// Calculate new proposer
+	c.backend.Validators().CalcProposer(newView.Round.Uint64())
+
+	c.round = newView.Round
+	c.sequence = newView.Sequence
+	c.current = nil
+	c.waitingForRoundChange = false
+	c.setState(StateAcceptRequest)
 }
 
 func (c *core) proposerSeed() uint64 {

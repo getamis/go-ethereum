@@ -26,7 +26,6 @@ var (
 		StateAcceptRequest: msgPreprepare,
 		StatePreprepared:   msgPrepare,
 		StatePrepared:      msgCommit,
-		StateCommitted:     msgNewView,
 	}
 )
 

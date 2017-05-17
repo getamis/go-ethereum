@@ -143,8 +143,8 @@ func (c *core) handle(msg *message, src pbft.Validator) error {
 		return testBacklog(c.handleCommit(msg, src))
 	case msgCheckpoint:
 		return c.handleCheckpoint(msg, src)
-	case msgViewChange:
-	case msgNewView:
+	case msgRoundChange:
+		return c.handleRoundChange(msg, src)
 	default:
 		logger.Error("Invalid message", "msg", msg)
 	}

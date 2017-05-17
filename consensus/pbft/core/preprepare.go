@@ -49,6 +49,11 @@ func (c *core) handlePreprepare(msg *message, src pbft.Validator) error {
 	logger := log.New("from", src.Address().Hex(), "state", c.state)
 	logger.Debug("handlePreprepare")
 
+	if c.waitingForRoundChange {
+		logger.Warn("Waiting for a RoundChange, ignore", "msg", msg)
+		return pbft.ErrIgnored
+	}
+
 	var preprepare *pbft.Preprepare
 	err := msg.Decode(&preprepare)
 	if err != nil {

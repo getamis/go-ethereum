@@ -41,6 +41,11 @@ func (c *core) handleCommit(msg *message, src pbft.Validator) error {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 	logger.Debug("handleCommit")
 
+	if c.waitingForRoundChange {
+		logger.Warn("Waiting for a RoundChange, ignore", "msg", msg)
+		return pbft.ErrIgnored
+	}
+
 	var commit *pbft.Subject
 	err := msg.Decode(&commit)
 	if err != nil {

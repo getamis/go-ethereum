@@ -24,5 +24,6 @@ var (
 	errFailedDecodePrepare    = errors.New("failed to decode Prepare")
 	errFailedDecodeCommit     = errors.New("failed to decode Commit")
 	errFailedDecodeCheckpoint = errors.New("failed to decode Checkpoint")
+	errFailedDecodeViewChange = errors.New("failed to decode RoundChange")
 	errFailedDecodeMessageSet = errors.New("failed to decode message set")
 )
