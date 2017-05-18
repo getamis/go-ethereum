@@ -28,7 +28,7 @@ import (
 // TODO: under cooking
 type State struct {
 	View     *View
-	Proposal *Proposal
+	Proposal RequestContexter
 
 	PrepareMsgs map[uint64]*Subject
 	CommitMsgs  map[uint64]*Subject
@@ -59,41 +59,9 @@ type View struct {
 	Sequence *big.Int
 }
 
-type ProposalHeader struct {
-	Sequence   *big.Int
-	ParentHash common.Hash
-	DataHash   common.Hash
-}
-
-type Proposal struct {
-	Header         *ProposalHeader
-	RequestContext RequestContexter
-	Signatures     [][]byte
-}
-
-// EncodeRLP serializes b into the Ethereum RLP format.
-func (b *Proposal) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, []interface{}{b.Header, b.RequestContext, b.Signatures})
-}
-
-// DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
-func (b *Proposal) DecodeRLP(s *rlp.Stream) error {
-	var proposal struct {
-		Header         *ProposalHeader
-		RequestContext *types.Block
-		Signatures     [][]byte
-	}
-
-	if err := s.Decode(&proposal); err != nil {
-		return err
-	}
-	b.Header, b.RequestContext, b.Signatures = proposal.Header, proposal.RequestContext, proposal.Signatures
-	return nil
-}
-
 type Preprepare struct {
 	View     *View
-	Proposal *Proposal
+	Proposal RequestContexter
 }
 
 // EncodeRLP serializes b into the Ethereum RLP format.
@@ -105,7 +73,7 @@ func (b *Preprepare) EncodeRLP(w io.Writer) error {
 func (b *Preprepare) DecodeRLP(s *rlp.Stream) error {
 	var preprepare struct {
 		View     *View
-		Proposal *Proposal
+		Proposal *types.Block
 	}
 
 	if err := s.Decode(&preprepare); err != nil {
@@ -144,7 +112,7 @@ type ViewChange struct {
 	ViewNumber *big.Int
 	PSet       []*Subject
 	QSet       []*Subject
-	Proposal   *Proposal
+	Proposal   RequestContexter
 }
 
 // EncodeRLP serializes b into the Ethereum RLP format.
@@ -158,7 +126,7 @@ func (b *ViewChange) DecodeRLP(s *rlp.Stream) error {
 		ViewNumber *big.Int
 		PSet       []*Subject
 		QSet       []*Subject
-		Proposal   *Proposal
+		Proposal   *types.Block
 	}
 
 	if err := s.Decode(&viewChange); err != nil {
@@ -177,7 +145,7 @@ type NewView struct {
 	ViewNumber *big.Int
 	VSet       *SignedViewChange
 	XSet       *Subject
-	Proposal   *Proposal
+	Proposal   RequestContexter
 }
 
 // EncodeRLP serializes b into the Ethereum RLP format.
@@ -191,7 +159,7 @@ func (b *NewView) DecodeRLP(s *rlp.Stream) error {
 		ViewNumber *big.Int
 		VSet       *SignedViewChange
 		XSet       *Subject
-		Proposal   *Proposal
+		Proposal   *types.Block
 	}
 
 	if err := s.Decode(&newView); err != nil {
