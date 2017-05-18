@@ -47,10 +47,6 @@ func (c *core) handleCheckpoint(msg *message, src pbft.Validator) error {
 		logger.Error("Invalid checkpoint message", "msg", msg)
 		return pbft.ErrInvalidMessage
 	}
-	if cp == nil {
-		logger.Warn("Ignore empty checkpoint messsage")
-		return pbft.ErrIgnored
-	}
 
 	var snapshot *snapshot
 
@@ -70,7 +66,7 @@ func (c *core) handleCheckpoint(msg *message, src pbft.Validator) error {
 		)
 
 		// If there is no such index, Search returns len(c.snapshots).
-		if snapshotIndex < len(c.snapshots) {
+		if snapshotIndex < len(c.snapshots) && c.snapshots[snapshotIndex].Sequence.Cmp(cp.View.Sequence) == 0 {
 			snapshot = c.snapshots[snapshotIndex]
 		} else {
 			logger.Warn("Failed to find snapshot entry", "seq", cp.View.Sequence, "current", c.current.Sequence)

@@ -23,8 +23,10 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/consensus/pbft/validator"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	elog "github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 var testLogger = elog.New()
@@ -41,6 +43,7 @@ type testSystemBackend struct {
 	sentMsgs   [][]byte // store the message when Send is called by core
 
 	address common.Address
+	db      ethdb.Database
 }
 
 // ==============================================
@@ -148,14 +151,20 @@ func (self *testSystemBackend) NewRequest(request pbft.RequestContexter) {
 
 // Save an object into db
 func (self *testSystemBackend) Save(key string, val interface{}) error {
-	testLogger.Warn("nothing to happen")
-	return nil
+	blob, err := rlp.EncodeToBytes(val)
+	if err != nil {
+		return err
+	}
+	return self.db.Put([]byte(key), blob)
 }
 
 // Restore an object to val from db
 func (self *testSystemBackend) Restore(key string, val interface{}) error {
-	testLogger.Warn("nothing to happen")
-	return nil
+	blob, err := self.db.Get([]byte(key))
+	if err != nil {
+		return err
+	}
+	return rlp.DecodeBytes(blob, val)
 }
 
 // ==============================================
@@ -264,10 +273,13 @@ func (t *testSystem) stop(core bool) {
 }
 
 func (t *testSystem) NewBackend(id uint64) *testSystemBackend {
+	// assume always success
+	ethDB, _ := ethdb.NewMemDatabase()
 	backend := &testSystemBackend{
 		id:     id,
 		sys:    t,
 		events: new(event.TypeMux),
+		db:     ethDB,
 	}
 
 	t.backends[id] = backend
