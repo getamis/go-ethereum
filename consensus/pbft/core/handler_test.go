@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/consensus/pbft"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 // notice: the normal case have been tested in integration tests.
@@ -24,7 +25,7 @@ func TestHandleMsg(t *testing.T) {
 			Sequence: big.NewInt(0),
 			Round:    big.NewInt(0),
 		},
-		Digest: []byte{1},
+		Digest: common.StringToHash("1234567890"),
 	})
 	// with a matched payload. msgPreprepare should match with *pbft.Preprepare in normal case.
 	msg := &message{

@@ -86,7 +86,7 @@ func (b *Preprepare) DecodeRLP(s *rlp.Stream) error {
 
 type Subject struct {
 	View   *View
-	Digest []byte
+	Digest common.Hash
 }
 
 // EncodeRLP serializes b into the Ethereum RLP format.
@@ -98,7 +98,7 @@ func (b *Subject) EncodeRLP(w io.Writer) error {
 func (b *Subject) DecodeRLP(s *rlp.Stream) error {
 	var subject struct {
 		View   *View
-		Digest []byte
+		Digest common.Hash
 	}
 
 	if err := s.Decode(&subject); err != nil {

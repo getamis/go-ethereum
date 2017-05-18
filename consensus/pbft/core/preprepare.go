@@ -92,7 +92,7 @@ func (c *core) handlePreprepare(msg *message, src pbft.Validator) error {
 func (c *core) acceptPreprepare(preprepare *pbft.Preprepare) {
 	subject := &pbft.Subject{
 		View:   preprepare.View,
-		Digest: preprepare.Proposal.Hash().Bytes(),
+		Digest: preprepare.Proposal.Hash(),
 	}
 
 	c.subject = subject

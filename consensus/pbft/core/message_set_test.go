@@ -23,6 +23,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 func TestMessageSetWithPreprepare(t *testing.T) {
@@ -78,7 +79,7 @@ func TestMessageSetWithSubject(t *testing.T) {
 
 	sub := &pbft.Subject{
 		View:   view,
-		Digest: []byte{0x01, 0x02},
+		Digest: common.StringToHash("1234567890"),
 	}
 
 	rawSub, err := rlp.EncodeToBytes(sub)

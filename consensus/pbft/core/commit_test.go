@@ -20,6 +20,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/consensus/pbft/validator"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -96,7 +97,7 @@ func TestHandleCommit(t *testing.T) {
 					c.state = StatePrepared
 
 					if i != 0 {
-						c.subject.Digest = []byte{2, 3, 4}
+						c.subject.Digest = common.StringToHash("1234567890")
 					}
 				}
 				return sys
@@ -191,11 +192,11 @@ func TestVerifyCommit(t *testing.T) {
 			expected: nil,
 			commit: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
-				Digest: []byte{1},
+				Digest: common.StringToHash("1234567890"),
 			},
 			self: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
-				Digest: []byte{1},
+				Digest: common.StringToHash("1234567890"),
 			},
 		},
 		{
@@ -203,11 +204,11 @@ func TestVerifyCommit(t *testing.T) {
 			expected: pbft.ErrSubjectNotMatched,
 			commit: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(0), Sequence: nil},
-				Digest: []byte{1},
+				Digest: common.StringToHash("1234567890"),
 			},
 			self: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(1), Sequence: big.NewInt(1)},
-				Digest: []byte{1},
+				Digest: common.StringToHash("1234567890"),
 			},
 		},
 		{
@@ -215,11 +216,11 @@ func TestVerifyCommit(t *testing.T) {
 			expected: pbft.ErrSubjectNotMatched,
 			commit: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(1), Sequence: big.NewInt(0)},
-				Digest: []byte{1},
+				Digest: common.StringToHash("1234567890"),
 			},
 			self: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
-				Digest: []byte{1},
+				Digest: common.StringToHash("1234567890"),
 			},
 		},
 		{
@@ -227,11 +228,11 @@ func TestVerifyCommit(t *testing.T) {
 			expected: pbft.ErrSubjectNotMatched,
 			commit: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(1)},
-				Digest: []byte{1},
+				Digest: common.StringToHash("1234567890"),
 			},
 			self: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
-				Digest: []byte{1},
+				Digest: common.StringToHash("1234567890"),
 			},
 		},
 	}

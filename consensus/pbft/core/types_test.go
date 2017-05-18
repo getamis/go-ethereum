@@ -79,7 +79,7 @@ func testSubject(t *testing.T) {
 			Round:    big.NewInt(1),
 			Sequence: big.NewInt(2),
 		},
-		Digest: []byte{0x01, 0x02},
+		Digest: common.StringToHash("1234567890"),
 	}
 
 	subjectPayload, _ := Encode(s)
@@ -118,7 +118,7 @@ func testWithSignature(t *testing.T) {
 			Round:    big.NewInt(1),
 			Sequence: big.NewInt(2),
 		},
-		Digest: []byte{0x01, 0x02},
+		Digest: common.StringToHash("1234567890"),
 	}
 	expectedSig := []byte{0x01}
 

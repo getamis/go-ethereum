@@ -28,7 +28,7 @@ func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validato
 	logger := c.logger.New("state", c.state)
 	// this block is from consensus
 	if c.subject != nil &&
-		bytes.Compare(ev.BlockHash.Bytes(), c.subject.Digest) == 0 &&
+		bytes.Compare(ev.BlockHash.Bytes(), c.subject.Digest.Bytes()) == 0 &&
 		c.state == StateCommitted {
 		logger.Debug("handleFinalCommitted from consensus", "height", ev.BlockNumber, "hash", ev.BlockHash)
 		// send out the checkpoint
@@ -37,7 +37,7 @@ func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validato
 				Sequence: ev.BlockNumber,
 				Round:    c.round,
 			},
-			Digest: ev.BlockHash.Bytes(),
+			Digest: ev.BlockHash,
 		})
 		c.snapshotsMu.Lock()
 		c.snapshots = append(c.snapshots, c.current)

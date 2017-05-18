@@ -163,7 +163,7 @@ func TestStoreBacklog(t *testing.T) {
 	// push prepare msg
 	subject := &pbft.Subject{
 		View:   v,
-		Digest: []byte("digest"),
+		Digest: common.StringToHash("1234567890"),
 	}
 	subjectPayload, _ := Encode(subject)
 
@@ -212,7 +212,7 @@ func TestProcessFutureBacklog(t *testing.T) {
 	// push a future msg
 	subject := &pbft.Subject{
 		View:   v,
-		Digest: []byte("digest"),
+		Digest: common.StringToHash("1234567890"),
 	}
 	subjectPayload, _ := Encode(subject)
 	m := &message{
@@ -246,7 +246,7 @@ func TestProcessBacklog(t *testing.T) {
 
 	subject := &pbft.Subject{
 		View:   v,
-		Digest: []byte("digest"),
+		Digest: common.StringToHash("1234567890"),
 	}
 	subjectPayload, _ := Encode(subject)
 
