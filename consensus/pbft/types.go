@@ -42,9 +42,6 @@ type Proposal interface {
 	// Hash retrieves hash of request.
 	Hash() common.Hash
 
-	// Hash retrieves parent hash of request.
-	ParentHash() common.Hash
-
 	EncodeRLP(w io.Writer) error
 
 	DecodeRLP(s *rlp.Stream) error
