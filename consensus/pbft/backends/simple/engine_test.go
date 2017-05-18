@@ -27,8 +27,9 @@ func newBlockChain(n int) (*core.BlockChain, *simpleBackend) {
 	genesis, nodeKeys := getGenesisAndKeys(n)
 	eventMux := new(event.TypeMux)
 	memDB, _ := ethdb.NewMemDatabase()
+	config := pbft.DefaultConfig
 	// Use the first key as private key
-	backend := New(3000, eventMux, nodeKeys[0], memDB)
+	backend := New(config, eventMux, nodeKeys[0], memDB)
 	genesis.MustCommit(memDB)
 	blockchain, err := core.NewBlockChain(memDB, genesis.Config, backend, eventMux, vm.Config{})
 	if err != nil {

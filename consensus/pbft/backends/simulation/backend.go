@@ -45,7 +45,8 @@ const (
 func New(nodeKey *NodeKey, genesis *core.Genesis) *ProtocolManager {
 	eventMux := new(event.TypeMux)
 	memDB, _ := ethdb.NewMemDatabase()
-	backend := simple.New(3000, eventMux, nodeKey.PrivateKey(), memDB)
+	config := pbft.DefaultConfig
+	backend := simple.New(config, eventMux, nodeKey.PrivateKey(), memDB)
 	p := newPeer(nodeKey)
 	pm := &ProtocolManager{
 		rwMutex:  new(sync.RWMutex),

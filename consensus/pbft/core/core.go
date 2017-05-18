@@ -61,11 +61,12 @@ type Engine interface {
 	Stop() error
 }
 
-func New(backend pbft.Backend) Engine {
+func New(backend pbft.Backend, config *pbft.Config) Engine {
 	// update n and f
 	n := int64(backend.Validators().Size())
 	f := int64(math.Ceil(float64(n)/3) - 1)
 	return &core{
+		config:      config,
 		address:     backend.Address(),
 		N:           n,
 		F:           f,
@@ -84,6 +85,7 @@ func New(backend pbft.Backend) Engine {
 // ----------------------------------------------------------------------------
 
 type core struct {
+	config  *pbft.Config
 	address common.Address
 	N       int64
 	F       int64
