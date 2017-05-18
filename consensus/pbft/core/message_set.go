@@ -31,8 +31,8 @@ import (
 func newMessageSet(valSet pbft.ValidatorSet) *messageSet {
 	return &messageSet{
 		view: &pbft.View{
-			ViewNumber: new(big.Int),
-			Sequence:   new(big.Int),
+			Round:    new(big.Int),
+			Sequence: new(big.Int),
 		},
 		messagesMu: new(sync.Mutex),
 		messages:   make(map[common.Hash]*message),
@@ -156,7 +156,7 @@ func (ms *messageSet) EncodeRLP(w io.Writer) error {
 
 func (ms *messageSet) verify(msg *message) error {
 	// verify if the message comes from one of the validators
-	if v := ms.valSet.GetByAddress(msg.Address); v == nil {
+	if _, v := ms.valSet.GetByAddress(msg.Address); v == nil {
 		return pbft.ErrNoMatchingValidator
 	}
 

@@ -33,8 +33,8 @@ func TestMessageSetWithPreprepare(t *testing.T) {
 	ms := newMessageSet(valSet)
 
 	view := &pbft.View{
-		ViewNumber: new(big.Int),
-		Sequence:   new(big.Int),
+		Round:    new(big.Int),
+		Sequence: new(big.Int),
 	}
 	pp := &pbft.Preprepare{
 		View: view,
@@ -84,8 +84,8 @@ func TestMessageSetWithSubject(t *testing.T) {
 	ms := newMessageSet(valSet)
 
 	view := &pbft.View{
-		ViewNumber: new(big.Int),
-		Sequence:   new(big.Int),
+		Round:    new(big.Int),
+		Sequence: new(big.Int),
 	}
 
 	sub := &pbft.Subject{
@@ -127,8 +127,8 @@ func TestMessageSetEncodeDecode(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		view := &pbft.View{
-			ViewNumber: new(big.Int),
-			Sequence:   new(big.Int),
+			Round:    new(big.Int),
+			Sequence: new(big.Int),
 		}
 		pp := &pbft.Preprepare{
 			View: view,

@@ -29,8 +29,8 @@ func TestHandleCheckpoint(t *testing.T) {
 	F := uint64(1)
 	preprepare := &pbft.Preprepare{
 		View: &pbft.View{
-			ViewNumber: big.NewInt(0),
-			Sequence:   big.NewInt(3),
+			Round:    big.NewInt(0),
+			Sequence: big.NewInt(3),
 		},
 	}
 	system := NewTestSystemWithBackend(N, F)
@@ -38,13 +38,13 @@ func TestHandleCheckpoint(t *testing.T) {
 	c.current = newSnapshot(preprepare, system.backends[0].Validators())
 	c.snapshots = append(c.snapshots, newSnapshot(&pbft.Preprepare{
 		View: &pbft.View{
-			ViewNumber: big.NewInt(0),
-			Sequence:   big.NewInt(1),
+			Round:    big.NewInt(0),
+			Sequence: big.NewInt(1),
 		},
 	}, system.backends[0].Validators()), newSnapshot(&pbft.Preprepare{
 		View: &pbft.View{
-			ViewNumber: big.NewInt(0),
-			Sequence:   big.NewInt(2),
+			Round:    big.NewInt(0),
+			Sequence: big.NewInt(2),
 		},
 	}, system.backends[0].Validators()))
 
@@ -116,15 +116,15 @@ func TestBuildStableCheckpoint(t *testing.T) {
 	}
 	expectedStableSnapshot := newSnapshot(&pbft.Preprepare{
 		View: &pbft.View{
-			ViewNumber: big.NewInt(0),
-			Sequence:   big.NewInt(1),
+			Round:    big.NewInt(0),
+			Sequence: big.NewInt(1),
 		},
 		Proposal: proposal,
 	}, system.backends[0].Validators())
 	c.snapshots = append(c.snapshots, expectedStableSnapshot, newSnapshot(&pbft.Preprepare{
 		View: &pbft.View{
-			ViewNumber: big.NewInt(0),
-			Sequence:   big.NewInt(2),
+			Round:    big.NewInt(0),
+			Sequence: big.NewInt(2),
 		},
 		Proposal: proposal,
 	}, system.backends[0].Validators()))

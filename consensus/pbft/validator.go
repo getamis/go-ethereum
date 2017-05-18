@@ -33,7 +33,7 @@ type ValidatorSet interface {
 	// Get validator by index
 	GetByIndex(i uint64) Validator
 	// Get validator by address
-	GetByAddress(addr common.Address) Validator
+	GetByAddress(addr common.Address) (int, Validator)
 	// Get current proposer
 	GetProposer() Validator
 	// Check whether the validator with address is a proposer

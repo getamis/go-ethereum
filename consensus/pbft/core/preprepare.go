@@ -25,15 +25,15 @@ import (
 
 func (c *core) sendPreprepare(request *pbft.Request) {
 	logger := c.logger.New("state", c.state)
-	nextSeqView := c.nextSequence()
+	curView := c.currentView()
 
 	if c.isPrimary() {
 		preprepare, err := Encode(&pbft.Preprepare{
-			View:     nextSeqView,
-			Proposal: c.makeProposal(nextSeqView.Sequence, request),
+			View:     curView,
+			Proposal: c.makeProposal(curView.Sequence, request),
 		})
 		if err != nil {
-			logger.Error("Failed to encode", "view", nextSeqView)
+			logger.Error("Failed to encode", "view", curView)
 			return
 		}
 
@@ -69,7 +69,7 @@ func (c *core) handlePreprepare(msg *message, src pbft.Validator) error {
 		return err
 	}
 
-	view := c.nextSequence()
+	view := c.currentView()
 	if !reflect.DeepEqual(preprepare.View, view) {
 		logger.Warn("Preprepare does not match", "expected", view, "got", preprepare.View)
 		return pbft.ErrInvalidMessage
@@ -97,5 +97,4 @@ func (c *core) acceptPreprepare(preprepare *pbft.Preprepare) {
 
 	c.subject = subject
 	c.current = newSnapshot(preprepare, c.backend.Validators())
-	c.completed = false
 }

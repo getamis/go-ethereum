@@ -64,8 +64,8 @@ func TestHandlePreprepare(t *testing.T) {
 						// hack: force set subject that future message can be simulated
 						c.subject = &pbft.Subject{
 							View: &pbft.View{
-								Sequence:   big.NewInt(0),
-								ViewNumber: big.NewInt(0),
+								Sequence: big.NewInt(0),
+								Round:    big.NewInt(0),
 							},
 							Digest: []byte{1},
 						}
@@ -110,7 +110,7 @@ func TestHandlePreprepare(t *testing.T) {
 					if i != 0 {
 						c.state = StatePreprepared
 						c.sequence = big.NewInt(10)
-						c.viewNumber = big.NewInt(10)
+						c.round = big.NewInt(10)
 					}
 				}
 				return sys
@@ -146,11 +146,11 @@ OUTER:
 		v0 := test.system.backends[0]
 		r0 := v0.engine.(*core)
 
-		nextSeqView := r0.nextSequence()
+		curView := r0.currentView()
 
 		preprepare := &pbft.Preprepare{
-			View:     nextSeqView,
-			Proposal: r0.makeProposal(nextSeqView.Sequence, &pbft.Request{BlockContext: test.expectedRequest}),
+			View:     curView,
+			Proposal: r0.makeProposal(curView.Sequence, &pbft.Request{BlockContext: test.expectedRequest}),
 		}
 
 		for i, v := range test.system.backends {
@@ -168,12 +168,13 @@ OUTER:
 			//}
 
 			m, _ := Encode(preprepare)
+			_, val := v0.Validators().GetByAddress(v0.Address())
 			// run each backends and verify handlePreprepare function.
 			if err := c.handlePreprepare(&message{
 				Code:    msgPreprepare,
 				Msg:     m,
 				Address: v0.Address(),
-			}, v0.Validators().GetByAddress(v0.Address())); err != nil {
+			}, val); err != nil {
 				if err != test.expectedErr {
 					t.Error("unexpected error: ", err)
 				}
@@ -184,13 +185,10 @@ OUTER:
 				t.Error("state should be preprepared")
 			}
 
-			if !reflect.DeepEqual(c.subject.View, nextSeqView) {
+			if !reflect.DeepEqual(c.subject.View, curView) {
 				t.Error("view should be the same")
 			}
 
-			if c.completed {
-				t.Error("should not complete")
-			}
 			// verify prepare messages
 			decodedMsg := new(message)
 			err := decodedMsg.FromPayload(v.sentMsgs[0], nil)

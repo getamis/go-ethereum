@@ -34,8 +34,8 @@ func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validato
 		// send out the checkpoint
 		c.sendCheckpoint(&pbft.Subject{
 			View: &pbft.View{
-				Sequence:   ev.BlockNumber,
-				ViewNumber: c.viewNumber,
+				Sequence: ev.BlockNumber,
+				Round:    c.round,
 			},
 			Digest: ev.BlockHash.Bytes(),
 		})
@@ -43,23 +43,23 @@ func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validato
 		c.snapshots = append(c.snapshots, c.current)
 		c.snapshotsMu.Unlock()
 
-		c.viewNumber = new(big.Int).Set(c.current.ViewNumber)
-		c.sequence = new(big.Int).Set(c.current.Sequence)
-		c.completed = true
-		c.setState(StateAcceptRequest)
-		// this block is from geth sync
 	} else {
+		// this block is from geth sync
 		logger.Debug("handleFinalCommitted from geth sync", "height", ev.BlockNumber, "hash", ev.BlockHash)
-		// reset view number to 0
-		c.viewNumber = common.Big0
-		c.sequence = new(big.Int).Set(ev.BlockNumber)
-		c.completed = true
+	}
+
+	if ev.BlockNumber.Cmp(c.sequence) >= 0 {
+		// We build stable checkpoint every 100 blocks
+		// FIXME: this should be passed by configuration
+		if new(big.Int).Mod(c.sequence, big.NewInt(int64(c.config.CheckPointPeriod))).Int64() == 0 {
+			go c.sendInternalEvent(buildCheckpointEvent{})
+		}
+
+		c.sequence = new(big.Int).Add(ev.BlockNumber, common.Big1)
+		c.round = common.Big0
+		c.lastProposer = ev.BlockProposer
 		c.setState(StateAcceptRequest)
 	}
-	// We build stable checkpoint every 100 blocks
-	// FIXME: this should be passed by configuration
-	if new(big.Int).Mod(c.sequence, big.NewInt(100)).Int64() == 0 {
-		go c.sendInternalEvent(buildCheckpointEvent{})
-	}
+
 	return nil
 }

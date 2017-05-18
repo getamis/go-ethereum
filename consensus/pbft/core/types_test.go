@@ -29,8 +29,8 @@ func testPreprepare(t *testing.T) {
 	block := makeBlock(1)
 	pp := &pbft.Preprepare{
 		View: &pbft.View{
-			ViewNumber: big.NewInt(1),
-			Sequence:   big.NewInt(2),
+			Round:    big.NewInt(1),
+			Sequence: big.NewInt(2),
 		},
 		Proposal: &pbft.Proposal{
 			Header: &pbft.ProposalHeader{
@@ -92,8 +92,8 @@ func testPreprepare(t *testing.T) {
 func testSubject(t *testing.T) {
 	s := &pbft.Subject{
 		View: &pbft.View{
-			ViewNumber: big.NewInt(1),
-			Sequence:   big.NewInt(2),
+			Round:    big.NewInt(1),
+			Sequence: big.NewInt(2),
 		},
 		Digest: []byte{0x01, 0x02},
 	}
@@ -131,8 +131,8 @@ func testSubject(t *testing.T) {
 func testWithSignature(t *testing.T) {
 	s := &pbft.Subject{
 		View: &pbft.View{
-			ViewNumber: big.NewInt(1),
-			Sequence:   big.NewInt(2),
+			Round:    big.NewInt(1),
+			Sequence: big.NewInt(2),
 		},
 		Digest: []byte{0x01, 0x02},
 	}

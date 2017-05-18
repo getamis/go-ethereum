@@ -16,10 +16,19 @@
 
 package core
 
-import "github.com/ethereum/go-ethereum/consensus/pbft"
+import (
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/pbft"
+)
 
 // Start implements core.Engine.Start
-func (c *core) Start() error {
+func (c *core) Start(lastSequence *big.Int, lastProposer common.Address) error {
+	// initial last commit sequence and proposer
+	c.sequence = new(big.Int).Add(lastSequence, common.Big1)
+	c.lastProposer = lastProposer
+
 	// Tests will handle events itself, so we have to make subscribeEvents()
 	// be able to call in test.
 	c.subscribeEvents()
@@ -62,13 +71,15 @@ func (c *core) handleExternalEvent() {
 		// A real event arrived, process interesting content
 		switch ev := event.Data.(type) {
 		case pbft.FinalCommittedEvent:
-			c.handleFinalCommitted(ev, c.backend.Validators().GetByAddress(c.Address()))
+			_, val := c.backend.Validators().GetByAddress(c.Address())
+			c.handleFinalCommitted(ev, val)
 		case pbft.ConnectionEvent:
 
 		case pbft.RequestEvent:
+			_, val := c.backend.Validators().GetByAddress(c.Address())
 			c.handleRequest(&pbft.Request{
 				BlockContext: ev.BlockContext,
-			}, c.backend.Validators().GetByAddress(c.Address()))
+			}, val)
 		case pbft.MessageEvent:
 			c.handleMsg(ev.Payload)
 		}
@@ -102,7 +113,7 @@ func (c *core) handleMsg(payload []byte) error {
 	}
 
 	// Only accept message if address is valid
-	src := c.backend.Validators().GetByAddress(msg.Address)
+	_, src := c.backend.Validators().GetByAddress(msg.Address)
 	if src == nil {
 		logger.Error("Invalid address in message", "msg", msg)
 		return pbft.ErrNoMatchingValidator

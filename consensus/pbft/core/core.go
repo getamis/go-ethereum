@@ -57,7 +57,7 @@ func (s State) String() string {
 }
 
 type Engine interface {
-	Start() error
+	Start(lastSequence *big.Int, lastProposer common.Address) error
 	Stop() error
 }
 
@@ -65,6 +65,7 @@ func New(backend pbft.Backend, config *pbft.Config) Engine {
 	// update n and f
 	n := int64(backend.Validators().Size())
 	f := int64(math.Ceil(float64(n)/3) - 1)
+
 	return &core{
 		config:      config,
 		address:     backend.Address(),
@@ -73,8 +74,8 @@ func New(backend pbft.Backend, config *pbft.Config) Engine {
 		state:       StateAcceptRequest,
 		logger:      log.New("address", backend.Address().Hex()),
 		backend:     backend,
-		sequence:    new(big.Int),
-		viewNumber:  new(big.Int),
+		sequence:    common.Big0,
+		round:       common.Big0,
 		internalMux: new(event.TypeMux),
 		backlogs:    make(map[pbft.Validator]*prque.Prque),
 		backlogsMu:  new(sync.Mutex),
@@ -98,9 +99,9 @@ type core struct {
 	internalMux    *event.TypeMux
 	internalEvents *event.TypeMuxSubscription
 
-	sequence   *big.Int
-	viewNumber *big.Int
-	completed  bool
+	sequence     *big.Int
+	round        *big.Int
+	lastProposer common.Address
 
 	subject *pbft.Subject
 
@@ -151,17 +152,17 @@ func (c *core) broadcast(msg *message) {
 	}
 }
 
-func (c *core) nextSequence() *pbft.View {
+func (c *core) currentView() *pbft.View {
 	return &pbft.View{
-		ViewNumber: c.viewNumber,
-		Sequence:   new(big.Int).Add(c.sequence, common.Big1),
+		Sequence: new(big.Int).Set(c.sequence),
+		Round:    new(big.Int).Set(c.round),
 	}
 }
 
-func (c *core) nextViewNumber() *pbft.View {
+func (c *core) nextRound() *pbft.View {
 	return &pbft.View{
-		ViewNumber: new(big.Int).Add(c.viewNumber, common.Big1),
-		Sequence:   c.sequence,
+		Sequence: new(big.Int).Set(c.sequence),
+		Round:    new(big.Int).Add(c.round, common.Big1),
 	}
 }
 
@@ -190,6 +191,18 @@ func (c *core) commit() {
 	if err := c.backend.Commit(c.current.Preprepare.Proposal); err != nil {
 		// TODO: fire a view change immediately
 	}
+}
+
+func (c *core) proposerSeed() uint64 {
+	emptyAddr := common.Address{}
+	if c.lastProposer == emptyAddr {
+		return c.round.Uint64()
+	}
+	offset := 0
+	if idx, val := c.backend.Validators().GetByAddress(c.lastProposer); val != nil {
+		offset = idx
+	}
+	return uint64(offset) + c.round.Uint64() + 1
 }
 
 func (c *core) setState(state State) {

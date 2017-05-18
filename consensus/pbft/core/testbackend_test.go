@@ -131,13 +131,6 @@ func (self *testSystemBackend) IsProposer() bool {
 func (self *testSystemBackend) Hash(b interface{}) common.Hash {
 	return common.StringToHash("Test")
 }
-func (self *testSystemBackend) Encode(b interface{}) ([]byte, error) {
-	return []byte(""), nil
-
-}
-func (self *testSystemBackend) Decode([]byte, interface{}) error {
-	return nil
-}
 
 func (self *testSystemBackend) NewRequest(request pbft.RequestContexter) {
 	go self.events.Post(pbft.RequestEvent{
@@ -253,7 +246,7 @@ func (t *testSystem) listen() {
 func (t *testSystem) Run(core bool) func() {
 	for _, b := range t.backends {
 		if core {
-			b.engine.Start() // start PBFT core
+			b.engine.Start(common.Big0, common.Address{}) // start PBFT core
 		}
 	}
 
