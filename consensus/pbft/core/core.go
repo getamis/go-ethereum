@@ -61,36 +61,36 @@ type Engine interface {
 	Stop() error
 }
 
-func New(backend pbft.Backend, requestTimeout uint64) Engine {
+func New(backend pbft.Backend, config *pbft.Config) Engine {
 	// update n and f
 	n := int64(backend.Validators().Size())
 	f := int64(math.Ceil(float64(n)/3) - 1)
 	return &core{
-		requestTimeout: requestTimeout,
-		address:        backend.Address(),
-		N:              n,
-		F:              f,
-		state:          StateAcceptRequest,
-		logger:         log.New("address", backend.Address().Hex()),
-		backend:        backend,
-		sequence:       new(big.Int),
-		viewNumber:     new(big.Int),
-		internalMux:    new(event.TypeMux),
-		backlogs:       make(map[pbft.Validator]*prque.Prque),
-		backlogsMu:     new(sync.Mutex),
-		snapshotsMu:    new(sync.RWMutex),
+		config:      config,
+		address:     backend.Address(),
+		N:           n,
+		F:           f,
+		state:       StateAcceptRequest,
+		logger:      log.New("address", backend.Address().Hex()),
+		backend:     backend,
+		sequence:    new(big.Int),
+		viewNumber:  new(big.Int),
+		internalMux: new(event.TypeMux),
+		backlogs:    make(map[pbft.Validator]*prque.Prque),
+		backlogsMu:  new(sync.Mutex),
+		snapshotsMu: new(sync.RWMutex),
 	}
 }
 
 // ----------------------------------------------------------------------------
 
 type core struct {
-	requestTimeout uint64
-	address        common.Address
-	N              int64
-	F              int64
-	state          State
-	logger         log.Logger
+	config  *pbft.Config
+	address common.Address
+	N       int64
+	F       int64
+	state   State
+	logger  log.Logger
 
 	backend pbft.Backend
 	events  *event.TypeMuxSubscription

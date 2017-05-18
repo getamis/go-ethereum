@@ -393,7 +393,7 @@ func (sb *simpleBackend) Start(chain consensus.ChainReader, inserter func(block 
 	}
 	sb.chain = chain
 	sb.inserter = inserter
-	sb.core = pbftCore.New(sb, sb.config.RequestTimeoutMsec)
+	sb.core = pbftCore.New(sb, sb.config)
 	return sb.core.Start()
 }
 

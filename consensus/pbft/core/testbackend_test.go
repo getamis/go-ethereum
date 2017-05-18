@@ -207,7 +207,7 @@ func NewTestSystemWithBackend(n, f uint64) *testSystem {
 		backend.peers = vset
 		backend.address = vset.GetByIndex(i).Address()
 
-		core := New(backend, config.BlockPeriod).(*core)
+		core := New(backend, config).(*core)
 		core.current = newSnapshot(&pbft.Preprepare{
 			View:     &pbft.View{},
 			Proposal: &pbft.Proposal{},
