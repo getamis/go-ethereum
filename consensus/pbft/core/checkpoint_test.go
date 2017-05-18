@@ -20,7 +20,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 )
 
@@ -102,18 +101,7 @@ func TestBuildStableCheckpoint(t *testing.T) {
 	system := NewTestSystemWithBackend(N, F)
 	c := system.backends[0].engine.(*core)
 	v := system.backends[0].Validators().List()[0]
-	proposal := &pbft.Proposal{
-		Header: &pbft.ProposalHeader{
-			Sequence:   big.NewInt(10),
-			ParentHash: common.HexToHash("0x1234567890"),
-			DataHash:   common.HexToHash("0x9876543210"),
-		},
-		RequestContext: makeBlock(1),
-		Signatures: [][]byte{
-			[]byte{0x01, 0x03},
-			[]byte{0x02, 0x04},
-		},
-	}
+	proposal := makeBlock(1)
 	expectedStableSnapshot := newSnapshot(&pbft.Preprepare{
 		View: &pbft.View{
 			Round:    big.NewInt(0),

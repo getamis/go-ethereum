@@ -42,13 +42,13 @@ type Backend interface {
 	UpdateState(*State) error
 
 	// Commit is to deliver a final result to write into blockchain
-	Commit(*Proposal) error
+	Commit(RequestContexter) error
 
 	// ViewChanged is called when view change occurred
 	ViewChanged(needNewProposal bool) error
 
 	// Verify is to verify the proposal request
-	Verify(*Proposal) error
+	Verify(RequestContexter) error
 
 	// Sign is to sign the data
 	Sign([]byte) ([]byte, error)

@@ -31,12 +31,9 @@ func TestHandleCommit(t *testing.T) {
 
 	toPreprepare := func(c *core) {
 		curView := c.currentView()
-
-		proposal := c.makeProposal(curView.Sequence, &pbft.Request{BlockContext: makeBlock(1)})
-		proposal.Signatures = [][]byte{}
 		preprepare := &pbft.Preprepare{
 			View:     curView,
-			Proposal: proposal,
+			Proposal: makeBlock(1),
 		}
 		c.acceptPreprepare(preprepare)
 	}

@@ -30,7 +30,7 @@ func (c *core) sendPreprepare(request *pbft.Request) {
 	if c.isPrimary() {
 		preprepare, err := Encode(&pbft.Preprepare{
 			View:     curView,
-			Proposal: c.makeProposal(curView.Sequence, request),
+			Proposal: request.BlockContext,
 		})
 		if err != nil {
 			logger.Error("Failed to encode", "view", curView)
@@ -92,7 +92,7 @@ func (c *core) handlePreprepare(msg *message, src pbft.Validator) error {
 func (c *core) acceptPreprepare(preprepare *pbft.Preprepare) {
 	subject := &pbft.Subject{
 		View:   preprepare.View,
-		Digest: preprepare.Proposal.RequestContext.Hash().Bytes(),
+		Digest: preprepare.Proposal.Hash().Bytes(),
 	}
 
 	c.subject = subject

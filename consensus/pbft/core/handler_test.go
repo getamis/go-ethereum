@@ -4,7 +4,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 )
 
@@ -44,18 +43,7 @@ func TestHandleMsg(t *testing.T) {
 			Sequence: big.NewInt(0),
 			Round:    big.NewInt(0),
 		},
-		Proposal: &pbft.Proposal{
-			Header: &pbft.ProposalHeader{
-				Sequence:   big.NewInt(10),
-				ParentHash: common.HexToHash("0x1234567890"),
-				DataHash:   common.HexToHash("0x9876543210"),
-			},
-			RequestContext: makeBlock(1),
-			Signatures: [][]byte{
-				[]byte{0x01},
-				[]byte{0x02},
-			},
-		},
+		Proposal: makeBlock(1),
 	})
 	// with a unmatched payload. msgPrepare should match with *pbft.Subject in normal case.
 	msg = &message{
@@ -74,18 +62,7 @@ func TestHandleMsg(t *testing.T) {
 			Sequence: big.NewInt(0),
 			Round:    big.NewInt(0),
 		},
-		Proposal: &pbft.Proposal{
-			Header: &pbft.ProposalHeader{
-				Sequence:   big.NewInt(10),
-				ParentHash: common.HexToHash("0x1234567890"),
-				DataHash:   common.HexToHash("0x9876543210"),
-			},
-			RequestContext: makeBlock(2),
-			Signatures: [][]byte{
-				[]byte{0x01},
-				[]byte{0x02},
-			},
-		},
+		Proposal: makeBlock(2),
 	})
 	// with a unmatched payload. pbft.MsgCommit should match with *pbft.Subject in normal case.
 	msg = &message{
@@ -104,18 +81,7 @@ func TestHandleMsg(t *testing.T) {
 			Sequence: big.NewInt(0),
 			Round:    big.NewInt(0),
 		},
-		Proposal: &pbft.Proposal{
-			Header: &pbft.ProposalHeader{
-				Sequence:   big.NewInt(10),
-				ParentHash: common.HexToHash("0x1234567890"),
-				DataHash:   common.HexToHash("0x9876543210"),
-			},
-			RequestContext: makeBlock(2),
-			Signatures: [][]byte{
-				[]byte{0x01},
-				[]byte{0x02},
-			},
-		},
+		Proposal: makeBlock(3),
 	})
 	// invalid message code. message code is not exists in list
 	msg = &message{

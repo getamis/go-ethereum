@@ -150,7 +150,7 @@ OUTER:
 
 		preprepare := &pbft.Preprepare{
 			View:     curView,
-			Proposal: r0.makeProposal(curView.Sequence, &pbft.Request{BlockContext: test.expectedRequest}),
+			Proposal: test.expectedRequest,
 		}
 
 		for i, v := range test.system.backends {
