@@ -25,7 +25,7 @@ const (
 type Config struct {
 	RequestTimeoutMsec uint64         // The timeout for each PBFT round
 	BlockPeriod        uint64         // Default minimum difference between two consecutive block's timestamps in second
-	BlockPauseTime     uint64         // Pause time when zero tx in previous block, , values should be larger than pbft_block_period
+	BlockPauseTime     uint64         // Pause time when zero tx in previous block, values should be larger than pbft_block_period
 	ProposerPolicy     ProposerPolicy // The policy for proposer, the detail is not determined
 	CheckPointPeriod   int            // Synchronizes the mapping's checkpoint to the blocks on each round
 }
