@@ -30,7 +30,7 @@ func TestHandlePreprepare(t *testing.T) {
 
 	testCases := []struct {
 		system          *testSystem
-		expectedRequest pbft.RequestContexter
+		expectedRequest pbft.Proposal
 
 		expectedErr error
 	}{

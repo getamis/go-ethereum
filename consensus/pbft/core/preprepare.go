@@ -30,7 +30,7 @@ func (c *core) sendPreprepare(request *pbft.Request) {
 	if c.isPrimary() {
 		preprepare, err := Encode(&pbft.Preprepare{
 			View:     curView,
-			Proposal: request.BlockContext,
+			Proposal: request.Proposal,
 		})
 		if err != nil {
 			logger.Error("Failed to encode", "view", curView)

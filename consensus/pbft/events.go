@@ -30,7 +30,7 @@ type ConsensusDataEvent struct {
 }
 
 type RequestEvent struct {
-	BlockContext RequestContexter
+	Proposal Proposal
 }
 
 type ConnectionEvent struct {

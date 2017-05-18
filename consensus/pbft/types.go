@@ -28,14 +28,14 @@ import (
 // TODO: under cooking
 type State struct {
 	View     *View
-	Proposal RequestContexter
+	Proposal Proposal
 
 	PrepareMsgs map[uint64]*Subject
 	CommitMsgs  map[uint64]*Subject
 }
 
-// BlockContexter supports retrieving height and serialized block to be used during PBFT consensus.
-type RequestContexter interface {
+// Proposal supports retrieving height and serialized block to be used during PBFT consensus.
+type Proposal interface {
 	// Number retrieves number of sequence.
 	Number() *big.Int
 
@@ -51,7 +51,7 @@ type RequestContexter interface {
 }
 
 type Request struct {
-	BlockContext RequestContexter
+	Proposal Proposal
 }
 
 type View struct {
@@ -61,7 +61,7 @@ type View struct {
 
 type Preprepare struct {
 	View     *View
-	Proposal RequestContexter
+	Proposal Proposal
 }
 
 // EncodeRLP serializes b into the Ethereum RLP format.
@@ -112,7 +112,7 @@ type ViewChange struct {
 	ViewNumber *big.Int
 	PSet       []*Subject
 	QSet       []*Subject
-	Proposal   RequestContexter
+	Proposal   Proposal
 }
 
 // EncodeRLP serializes b into the Ethereum RLP format.
@@ -145,7 +145,7 @@ type NewView struct {
 	ViewNumber *big.Int
 	VSet       *SignedViewChange
 	XSet       *Subject
-	Proposal   RequestContexter
+	Proposal   Proposal
 }
 
 // EncodeRLP serializes b into the Ethereum RLP format.

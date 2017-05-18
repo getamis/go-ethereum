@@ -39,7 +39,7 @@ type testSystemBackend struct {
 	peers  pbft.ValidatorSet
 	events *event.TypeMux
 
-	commitMsgs []pbft.RequestContexter
+	commitMsgs []pbft.Proposal
 	sentMsgs   [][]byte // store the message when Send is called by core
 
 	address common.Address
@@ -91,7 +91,7 @@ func (self *testSystemBackend) ViewChanged(needNewProposal bool) error {
 	return nil
 }
 
-func (self *testSystemBackend) Commit(proposal pbft.RequestContexter) error {
+func (self *testSystemBackend) Commit(proposal pbft.Proposal) error {
 	testLogger.Info("commit message", "address", self.Address())
 	self.commitMsgs = append(self.commitMsgs, proposal)
 
@@ -103,7 +103,7 @@ func (self *testSystemBackend) Commit(proposal pbft.RequestContexter) error {
 	return nil
 }
 
-func (self *testSystemBackend) Verify(proposal pbft.RequestContexter) error {
+func (self *testSystemBackend) Verify(proposal pbft.Proposal) error {
 	return nil
 }
 
@@ -132,9 +132,9 @@ func (self *testSystemBackend) Hash(b interface{}) common.Hash {
 	return common.StringToHash("Test")
 }
 
-func (self *testSystemBackend) NewRequest(request pbft.RequestContexter) {
+func (self *testSystemBackend) NewRequest(request pbft.Proposal) {
 	go self.events.Post(pbft.RequestEvent{
-		BlockContext: request,
+		Proposal: request,
 	})
 }
 

@@ -307,7 +307,7 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 	block = block.WithSeal(header)
 	// step 2. post block into PBFT engine
 	go sb.EventMux().Post(pbft.RequestEvent{
-		BlockContext: block,
+		Proposal: block,
 	})
 
 	for {

@@ -58,7 +58,7 @@ func testPreprepare(t *testing.T) {
 		t.Error(err)
 	}
 
-	// if block is encoded/decoded by rlp, we cannot to compare interface data type using reflect.DeepEqual. (like RequestContexter)
+	// if block is encoded/decoded by rlp, we cannot to compare interface data type using reflect.DeepEqual. (like pbft.Proposal)
 	// so individual comparison here.
 	if !reflect.DeepEqual(pp.Proposal.Hash(), decodedPP.Proposal.Hash()) {
 		t.Errorf("Header are different, expected '%+v', got '%+v'", pp.Proposal, decodedPP.Proposal)

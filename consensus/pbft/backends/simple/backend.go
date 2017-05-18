@@ -119,7 +119,7 @@ func (sb *simpleBackend) Broadcast(payload []byte) error {
 }
 
 // Commit implements pbft.Backend.Commit
-func (sb *simpleBackend) Commit(proposal pbft.RequestContexter) error {
+func (sb *simpleBackend) Commit(proposal pbft.Proposal) error {
 	sb.logger.Info("Committed", "address", sb.Address().Hex(), "proposal", proposal)
 	// step1: update validator set from extra data of block
 	// step2: insert chain
@@ -175,7 +175,7 @@ func (sb *simpleBackend) EventMux() *event.TypeMux {
 }
 
 // Verify implements pbft.Backend.Verify
-func (sb *simpleBackend) Verify(proposal pbft.RequestContexter) error {
+func (sb *simpleBackend) Verify(proposal pbft.Proposal) error {
 	// decode the proposal to block
 	block := &types.Block{}
 	block, ok := proposal.(*types.Block)
