@@ -121,7 +121,7 @@ func (sb *simpleBackend) Broadcast(payload []byte) error {
 
 // Commit implements pbft.Backend.Commit
 func (sb *simpleBackend) Commit(proposal pbft.Proposal) error {
-	sb.logger.Info("Committed", "address", sb.Address().Hex(), "proposal", proposal)
+	sb.logger.Info("Committed", "address", sb.Address().Hex(), "hash", proposal.Hash(), "number", proposal.Number().Uint64())
 	// step1: update validator set from extra data of block
 	// step2: insert chain
 	block := &types.Block{}

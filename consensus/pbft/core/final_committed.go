@@ -30,6 +30,7 @@ func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validato
 		ev.Proposal.Hash() == c.subject.Digest &&
 		c.state == StateCommitted {
 		logger.Debug("handleFinalCommitted from consensus", "height", ev.Proposal.Number(), "hash", ev.Proposal.Hash())
+
 		// send out the checkpoint
 		c.sendCheckpoint(&pbft.Subject{
 			View: &pbft.View{
@@ -56,7 +57,6 @@ func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validato
 		}
 
 		c.lastProposer = ev.Proposer
-
 		c.startNewRound(&pbft.View{
 			Sequence: new(big.Int).Add(ev.Proposal.Number(), common.Big1),
 			Round:    common.Big0,

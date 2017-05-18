@@ -30,7 +30,7 @@ const (
 	msgCommit
 	msgCheckpoint
 	msgRoundChange
-	msgInvalid
+	msgAll
 )
 
 type message struct {

@@ -18,6 +18,7 @@ package core
 
 import (
 	"crypto/ecdsa"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
@@ -205,9 +206,9 @@ func NewTestSystemWithBackend(n, f uint64) *testSystem {
 		backend.address = vset.GetByIndex(i).Address()
 
 		core := New(backend, config).(*core)
-		core.current = newSnapshot(&pbft.Preprepare{
-			View:     &pbft.View{},
-			Proposal: makeBlock(1),
+		core.current = newSnapshot(&pbft.View{
+			Round:    big.NewInt(0),
+			Sequence: big.NewInt(1),
 		}, vset)
 		core.logger = testLogger
 		core.N = int64(n)

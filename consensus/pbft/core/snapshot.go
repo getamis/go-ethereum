@@ -17,10 +17,12 @@
 package core
 
 import (
+	"io"
 	"math/big"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/consensus/pbft"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 func newSnapshot(view *pbft.View, validatorSet pbft.ValidatorSet) *snapshot {
@@ -44,6 +46,17 @@ type snapshot struct {
 	Checkpoints *messageSet
 
 	mu *sync.Mutex
+}
+
+func (s *snapshot) Proposal() pbft.Proposal {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.Preprepare != nil {
+		return s.Preprepare.Proposal
+	}
+
+	return nil
 }
 
 func (s *snapshot) SetRound(r *big.Int) {
@@ -72,4 +85,50 @@ func (s *snapshot) Sequence() *big.Int {
 	defer s.mu.Unlock()
 
 	return s.sequence
+}
+
+// The DecodeRLP method should read one value from the given
+// Stream. It is not forbidden to read less or more, but it might
+// be confusing.
+func (s *snapshot) DecodeRLP(stream *rlp.Stream) error {
+	var ss struct {
+		Round       *big.Int
+		Sequence    *big.Int
+		Preprepare  *pbft.Preprepare
+		Prepares    *messageSet
+		Commits     *messageSet
+		Checkpoints *messageSet
+	}
+
+	if err := stream.Decode(&ss); err != nil {
+		return err
+	}
+	s.round = ss.Round
+	s.sequence = ss.Sequence
+	s.Preprepare = ss.Preprepare
+	s.Prepares = ss.Prepares
+	s.Commits = ss.Commits
+	s.Checkpoints = ss.Checkpoints
+	s.mu = new(sync.Mutex)
+
+	return nil
+}
+
+// EncodeRLP should write the RLP encoding of its receiver to w.
+// If the implementation is a pointer method, it may also be
+// called for nil pointers.
+//
+// Implementations should generate valid RLP. The data written is
+// not verified at the moment, but a future version might. It is
+// recommended to write only a single value but writing multiple
+// values or no value at all is also permitted.
+func (s *snapshot) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, []interface{}{
+		s.round,
+		s.sequence,
+		s.Preprepare,
+		s.Prepares,
+		s.Commits,
+		s.Checkpoints,
+	})
 }

@@ -74,7 +74,7 @@ func New(backend pbft.Backend, config *pbft.Config) Engine {
 	n := int64(backend.Validators().Size())
 	f := int64(math.Ceil(float64(n)/3) - 1)
 
-	core := &core{
+	return &core{
 		config:         config,
 		address:        backend.Address(),
 		N:              n,
@@ -89,8 +89,6 @@ func New(backend pbft.Backend, config *pbft.Config) Engine {
 		roundChangeSet: newRoundChangeSet(backend.Validators()),
 		rouncChangeMu:  new(sync.RWMutex),
 	}
-
-	return core
 }
 
 // ----------------------------------------------------------------------------
@@ -201,10 +199,13 @@ func (c *core) isPrimary() bool {
 
 func (c *core) commit() {
 	c.setState(StateCommitted)
-	logger := c.logger.New("state", c.state)
-	logger.Debug("Ready to commit", "view", c.current.Preprepare.View)
-	if err := c.backend.Commit(c.current.Preprepare.Proposal); err != nil {
-		c.sendRoundChange()
+
+	proposal := c.current.Proposal()
+	if proposal != nil {
+		if err := c.backend.Commit(proposal); err != nil {
+			c.sendRoundChange()
+			return
+		}
 	}
 }
 
@@ -217,11 +218,21 @@ func (c *core) enterNewView(newView *pbft.View) {
 }
 
 func (c *core) startNewRound(newView *pbft.View) {
-	c.newRoundChangeTimer()
+	var logger log.Logger
+	if c.current == nil {
+		logger = c.logger.New("old_round", -1, "old_seq", 0, "old_proposer", c.backend.Validators().GetProposer().Address().Hex())
+	} else {
+		logger = c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence(), "old_proposer", c.backend.Validators().GetProposer().Address().Hex())
+	}
 
 	c.current = newSnapshot(newView, c.backend.Validators())
+	// Calculate new proposer
+	//c.backend.Validators().CalcProposer(c.proposerSeed())
 	c.waitingForRoundChange = false
 	c.setState(StateAcceptRequest)
+	c.newRoundChangeTimer()
+
+	logger.Debug("New round", "new_round", newView.Round, "new_seq", newView.Sequence, "new_proposer", c.backend.Validators().GetProposer().Address().Hex())
 }
 
 func (c *core) proposerSeed() uint64 {

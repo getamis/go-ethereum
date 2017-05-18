@@ -29,10 +29,11 @@ func (c *core) sendRoundChange() {
 	logger := c.logger.New("state", c.state)
 
 	c.waitingForRoundChange = true
+	cv := c.currentView()
 	rc := &roundChange{
 		// The view number we'd like to transfer to
-		Round:    new(big.Int).Add(c.currentView().Round, common.Big1),
-		Sequence: c.currentView().Sequence,
+		Round:    new(big.Int).Add(cv.Round, common.Big1),
+		Sequence: cv.Sequence,
 		Digest:   common.Hash{},
 	}
 
@@ -61,7 +62,7 @@ func (c *core) handleRoundChange(msg *message, src pbft.Validator) error {
 	cv := c.current
 
 	if rc.Sequence.Cmp(cv.Sequence()) != 0 {
-		logger.Warn("Wrong sequence number", "expected", cv.Sequence, "got", rc.Sequence)
+		logger.Warn("Wrong sequence number", "expected", cv.Sequence(), "got", rc.Sequence)
 		return pbft.ErrInvalidMessage
 	}
 
@@ -71,8 +72,8 @@ func (c *core) handleRoundChange(msg *message, src pbft.Validator) error {
 	}
 
 	num, err := c.roundChangeSet.Add(&pbft.View{
-		Round:    rc.Round,
-		Sequence: rc.Sequence,
+		Round:    new(big.Int).Set(rc.Round),
+		Sequence: new(big.Int).Set(rc.Sequence),
 	}, msg)
 	if err != nil {
 		logger.Warn("Failed to add RoundChange", "from", src.Address().Hex(), "msg", rc)
@@ -83,7 +84,11 @@ func (c *core) handleRoundChange(msg *message, src pbft.Validator) error {
 	// catch up the view number
 	if num == int(c.F+1) {
 		if cv.Round().Cmp(rc.Round) < 0 {
-			c.current.SetRound(rc.Round)
+			c.current = newSnapshot(
+				&pbft.View{
+					Round:    new(big.Int).Set(rc.Round),
+					Sequence: new(big.Int).Set(rc.Sequence),
+				}, c.backend.Validators())
 			c.newRoundChangeTimer()
 		}
 	}
@@ -92,8 +97,8 @@ func (c *core) handleRoundChange(msg *message, src pbft.Validator) error {
 	// enter new view
 	if num == int(2*c.F+1) {
 		c.enterNewView(&pbft.View{
-			Round:    rc.Round,
-			Sequence: rc.Sequence,
+			Round:    new(big.Int).Set(rc.Round),
+			Sequence: new(big.Int).Set(rc.Sequence),
 		})
 	}
 

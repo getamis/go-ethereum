@@ -56,6 +56,25 @@ type View struct {
 	Sequence *big.Int
 }
 
+// EncodeRLP serializes b into the Ethereum RLP format.
+func (v *View) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, []interface{}{v.Round, v.Sequence})
+}
+
+// DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
+func (v *View) DecodeRLP(s *rlp.Stream) error {
+	var view struct {
+		Round    *big.Int
+		Sequence *big.Int
+	}
+
+	if err := s.Decode(&view); err != nil {
+		return err
+	}
+	v.Round, v.Sequence = view.Round, view.Sequence
+	return nil
+}
+
 type Preprepare struct {
 	View     *View
 	Proposal Proposal

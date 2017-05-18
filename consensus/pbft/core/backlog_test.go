@@ -33,9 +33,11 @@ import (
 
 func TestIsFutureMessage(t *testing.T) {
 	c := &core{
-		state:    StateAcceptRequest,
-		sequence: big.NewInt(1),
-		round:    big.NewInt(0),
+		state: StateAcceptRequest,
+		current: newSnapshot(&pbft.View{
+			Sequence: big.NewInt(1),
+			Round:    big.NewInt(0),
+		}, newTestValidatorSet(4)),
 	}
 
 	// invalid view format
@@ -192,12 +194,14 @@ func TestProcessFutureBacklog(t *testing.T) {
 		events: new(event.TypeMux),
 	}
 	c := &core{
-		logger:      log.New("backend", "test", "id", 0),
-		backlogs:    make(map[pbft.Validator]*prque.Prque),
-		backlogsMu:  new(sync.Mutex),
-		backend:     backend,
-		sequence:    big.NewInt(1),
-		round:       big.NewInt(0),
+		logger:     log.New("backend", "test", "id", 0),
+		backlogs:   make(map[pbft.Validator]*prque.Prque),
+		backlogsMu: new(sync.Mutex),
+		backend:    backend,
+		current: newSnapshot(&pbft.View{
+			Sequence: big.NewInt(1),
+			Round:    big.NewInt(0),
+		}, newTestValidatorSet(4)),
 		state:       StateAcceptRequest,
 		internalMux: new(event.TypeMux),
 	}
@@ -282,8 +286,10 @@ func testProcessBacklog(t *testing.T, msg *message) {
 		backend:     backend,
 		internalMux: new(event.TypeMux),
 		state:       State(msg.Code),
-		sequence:    big.NewInt(1),
-		round:       big.NewInt(0),
+		current: newSnapshot(&pbft.View{
+			Sequence: big.NewInt(1),
+			Round:    big.NewInt(0),
+		}, newTestValidatorSet(4)),
 		subject: &pbft.Subject{
 			View: &pbft.View{
 				Sequence: big.NewInt(1),
