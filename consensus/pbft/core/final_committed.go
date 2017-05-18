@@ -17,7 +17,6 @@
 package core
 
 import (
-	"bytes"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -28,7 +27,7 @@ func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validato
 	logger := c.logger.New("state", c.state)
 	// this block is from consensus
 	if c.subject != nil &&
-		bytes.Compare(ev.BlockHash.Bytes(), c.subject.Digest.Bytes()) == 0 &&
+		ev.BlockHash == c.subject.Digest &&
 		c.state == StateCommitted {
 		logger.Debug("handleFinalCommitted from consensus", "height", ev.BlockNumber, "hash", ev.BlockHash)
 		// send out the checkpoint
