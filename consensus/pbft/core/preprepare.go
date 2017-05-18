@@ -20,7 +20,6 @@ import (
 	"reflect"
 
 	"github.com/ethereum/go-ethereum/consensus/pbft"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 func (c *core) sendPreprepare(request *pbft.Request) {
@@ -46,7 +45,7 @@ func (c *core) sendPreprepare(request *pbft.Request) {
 }
 
 func (c *core) handlePreprepare(msg *message, src pbft.Validator) error {
-	logger := log.New("from", src.Address().Hex(), "state", c.state)
+	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 	logger.Debug("handlePreprepare")
 
 	if c.waitingForRoundChange {
@@ -101,5 +100,5 @@ func (c *core) acceptPreprepare(preprepare *pbft.Preprepare) {
 	}
 
 	c.subject = subject
-	c.current = newSnapshot(preprepare, c.backend.Validators())
+	c.current.Preprepare = preprepare
 }

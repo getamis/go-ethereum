@@ -26,7 +26,6 @@ import (
 // Start implements core.Engine.Start
 func (c *core) Start(lastSequence *big.Int, lastProposer common.Address) error {
 	// initial last commit sequence and proposer
-	c.sequence = new(big.Int).Add(lastSequence, common.Big1)
 	c.lastProposer = lastProposer
 
 	// Tests will handle events itself, so we have to make subscribeEvents()
@@ -35,6 +34,11 @@ func (c *core) Start(lastSequence *big.Int, lastProposer common.Address) error {
 
 	go c.handleExternalEvent()
 	go c.handleInternalEvent()
+
+	c.startNewRound(&pbft.View{
+		Sequence: new(big.Int).Add(lastSequence, common.Big1),
+		Round:    common.Big0,
+	})
 
 	return nil
 }

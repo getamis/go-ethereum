@@ -60,17 +60,21 @@ func (c *core) handleCheckpoint(msg *message, src pbft.Validator) error {
 	defer c.snapshotsMu.Unlock()
 
 	// Look for matching snapshot
-	if cp.View.Sequence.Cmp(c.current.Sequence) == 0 { // current
+	if cp.View.Sequence.Cmp(c.current.Sequence()) == 0 { // current
+		// If we're waiting for RoundChange, ignore this
+		if c.waitingForRoundChange {
+			return pbft.ErrIgnored
+		}
 		snapshot = c.current
-	} else if cp.View.Sequence.Cmp(c.current.Sequence) < 0 { // old checkpoint
+	} else if cp.View.Sequence.Cmp(c.current.Sequence()) < 0 { // old checkpoint
 		snapshotIndex := sort.Search(len(c.snapshots),
 			func(i int) bool {
-				return c.snapshots[i].Sequence.Cmp(cp.View.Sequence) >= 0
+				return c.snapshots[i].Sequence().Cmp(cp.View.Sequence) >= 0
 			},
 		)
 
 		// If there is no such index, Search returns len(c.snapshots).
-		if snapshotIndex < len(c.snapshots) && c.snapshots[snapshotIndex].Sequence.Cmp(cp.View.Sequence) == 0 {
+		if snapshotIndex < len(c.snapshots) && c.snapshots[snapshotIndex].Sequence().Cmp(cp.View.Sequence) == 0 {
 			snapshot = c.snapshots[snapshotIndex]
 		} else {
 			logger.Warn("Failed to find snapshot entry", "seq", cp.View.Sequence, "current", c.current.Sequence)
@@ -93,7 +97,7 @@ func (c *core) handleCheckpoint(msg *message, src pbft.Validator) error {
 func (c *core) buildStableCheckpoint() {
 	var stableCheckpoint *snapshot
 	stableCheckpointIndex := -1
-	logger := c.logger.New("seq", c.sequence)
+	logger := c.logger.New("seq", c.current.Sequence())
 
 	c.snapshotsMu.Lock()
 	for i := len(c.snapshots) - 1; i >= 0; i-- {

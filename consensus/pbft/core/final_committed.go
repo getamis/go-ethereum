@@ -34,30 +34,33 @@ func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validato
 		c.sendCheckpoint(&pbft.Subject{
 			View: &pbft.View{
 				Sequence: ev.Proposal.Number(),
-				Round:    c.round,
+				Round:    c.current.Round(),
 			},
 			Digest: ev.Proposal.Hash(),
 		})
+
+		// store snapshot
 		c.snapshotsMu.Lock()
 		c.snapshots = append(c.snapshots, c.current)
 		c.snapshotsMu.Unlock()
-
 	} else {
 		// this block is from geth sync
 		logger.Debug("handleFinalCommitted from geth sync", "height", ev.Proposal.Number(), "hash", ev.Proposal.Hash())
 	}
 
-	if ev.Proposal.Number().Cmp(c.sequence) >= 0 {
+	if ev.Proposal.Number().Cmp(c.current.Sequence()) >= 0 {
 		// We build stable checkpoint every 100 blocks
 		// FIXME: this should be passed by configuration
-		if new(big.Int).Mod(c.sequence, big.NewInt(int64(c.config.CheckPointPeriod))).Int64() == 0 {
+		if new(big.Int).Mod(c.current.Sequence(), big.NewInt(int64(c.config.CheckPointPeriod))).Int64() == 0 {
 			go c.sendInternalEvent(buildCheckpointEvent{})
 		}
 
-		c.sequence = new(big.Int).Add(ev.Proposal.Number(), common.Big1)
-		c.round = common.Big0
 		c.lastProposer = ev.Proposer
-		c.setState(StateAcceptRequest)
+
+		c.startNewRound(&pbft.View{
+			Sequence: new(big.Int).Add(ev.Proposal.Number(), common.Big1),
+			Round:    common.Big0,
+		})
 	}
 
 	return nil

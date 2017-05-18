@@ -18,26 +18,58 @@ package core
 
 import (
 	"math/big"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 )
 
-func newSnapshot(preprepare *pbft.Preprepare, validatorSet pbft.ValidatorSet) *snapshot {
+func newSnapshot(view *pbft.View, validatorSet pbft.ValidatorSet) *snapshot {
 	return &snapshot{
-		Round:       preprepare.View.Round,
-		Sequence:    preprepare.View.Sequence,
-		Preprepare:  preprepare,
+		round:       view.Round,
+		sequence:    view.Sequence,
+		Preprepare:  nil,
 		Prepares:    newMessageSet(validatorSet),
 		Commits:     newMessageSet(validatorSet),
 		Checkpoints: newMessageSet(validatorSet),
+		mu:          new(sync.Mutex),
 	}
 }
 
 type snapshot struct {
-	Round       *big.Int
-	Sequence    *big.Int
+	round       *big.Int
+	sequence    *big.Int
 	Preprepare  *pbft.Preprepare
 	Prepares    *messageSet
 	Commits     *messageSet
 	Checkpoints *messageSet
+
+	mu *sync.Mutex
+}
+
+func (s *snapshot) SetRound(r *big.Int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.round = new(big.Int).Set(r)
+}
+
+func (s *snapshot) Round() *big.Int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.round
+}
+
+func (s *snapshot) SetSequence(seq *big.Int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.sequence = seq
+}
+
+func (s *snapshot) Sequence() *big.Int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.sequence
 }

@@ -74,7 +74,7 @@ func New(backend pbft.Backend, config *pbft.Config) Engine {
 	n := int64(backend.Validators().Size())
 	f := int64(math.Ceil(float64(n)/3) - 1)
 
-	return &core{
+	core := &core{
 		config:         config,
 		address:        backend.Address(),
 		N:              n,
@@ -82,8 +82,6 @@ func New(backend pbft.Backend, config *pbft.Config) Engine {
 		state:          StateAcceptRequest,
 		logger:         log.New("address", backend.Address().Hex()),
 		backend:        backend,
-		sequence:       common.Big0,
-		round:          common.Big0,
 		internalMux:    new(event.TypeMux),
 		backlogs:       make(map[pbft.Validator]*prque.Prque),
 		backlogsMu:     new(sync.Mutex),
@@ -91,6 +89,8 @@ func New(backend pbft.Backend, config *pbft.Config) Engine {
 		roundChangeSet: newRoundChangeSet(backend.Validators()),
 		rouncChangeMu:  new(sync.RWMutex),
 	}
+
+	return core
 }
 
 // ----------------------------------------------------------------------------
@@ -109,8 +109,6 @@ type core struct {
 	internalMux    *event.TypeMux
 	internalEvents *event.TypeMuxSubscription
 
-	sequence              *big.Int
-	round                 *big.Int
 	lastProposer          common.Address
 	waitingForRoundChange bool
 
@@ -185,15 +183,15 @@ func (c *core) broadcast(msg *message) {
 
 func (c *core) currentView() *pbft.View {
 	return &pbft.View{
-		Sequence: new(big.Int).Set(c.sequence),
-		Round:    new(big.Int).Set(c.round),
+		Sequence: new(big.Int).Set(c.current.Sequence()),
+		Round:    new(big.Int).Set(c.current.Round()),
 	}
 }
 
 func (c *core) nextRound() *pbft.View {
 	return &pbft.View{
-		Sequence: new(big.Int).Set(c.sequence),
-		Round:    new(big.Int).Add(c.round, common.Big1),
+		Sequence: new(big.Int).Set(c.current.Sequence()),
+		Round:    new(big.Int).Add(c.current.Round(), common.Big1),
 	}
 }
 
@@ -213,15 +211,15 @@ func (c *core) commit() {
 func (c *core) enterNewView(newView *pbft.View) {
 	// Clear invalid RoundChange messages
 	c.roundChangeSet.Clear(newView)
+	c.backend.ViewChanged(true)
 
-	// Calculate new proposer
-	c.backend.Validators().CalcProposer(newView.Round.Uint64())
+	c.startNewRound(newView)
+}
 
+func (c *core) startNewRound(newView *pbft.View) {
 	c.newRoundChangeTimer()
 
-	c.round = newView.Round
-	c.sequence = newView.Sequence
-	c.current = nil
+	c.current = newSnapshot(newView, c.backend.Validators())
 	c.waitingForRoundChange = false
 	c.setState(StateAcceptRequest)
 }
@@ -229,13 +227,13 @@ func (c *core) enterNewView(newView *pbft.View) {
 func (c *core) proposerSeed() uint64 {
 	emptyAddr := common.Address{}
 	if c.lastProposer == emptyAddr {
-		return c.round.Uint64()
+		return c.current.Round().Uint64()
 	}
 	offset := 0
 	if idx, val := c.backend.Validators().GetByAddress(c.lastProposer); val != nil {
 		offset = idx
 	}
-	return uint64(offset) + c.round.Uint64() + 1
+	return uint64(offset) + c.current.Round().Uint64() + 1
 }
 
 func (c *core) setState(state State) {
