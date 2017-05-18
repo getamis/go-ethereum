@@ -95,12 +95,12 @@ func testNormalValSet(t *testing.T) {
 		t.Errorf("get wrong validator, got: %v, expected: nil", val)
 	}
 	// test get by address
-	if val := valSet.GetByAddress(addr2); !reflect.DeepEqual(val, val2) {
+	if _, val := valSet.GetByAddress(addr2); !reflect.DeepEqual(val, val2) {
 		t.Errorf("get wrong validator, got: %v, expected: %v", val, val2)
 	}
 	// test get by invalid address
 	invalidAddr := common.HexToAddress("0x9535b2e7faaba5288511d89341d94a38063a349b")
-	if val := valSet.GetByAddress(invalidAddr); val != nil {
+	if _, val := valSet.GetByAddress(invalidAddr); val != nil {
 		t.Errorf("get wrong validator, got: %v, expected: nil", val)
 	}
 	// test get proposer

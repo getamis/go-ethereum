@@ -47,6 +47,7 @@ type testSystemBackend struct {
 	db      ethdb.Database
 
 	curBlockNumber *big.Int
+	lastProposer   common.Address
 }
 
 // ==============================================
@@ -98,6 +99,7 @@ func (self *testSystemBackend) Commit(proposal *pbft.Proposal) error {
 	testLogger.Info("commit message", "address", self.Address())
 	self.commitMsgs = append(self.commitMsgs, proposal)
 	self.curBlockNumber = new(big.Int).Add(self.curBlockNumber, common.Big1)
+	self.lastProposer = self.peers.GetProposer().Address()
 
 	// fake new head events
 	go self.events.Post(pbft.FinalCommittedEvent{
@@ -134,6 +136,10 @@ func (self *testSystemBackend) IsProposer() bool {
 
 func (self *testSystemBackend) LastCommitSequence() *big.Int {
 	return self.curBlockNumber
+}
+
+func (self *testSystemBackend) LastCommitProposer() (common.Address, error) {
+	return self.lastProposer, nil
 }
 
 func (self *testSystemBackend) Hash(b interface{}) common.Hash {

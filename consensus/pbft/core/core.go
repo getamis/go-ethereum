@@ -199,6 +199,14 @@ func (c *core) commit() {
 	}
 }
 
+func (c *core) proposerSeed() uint64 {
+	idx := 0
+	if lastProposer, err := c.backend.LastCommitProposer(); err == nil {
+		idx, _ = c.backend.Validators().GetByAddress(lastProposer)
+	}
+	return uint64(idx) + c.round.Uint64()
+}
+
 func (c *core) setState(state State) {
 	if c.state != state {
 		c.state = state

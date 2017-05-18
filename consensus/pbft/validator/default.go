@@ -77,13 +77,13 @@ func (valSet *defaultSet) GetByIndex(i uint64) pbft.Validator {
 	return nil
 }
 
-func (valSet *defaultSet) GetByAddress(addr common.Address) pbft.Validator {
-	for _, val := range valSet.List() {
+func (valSet *defaultSet) GetByAddress(addr common.Address) (int, pbft.Validator) {
+	for i, val := range valSet.List() {
 		if bytes.Compare(addr.Bytes(), val.Address().Bytes()) == 0 {
-			return val
+			return i, val
 		}
 	}
-	return nil
+	return -1, nil
 }
 
 func (valSet *defaultSet) GetProposer() pbft.Validator {
@@ -91,7 +91,8 @@ func (valSet *defaultSet) GetProposer() pbft.Validator {
 }
 
 func (valSet *defaultSet) IsProposer(address common.Address) bool {
-	return reflect.DeepEqual(valSet.GetProposer(), valSet.GetByAddress(address))
+	_, val := valSet.GetByAddress(address)
+	return reflect.DeepEqual(valSet.GetProposer(), val)
 }
 
 func (valSet *defaultSet) CalcProposer(seed uint64) {

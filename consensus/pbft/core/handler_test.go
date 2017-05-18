@@ -34,7 +34,8 @@ func TestHandleMsg(t *testing.T) {
 		Address: v0.Address(),
 	}
 
-	if err := r0.handle(msg, v0.Validators().GetByAddress(v0.Address())); err != errFailedDecodePreprepare {
+	_, val := v0.Validators().GetByAddress(v0.Address())
+	if err := r0.handle(msg, val); err != errFailedDecodePreprepare {
 		t.Error("message should decode failed")
 	}
 
@@ -63,7 +64,8 @@ func TestHandleMsg(t *testing.T) {
 		Address: v0.Address(),
 	}
 
-	if err := r0.handle(msg, v0.Validators().GetByAddress(v0.Address())); err != errFailedDecodePrepare {
+	_, val = v0.Validators().GetByAddress(v0.Address())
+	if err := r0.handle(msg, val); err != errFailedDecodePrepare {
 		t.Error("message should decode failed")
 	}
 
@@ -92,7 +94,8 @@ func TestHandleMsg(t *testing.T) {
 		Address: v0.Address(),
 	}
 
-	if err := r0.handle(msg, v0.Validators().GetByAddress(v0.Address())); err != errFailedDecodeCommit {
+	_, val = v0.Validators().GetByAddress(v0.Address())
+	if err := r0.handle(msg, val); err != errFailedDecodeCommit {
 		t.Error("message should decode failed")
 	}
 
@@ -121,7 +124,8 @@ func TestHandleMsg(t *testing.T) {
 		Address: v0.Address(),
 	}
 
-	if err := r0.handle(msg, v0.Validators().GetByAddress(v0.Address())); err != nil {
+	_, val = v0.Validators().GetByAddress(v0.Address())
+	if err := r0.handle(msg, val); err != nil {
 		t.Error("should not return failed message, but:", err)
 	}
 

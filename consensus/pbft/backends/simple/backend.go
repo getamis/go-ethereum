@@ -219,7 +219,7 @@ func (sb *simpleBackend) CheckValidatorSignature(data []byte, sig []byte) (commo
 	}
 
 	// 2. Check validator
-	if val := sb.valSet.GetByAddress(signer); val != nil {
+	if _, val := sb.valSet.GetByAddress(signer); val != nil {
 		return val.Address(), nil
 	}
 
@@ -256,4 +256,8 @@ func (sb *simpleBackend) LastCommitSequence() *big.Int {
 		return common.Big0
 	}
 	return new(big.Int).Set(sb.chain.CurrentHeader().Number)
+}
+
+func (sb *simpleBackend) LastCommitProposer() (common.Address, error) {
+	return sb.ecrecover(sb.chain.CurrentHeader())
 }

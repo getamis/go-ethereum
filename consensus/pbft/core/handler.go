@@ -64,13 +64,15 @@ func (c *core) handleExternalEvent() {
 		// A real event arrived, process interesting content
 		switch ev := event.Data.(type) {
 		case pbft.FinalCommittedEvent:
-			c.handleFinalCommitted(ev, c.backend.Validators().GetByAddress(c.Address()))
+			_, val := c.backend.Validators().GetByAddress(c.Address())
+			c.handleFinalCommitted(ev, val)
 		case pbft.ConnectionEvent:
 
 		case pbft.RequestEvent:
+			_, val := c.backend.Validators().GetByAddress(c.Address())
 			c.handleRequest(&pbft.Request{
 				BlockContext: ev.BlockContext,
-			}, c.backend.Validators().GetByAddress(c.Address()))
+			}, val)
 		case pbft.MessageEvent:
 			c.handleMsg(ev.Payload)
 		}
@@ -104,7 +106,7 @@ func (c *core) handleMsg(payload []byte) error {
 	}
 
 	// Only accept message if address is valid
-	src := c.backend.Validators().GetByAddress(msg.Address)
+	_, src := c.backend.Validators().GetByAddress(msg.Address)
 	if src == nil {
 		logger.Error("Invalid address in message", "msg", msg)
 		return pbft.ErrNoMatchingValidator

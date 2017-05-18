@@ -168,12 +168,13 @@ OUTER:
 			//}
 
 			m, _ := Encode(preprepare)
+			_, val := v0.Validators().GetByAddress(v0.Address())
 			// run each backends and verify handlePreprepare function.
 			if err := c.handlePreprepare(&message{
 				Code:    msgPreprepare,
 				Msg:     m,
 				Address: v0.Address(),
-			}, v0.Validators().GetByAddress(v0.Address())); err != nil {
+			}, val); err != nil {
 				if err != test.expectedErr {
 					t.Error("unexpected error: ", err)
 				}

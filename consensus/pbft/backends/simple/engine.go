@@ -200,7 +200,7 @@ func (sb *simpleBackend) verifySigner(chain consensus.ChainReader, header *types
 	if parentValSet == nil {
 		return errInvalidExtraDataFormat
 	}
-	if v := parentValSet.GetByAddress(signer); v == nil {
+	if _, v := parentValSet.GetByAddress(signer); v == nil {
 		return errUnauthorized
 	}
 	return nil
@@ -344,7 +344,7 @@ func (sb *simpleBackend) APIs(chain consensus.ChainReader) []rpc.API {
 func (sb *simpleBackend) AddPeer(peerID string, publicKey *ecdsa.PublicKey) error {
 	peer := newPeer(peerID, publicKey)
 	// check is validator
-	if val := sb.valSet.GetByAddress(peer.Address()); val != nil {
+	if _, val := sb.valSet.GetByAddress(peer.Address()); val != nil {
 		// add to peer set
 		sb.peerSet.Add(peer)
 		// post connection event to pbft core
@@ -369,7 +369,7 @@ func (sb *simpleBackend) HandleMsg(peerID string, data []byte) error {
 		return errInvalidPeer
 	}
 
-	if val := sb.valSet.GetByAddress(peer.Address()); val == nil {
+	if _, val := sb.valSet.GetByAddress(peer.Address()); val == nil {
 		sb.logger.Error("Not in validator set", "peerAddr", peer.Address().Hex())
 		return errInvalidPeer
 	}
