@@ -38,6 +38,11 @@ const (
 	extraSeal   = 65 // Fixed number of extra-data suffix bytes reserved for signer seal
 )
 
+type CommitResult struct {
+	hash       common.Hash
+	signatures []byte
+}
+
 func New(config *pbft.Config, eventMux *event.TypeMux, privateKey *ecdsa.PrivateKey, db ethdb.Database) consensus.PBFT {
 	backend := &simpleBackend{
 		config:       config,
@@ -72,7 +77,7 @@ type simpleBackend struct {
 
 	// the channels for pbft engine notifications
 	viewChange chan bool
-	commit     chan common.Hash
+	commit     chan *CommitResult
 	commitErr  chan error
 }
 
@@ -119,7 +124,7 @@ func (sb *simpleBackend) Broadcast(payload []byte) error {
 }
 
 // Commit implements pbft.Backend.Commit
-func (sb *simpleBackend) Commit(proposal pbft.Proposal) error {
+func (sb *simpleBackend) Commit(proposal *pbft.Proposal, signatures []byte) error {
 	sb.logger.Info("Committed", "address", sb.Address().Hex(), "proposal", proposal)
 	// step1: update validator set from extra data of block
 	// step2: insert chain
@@ -137,10 +142,11 @@ func (sb *simpleBackend) Commit(proposal pbft.Proposal) error {
 		}
 		defer closeCommitErr()
 		// feed block hash to Seal() and wait the Seal() result
-		sb.commit <- block.Hash()
+		sb.commit <- &CommitResult{block.Hash(), signatures}
 		// TODO: how do we check the block is inserted correctly?
 		return <-sb.commitErr
 	} else {
+		block.UpdateHeaderSignatures(signatures)
 		return sb.inserter(block)
 	}
 }

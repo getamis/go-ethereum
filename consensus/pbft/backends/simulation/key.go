@@ -18,6 +18,8 @@ package simulation
 
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -25,6 +27,14 @@ import (
 
 func NewNodeKey() *NodeKey {
 	key, _ := crypto.GenerateKey()
+	return &NodeKey{
+		key: key,
+	}
+}
+
+func BigToNodeKey(b *big.Int) *NodeKey {
+	hashData := crypto.Keccak256(b.Bytes())
+	key, _ := crypto.HexToECDSA(hex.EncodeToString(hashData))
 	return &NodeKey{
 		key: key,
 	}

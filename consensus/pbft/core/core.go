@@ -174,7 +174,11 @@ func (c *core) commit() {
 	c.setState(StateCommitted)
 	logger := c.logger.New("state", c.state)
 	logger.Debug("Ready to commit", "view", c.current.Preprepare.View)
-	if err := c.backend.Commit(c.current.Preprepare.Proposal); err != nil {
+	var signatures []byte
+	for _, v := range c.current.Commits.Values() {
+		signatures = append(signatures, v.Signature...)
+	}
+	if err := c.backend.Commit(c.current.Preprepare.Proposal, signatures); err != nil {
 		// TODO: fire a view change immediately
 	}
 }

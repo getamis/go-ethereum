@@ -17,6 +17,7 @@
 package main
 
 import (
+	"math/big"
 	"os"
 	"time"
 
@@ -48,7 +49,7 @@ func main() {
 	var nodeKeys = make([]*simulation.NodeKey, N)
 	var addrs = make([]common.Address, N)
 	for i := 0; i < N; i++ {
-		nodeKeys[i] = simulation.NewNodeKey()
+		nodeKeys[i] = simulation.BigToNodeKey(big.NewInt(int64(i)))
 		addrs[i] = nodeKeys[i].Address()
 	}
 
