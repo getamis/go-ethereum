@@ -42,6 +42,7 @@ type MessageEvent struct {
 }
 
 type FinalCommittedEvent struct {
-	BlockNumber *big.Int
-	BlockHash   common.Hash
+	BlockNumber   *big.Int
+	BlockHash     common.Hash
+	BlockProposer common.Address
 }

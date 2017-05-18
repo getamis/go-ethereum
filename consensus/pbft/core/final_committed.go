@@ -47,13 +47,19 @@ func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validato
 		// this block is from geth sync
 		logger.Debug("handleFinalCommitted from geth sync", "height", ev.BlockNumber, "hash", ev.BlockHash)
 	}
-	c.sequence = new(big.Int).Add(c.backend.LastCommitSequence(), common.Big1)
-	c.round = common.Big0
-	c.setState(StateAcceptRequest)
-	// We build stable checkpoint every 100 blocks
-	// FIXME: this should be passed by configuration
-	if new(big.Int).Mod(c.sequence, big.NewInt(100)).Int64() == 0 {
-		go c.sendInternalEvent(buildCheckpointEvent{})
+
+	if ev.BlockNumber.Cmp(c.sequence) >= 0 {
+		// We build stable checkpoint every 100 blocks
+		// FIXME: this should be passed by configuration
+		if new(big.Int).Mod(c.sequence, big.NewInt(int64(c.config.CheckPointPeriod))).Int64() == 0 {
+			go c.sendInternalEvent(buildCheckpointEvent{})
+		}
+
+		c.sequence = new(big.Int).Add(ev.BlockNumber, common.Big1)
+		c.round = common.Big0
+		c.lastProposer = ev.BlockProposer
+		c.setState(StateAcceptRequest)
 	}
+
 	return nil
 }

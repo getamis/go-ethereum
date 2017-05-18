@@ -396,7 +396,19 @@ func (sb *simpleBackend) Start(chain consensus.ChainReader, inserter func(block 
 	sb.chain = chain
 	sb.inserter = inserter
 	sb.core = pbftCore.New(sb, sb.config)
-	return sb.core.Start()
+
+	curHeader := chain.CurrentHeader()
+	lastSequence := new(big.Int).Set(curHeader.Number)
+	lastProposer := common.Address{}
+	// should get proposer if the block is not genesis
+	if lastSequence.Cmp(common.Big0) > 0 {
+		p, err := sb.Author(curHeader)
+		if err != nil {
+			return err
+		}
+		lastProposer = p
+	}
+	return sb.core.Start(lastSequence, lastProposer)
 }
 
 // Stop implements consensus.PBFT.Stop

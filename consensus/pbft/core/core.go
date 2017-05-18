@@ -17,6 +17,7 @@
 package core
 
 import (
+	"bytes"
 	"math"
 	"math/big"
 	"sync"
@@ -57,7 +58,7 @@ func (s State) String() string {
 }
 
 type Engine interface {
-	Start() error
+	Start(lastSequence *big.Int, lastProposer common.Address) error
 	Stop() error
 }
 
@@ -74,8 +75,8 @@ func New(backend pbft.Backend, config *pbft.Config) Engine {
 		state:       StateAcceptRequest,
 		logger:      log.New("address", backend.Address().Hex()),
 		backend:     backend,
-		sequence:    new(big.Int),
-		round:       new(big.Int),
+		sequence:    common.Big0,
+		round:       common.Big0,
 		internalMux: new(event.TypeMux),
 		backlogs:    make(map[pbft.Validator]*prque.Prque),
 		backlogsMu:  new(sync.Mutex),
@@ -99,9 +100,9 @@ type core struct {
 	internalMux    *event.TypeMux
 	internalEvents *event.TypeMuxSubscription
 
-	sequence  *big.Int
-	round     *big.Int
-	completed bool
+	sequence     *big.Int
+	round        *big.Int
+	lastProposer common.Address
 
 	subject *pbft.Subject
 
@@ -152,12 +153,6 @@ func (c *core) broadcast(msg *message) {
 	}
 }
 
-// initSequence initializes the current sequence and round
-func (c *core) initSequence() {
-	c.sequence = new(big.Int).Add(c.backend.LastCommitSequence(), common.Big1)
-	c.round = common.Big0
-}
-
 func (c *core) currentView() *pbft.View {
 	return &pbft.View{
 		Sequence: new(big.Int).Set(c.sequence),
@@ -200,11 +195,14 @@ func (c *core) commit() {
 }
 
 func (c *core) proposerSeed() uint64 {
-	idx := 0
-	if lastProposer, err := c.backend.LastCommitProposer(); err == nil {
-		idx, _ = c.backend.Validators().GetByAddress(lastProposer)
+	if bytes.Compare(c.lastProposer.Bytes(), []byte{}) == 0 {
+		return c.round.Uint64()
 	}
-	return uint64(idx) + c.round.Uint64()
+	offset := 0
+	if idx, val := c.backend.Validators().GetByAddress(c.lastProposer); val != nil {
+		offset = idx
+	}
+	return uint64(offset) + c.round.Uint64() + 1
 }
 
 func (c *core) setState(state State) {

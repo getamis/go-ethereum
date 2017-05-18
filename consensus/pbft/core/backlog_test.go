@@ -86,7 +86,6 @@ func TestIsFutureMessage(t *testing.T) {
 			if r {
 				t.Error("Should return false because we can execute it now")
 			}
-
 		} else {
 			if !r {
 				t.Error("Should return true because it's a future round")
@@ -102,7 +101,6 @@ func TestIsFutureMessage(t *testing.T) {
 			if r {
 				t.Error("Should return false because we can execute it now")
 			}
-
 		} else {
 			if !r {
 				t.Error("Should return true because it's a future round")
@@ -118,7 +116,6 @@ func TestIsFutureMessage(t *testing.T) {
 			if r {
 				t.Error("Should return false because we can execute it now")
 			}
-
 		} else {
 			if !r {
 				t.Error("Should return true because it's a future round")

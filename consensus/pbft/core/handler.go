@@ -16,12 +16,19 @@
 
 package core
 
-import "github.com/ethereum/go-ethereum/consensus/pbft"
+import (
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/pbft"
+)
 
 // Start implements core.Engine.Start
-func (c *core) Start() error {
-	// restore last commit sequence
-	c.initSequence()
+func (c *core) Start(lastSequence *big.Int, lastProposer common.Address) error {
+	// initial last commit sequence and proposer
+	c.sequence = new(big.Int).Add(lastSequence, common.Big1)
+	c.lastProposer = lastProposer
+
 	// Tests will handle events itself, so we have to make subscribeEvents()
 	// be able to call in test.
 	c.subscribeEvents()
