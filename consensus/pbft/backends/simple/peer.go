@@ -17,7 +17,6 @@
 package simple
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"sync"
 
@@ -90,7 +89,7 @@ func (ps *peerSet) GetByAddress(addr common.Address) *peer {
 	defer ps.mtx.Unlock()
 
 	for _, peer := range ps.peers {
-		if bytes.Compare(addr.Bytes(), peer.Address().Bytes()) == 0 {
+		if addr == peer.Address() {
 			return peer
 		}
 	}

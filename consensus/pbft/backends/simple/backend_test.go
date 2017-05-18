@@ -17,7 +17,6 @@
 package simple
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"sort"
 	"strings"
@@ -83,7 +82,7 @@ func TestCheckValidatorSignature(t *testing.T) {
 			t.Errorf("CheckValidatorSignature should succeed")
 		}
 		validator := vset.GetByIndex(uint64(i))
-		if bytes.Compare(addr.Bytes(), validator.Address().Bytes()) != 0 {
+		if addr != validator.Address() {
 			t.Errorf("CheckValidatorSignature should return correct validator's address")
 		}
 	}
@@ -104,7 +103,8 @@ func TestCheckValidatorSignature(t *testing.T) {
 	if err != pbft.ErrNoMatchingValidator {
 		t.Errorf("Expected error pbft.ErrNoMatchingValidator, but got: %v", err)
 	}
-	if bytes.Compare(addr.Bytes(), common.Address{}.Bytes()) != 0 {
+	emptyAddr := common.Address{}
+	if addr != emptyAddr {
 		t.Errorf("Expected empty address, but got: %v", addr)
 	}
 }

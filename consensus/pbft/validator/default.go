@@ -17,7 +17,6 @@
 package validator
 
 import (
-	"bytes"
 	"reflect"
 	"sort"
 	"strings"
@@ -79,7 +78,7 @@ func (valSet *defaultSet) GetByIndex(i uint64) pbft.Validator {
 
 func (valSet *defaultSet) GetByAddress(addr common.Address) (int, pbft.Validator) {
 	for i, val := range valSet.List() {
-		if bytes.Compare(addr.Bytes(), val.Address().Bytes()) == 0 {
+		if addr == val.Address() {
 			return i, val
 		}
 	}

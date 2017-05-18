@@ -17,7 +17,6 @@
 package core
 
 import (
-	"bytes"
 	"math"
 	"math/big"
 	"sync"
@@ -195,7 +194,8 @@ func (c *core) commit() {
 }
 
 func (c *core) proposerSeed() uint64 {
-	if bytes.Compare(c.lastProposer.Bytes(), []byte{}) == 0 {
+	emptyAddr := common.Address{}
+	if c.lastProposer == emptyAddr {
 		return c.round.Uint64()
 	}
 	offset := 0

@@ -17,7 +17,6 @@
 package simple
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -202,7 +201,7 @@ func (sb *simpleBackend) CheckSignature(data []byte, address common.Address, sig
 		return err
 	}
 	//Compare derived addresses
-	if bytes.Compare(signer.Bytes(), address.Bytes()) != 0 {
+	if signer != address {
 		return pbft.ErrInvalidSignature
 	}
 	return nil
