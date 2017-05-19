@@ -24,12 +24,12 @@ import (
 )
 
 func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validator) error {
-	logger := c.logger.New("state", c.state)
+	logger := c.logger.New("state", c.state, "number", ev.Proposal.Number(), "hash", ev.Proposal.Hash())
 	// this block is from consensus
 	if c.subject != nil &&
 		ev.Proposal.Hash() == c.subject.Digest &&
 		c.state == StateCommitted {
-		logger.Debug("handleFinalCommitted from consensus", "height", ev.Proposal.Number(), "hash", ev.Proposal.Hash())
+		logger.Trace("New block from consensus")
 
 		// send out the checkpoint
 		c.sendCheckpoint(&pbft.Subject{
@@ -44,9 +44,8 @@ func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validato
 		c.snapshotsMu.Lock()
 		c.snapshots = append(c.snapshots, c.current)
 		c.snapshotsMu.Unlock()
-	} else {
-		// this block is from geth sync
-		logger.Debug("handleFinalCommitted from geth sync", "height", ev.Proposal.Number(), "hash", ev.Proposal.Hash())
+	} else { // this block is from geth sync
+		logger.Trace("New block from synchronization")
 	}
 
 	if ev.Proposal.Number().Cmp(c.current.Sequence()) >= 0 {

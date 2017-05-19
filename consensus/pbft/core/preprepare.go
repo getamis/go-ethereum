@@ -36,7 +36,7 @@ func (c *core) sendPreprepare(request *pbft.Request) {
 			return
 		}
 
-		logger.Debug("sendPreprepare")
+		logger.Trace("sendPreprepare")
 		c.broadcast(&message{
 			Code: msgPreprepare,
 			Msg:  preprepare,
@@ -46,7 +46,7 @@ func (c *core) sendPreprepare(request *pbft.Request) {
 
 func (c *core) handlePreprepare(msg *message, src pbft.Validator) error {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
-	logger.Debug("handlePreprepare")
+	logger.Trace("handlePreprepare")
 
 	if c.waitingForRoundChange {
 		logger.Warn("Waiting for a RoundChange, ignore", "msg", msg)

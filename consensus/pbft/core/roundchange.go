@@ -51,7 +51,7 @@ func (c *core) sendRoundChange() {
 
 func (c *core) handleRoundChange(msg *message, src pbft.Validator) error {
 	logger := c.logger.New("state", c.state)
-	logger.Debug("handleRoundChange")
+	logger.Trace("handleRoundChange")
 
 	var rc *roundChange
 	if err := msg.Decode(&rc); err != nil {

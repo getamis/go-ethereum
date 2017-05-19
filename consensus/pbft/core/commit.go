@@ -24,7 +24,7 @@ import (
 
 func (c *core) sendCommit() {
 	logger := c.logger.New("state", c.state)
-	logger.Debug("sendCommit")
+	logger.Trace("sendCommit")
 
 	subject, err := Encode(c.subject)
 	if err != nil {
@@ -39,7 +39,7 @@ func (c *core) sendCommit() {
 
 func (c *core) handleCommit(msg *message, src pbft.Validator) error {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
-	logger.Debug("handleCommit")
+	logger.Trace("handleCommit")
 
 	if c.waitingForRoundChange {
 		logger.Warn("Waiting for a RoundChange, ignore", "msg", msg)

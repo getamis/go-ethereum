@@ -24,7 +24,7 @@ import (
 
 func (c *core) sendCheckpoint(cp *pbft.Subject) {
 	logger := c.logger.New("state", c.state)
-	logger.Debug("sendCheckpoint")
+	logger.Trace("sendCheckpoint")
 
 	newCp, err := Encode(cp)
 	if err != nil {
@@ -54,7 +54,7 @@ func (c *core) handleCheckpoint(msg *message, src pbft.Validator) error {
 
 	var snapshot *snapshot
 
-	logger.Debug("handleCheckpoint")
+	logger.Trace("handleCheckpoint")
 
 	c.snapshotsMu.Lock()
 	defer c.snapshotsMu.Unlock()

@@ -24,7 +24,7 @@ import (
 
 func (c *core) sendPrepare() {
 	logger := c.logger.New("state", c.state)
-	logger.Debug("sendPrepare")
+	logger.Trace("sendPrepare")
 
 	subject, err := Encode(c.subject)
 	if err != nil {
@@ -39,7 +39,7 @@ func (c *core) sendPrepare() {
 
 func (c *core) handlePrepare(msg *message, src pbft.Validator) error {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
-	logger.Debug("handlePrepare")
+	logger.Trace("handlePrepare")
 
 	if c.waitingForRoundChange {
 		logger.Warn("Waiting for a RoundChange, ignore", "msg", msg)
