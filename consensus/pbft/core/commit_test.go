@@ -167,8 +167,8 @@ OUTER:
 			t.Error("prepare messages size should greater than 2F+1, size:", r0.current.Prepares.Size())
 		}
 
-		if len(v0.commitMsgs) != 1 {
-			t.Error("backend Commit() function should be called once, but got:", len(v0.commitMsgs))
+		if len(v0.committedResults) != 1 {
+			t.Error("backend Commit() function should be called once, but got:", len(v0.committedResults))
 		}
 	}
 }

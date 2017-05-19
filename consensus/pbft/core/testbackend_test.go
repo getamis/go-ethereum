@@ -39,11 +39,16 @@ type testSystemBackend struct {
 	peers  pbft.ValidatorSet
 	events *event.TypeMux
 
-	commitMsgs []pbft.Proposal
-	sentMsgs   [][]byte // store the message when Send is called by core
+	committedResults []*result
+	sentMsgs         [][]byte // store the message when Send is called by core
 
 	address common.Address
 	db      ethdb.Database
+}
+
+type result struct {
+	Signatures []byte
+	Proposal   pbft.Proposal
 }
 
 // ==============================================
@@ -91,9 +96,10 @@ func (self *testSystemBackend) ViewChanged(needNewProposal bool) error {
 	return nil
 }
 
-func (self *testSystemBackend) Commit(proposal pbft.Proposal) error {
+func (self *testSystemBackend) Commit(proposal pbft.Proposal, signatures []byte) error {
 	testLogger.Info("commit message", "address", self.Address())
-	self.commitMsgs = append(self.commitMsgs, proposal)
+
+	self.committedResults = append(self.committedResults, &result{Signatures: signatures, Proposal: proposal})
 
 	// fake new head events
 	go self.events.Post(pbft.FinalCommittedEvent{
