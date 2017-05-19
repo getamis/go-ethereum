@@ -382,8 +382,14 @@ func (sb *simpleBackend) HandleMsg(peerID string, data []byte) error {
 
 // NewChainHead implements consensus.PBFT.NewChainHead
 func (sb *simpleBackend) NewChainHead(block *types.Block) {
+	p, err := sb.Author(block.Header())
+	if err != nil {
+		sb.logger.Error("Failed to get block proposer", "error", err)
+		return
+	}
 	go sb.pbftEventMux.Post(pbft.FinalCommittedEvent{
 		Proposal: block,
+		Proposer: p,
 	})
 }
 
