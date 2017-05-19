@@ -39,7 +39,7 @@ type testSystemBackend struct {
 	peers  pbft.ValidatorSet
 	events *event.TypeMux
 
-	commitMsgs []*pbft.Proposal
+	commitMsgs []pbft.Proposal
 	sentMsgs   [][]byte // store the message when Send is called by core
 
 	address common.Address
@@ -91,19 +91,18 @@ func (self *testSystemBackend) ViewChanged(needNewProposal bool) error {
 	return nil
 }
 
-func (self *testSystemBackend) Commit(proposal *pbft.Proposal) error {
+func (self *testSystemBackend) Commit(proposal pbft.Proposal) error {
 	testLogger.Info("commit message", "address", self.Address())
 	self.commitMsgs = append(self.commitMsgs, proposal)
 
 	// fake new head events
 	go self.events.Post(pbft.FinalCommittedEvent{
-		BlockNumber: proposal.RequestContext.Number(),
-		BlockHash:   proposal.RequestContext.Hash(),
+		Proposal: proposal,
 	})
 	return nil
 }
 
-func (self *testSystemBackend) Verify(proposal *pbft.Proposal) error {
+func (self *testSystemBackend) Verify(proposal pbft.Proposal) error {
 	return nil
 }
 
@@ -132,9 +131,9 @@ func (self *testSystemBackend) Hash(b interface{}) common.Hash {
 	return common.StringToHash("Test")
 }
 
-func (self *testSystemBackend) NewRequest(request pbft.RequestContexter) {
+func (self *testSystemBackend) NewRequest(request pbft.Proposal) {
 	go self.events.Post(pbft.RequestEvent{
-		BlockContext: request,
+		Proposal: request,
 	})
 }
 
@@ -212,7 +211,7 @@ func NewTestSystemWithBackend(n, f uint64) *testSystem {
 		core := New(backend, config).(*core)
 		core.current = newSnapshot(&pbft.Preprepare{
 			View:     &pbft.View{},
-			Proposal: &pbft.Proposal{},
+			Proposal: makeBlock(1),
 		}, vset)
 		core.logger = testLogger
 		core.N = int64(n)

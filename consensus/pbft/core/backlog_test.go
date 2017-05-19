@@ -148,15 +148,7 @@ func TestStoreBacklog(t *testing.T) {
 	// push preprepare msg
 	preprepare := &pbft.Preprepare{
 		View: v,
-		Proposal: &pbft.Proposal{
-			Header: &pbft.ProposalHeader{
-				Sequence:   big.NewInt(10),
-				ParentHash: common.HexToHash("0x1234567890"),
-				DataHash:   common.HexToHash("0x9876543210"),
-			},
-			RequestContext: makeBlock(1),
-			Signatures:     [][]byte{[]byte("sig1")},
-		},
+		Proposal: makeBlock(1),
 	}
 	prepreparePayload, _ := Encode(preprepare)
 	m := &message{
@@ -171,7 +163,7 @@ func TestStoreBacklog(t *testing.T) {
 	// push prepare msg
 	subject := &pbft.Subject{
 		View:   v,
-		Digest: []byte("digest"),
+		Digest: common.StringToHash("1234567890"),
 	}
 	subjectPayload, _ := Encode(subject)
 
@@ -220,7 +212,7 @@ func TestProcessFutureBacklog(t *testing.T) {
 	// push a future msg
 	subject := &pbft.Subject{
 		View:   v,
-		Digest: []byte("digest"),
+		Digest: common.StringToHash("1234567890"),
 	}
 	subjectPayload, _ := Encode(subject)
 	m := &message{
@@ -248,21 +240,13 @@ func TestProcessBacklog(t *testing.T) {
 	}
 	preprepare := &pbft.Preprepare{
 		View: v,
-		Proposal: &pbft.Proposal{
-			Header: &pbft.ProposalHeader{
-				Sequence:   big.NewInt(10),
-				ParentHash: common.HexToHash("0x1234567890"),
-				DataHash:   common.HexToHash("0x9876543210"),
-			},
-			RequestContext: makeBlock(1),
-			Signatures:     [][]byte{[]byte("sig1")},
-		},
+		Proposal: makeBlock(1),
 	}
 	prepreparePayload, _ := Encode(preprepare)
 
 	subject := &pbft.Subject{
 		View:   v,
-		Digest: []byte("digest"),
+		Digest: common.StringToHash("1234567890"),
 	}
 	subjectPayload, _ := Encode(subject)
 

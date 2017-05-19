@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/consensus/pbft/validator"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -34,7 +35,7 @@ func TestHandlePrepare(t *testing.T) {
 		View: &pbft.View{
 			Round:    big.NewInt(0),
 			Sequence: big.NewInt(0)},
-		Digest: []byte{1},
+		Digest: common.StringToHash("1234567890"),
 	}
 
 	testCases := []struct {
@@ -77,7 +78,7 @@ func TestHandlePrepare(t *testing.T) {
 							View: &pbft.View{
 								Round:    big.NewInt(2),
 								Sequence: big.NewInt(3)},
-							Digest: []byte{1},
+							Digest: common.StringToHash("1234567890"),
 						}
 					}
 				}
@@ -102,7 +103,7 @@ func TestHandlePrepare(t *testing.T) {
 							View: &pbft.View{
 								Round:    big.NewInt(0),
 								Sequence: big.NewInt(0)},
-							Digest: []byte{2, 3, 4},
+							Digest: common.StringToHash("1234567890"),
 						}
 					}
 				}
@@ -219,11 +220,11 @@ func TestVerifyPrepare(t *testing.T) {
 			expected: nil,
 			prepare: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
-				Digest: []byte{1},
+				Digest: common.StringToHash("1234567890"),
 			},
 			self: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
-				Digest: []byte{1},
+				Digest: common.StringToHash("1234567890"),
 			},
 		},
 		{
@@ -231,11 +232,11 @@ func TestVerifyPrepare(t *testing.T) {
 			expected: pbft.ErrOldMessage,
 			prepare: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
-				Digest: []byte{1},
+				Digest: common.StringToHash("1234567890"),
 			},
 			self: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(1), Sequence: big.NewInt(1)},
-				Digest: []byte{1},
+				Digest: common.StringToHash("1234567890"),
 			},
 		},
 		{
@@ -243,11 +244,11 @@ func TestVerifyPrepare(t *testing.T) {
 			expected: pbft.ErrSubjectNotMatched,
 			prepare: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(0), Sequence: nil},
-				Digest: []byte{1},
+				Digest: common.StringToHash("1234567890"),
 			},
 			self: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(1), Sequence: big.NewInt(1)},
-				Digest: []byte{1},
+				Digest: common.StringToHash("1234567890"),
 			},
 		},
 		{
@@ -255,11 +256,11 @@ func TestVerifyPrepare(t *testing.T) {
 			expected: pbft.ErrSubjectNotMatched,
 			prepare: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(1), Sequence: big.NewInt(0)},
-				Digest: []byte{1},
+				Digest: common.StringToHash("1234567890"),
 			},
 			self: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
-				Digest: []byte{1},
+				Digest: common.StringToHash("1234567890"),
 			},
 		},
 		{
@@ -267,11 +268,11 @@ func TestVerifyPrepare(t *testing.T) {
 			expected: pbft.ErrSubjectNotMatched,
 			prepare: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(1)},
-				Digest: []byte{1},
+				Digest: common.StringToHash("1234567890"),
 			},
 			self: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
-				Digest: []byte{1},
+				Digest: common.StringToHash("1234567890"),
 			},
 		},
 	}

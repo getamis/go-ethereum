@@ -170,20 +170,6 @@ func (c *core) isPrimary() bool {
 	return c.backend.IsProposer()
 }
 
-func (c *core) makeProposal(seq *big.Int, request *pbft.Request) *pbft.Proposal {
-	header := &pbft.ProposalHeader{
-		Sequence: seq,
-		// FIXME: use actual parent hash
-		ParentHash: c.backend.Hash(request.BlockContext.Number()),
-		DataHash:   c.backend.Hash(request.BlockContext.Number()),
-	}
-
-	return &pbft.Proposal{
-		Header:         header,
-		RequestContext: request.BlockContext,
-	}
-}
-
 func (c *core) commit() {
 	c.setState(StateCommitted)
 	logger := c.logger.New("state", c.state)

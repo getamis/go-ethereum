@@ -21,9 +21,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 func TestMessageSetWithPreprepare(t *testing.T) {
@@ -37,19 +37,8 @@ func TestMessageSetWithPreprepare(t *testing.T) {
 		Sequence: new(big.Int),
 	}
 	pp := &pbft.Preprepare{
-		View: view,
-		Proposal: &pbft.Proposal{
-			Header: &pbft.ProposalHeader{
-				Sequence:   big.NewInt(10),
-				ParentHash: common.HexToHash("0x1234567890"),
-				DataHash:   common.HexToHash("0x9876543210"),
-			},
-			RequestContext: makeBlock(1),
-			Signatures: [][]byte{
-				[]byte{0x01, 0x03},
-				[]byte{0x02, 0x04},
-			},
-		},
+		View:     view,
+		Proposal: makeBlock(1),
 	}
 
 	rawPP, err := rlp.EncodeToBytes(pp)
@@ -90,7 +79,7 @@ func TestMessageSetWithSubject(t *testing.T) {
 
 	sub := &pbft.Subject{
 		View:   view,
-		Digest: []byte{0x01, 0x02},
+		Digest: common.StringToHash("1234567890"),
 	}
 
 	rawSub, err := rlp.EncodeToBytes(sub)
@@ -131,19 +120,8 @@ func TestMessageSetEncodeDecode(t *testing.T) {
 			Sequence: new(big.Int),
 		}
 		pp := &pbft.Preprepare{
-			View: view,
-			Proposal: &pbft.Proposal{
-				Header: &pbft.ProposalHeader{
-					Sequence:   big.NewInt(int64(i)),
-					ParentHash: common.HexToHash("0x1234567890"),
-					DataHash:   common.HexToHash("0x9876543210"),
-				},
-				RequestContext: makeBlock(int64(i)),
-				Signatures: [][]byte{
-					[]byte{0x01, 0x03},
-					[]byte{0x02, 0x04},
-				},
-			},
+			View:     view,
+			Proposal: makeBlock(1),
 		}
 
 		rawPP, err := rlp.EncodeToBytes(pp)

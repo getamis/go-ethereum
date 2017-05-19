@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/consensus/pbft"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 func TestHandlePreprepare(t *testing.T) {
@@ -30,7 +31,7 @@ func TestHandlePreprepare(t *testing.T) {
 
 	testCases := []struct {
 		system          *testSystem
-		expectedRequest pbft.RequestContexter
+		expectedRequest pbft.Proposal
 
 		expectedErr error
 	}{
@@ -67,7 +68,7 @@ func TestHandlePreprepare(t *testing.T) {
 								Sequence: big.NewInt(0),
 								Round:    big.NewInt(0),
 							},
-							Digest: []byte{1},
+							Digest: common.StringToHash("1234567890"),
 						}
 					} else {
 						c.sequence = big.NewInt(10)
@@ -150,7 +151,7 @@ OUTER:
 
 		preprepare := &pbft.Preprepare{
 			View:     curView,
-			Proposal: r0.makeProposal(curView.Sequence, &pbft.Request{BlockContext: test.expectedRequest}),
+			Proposal: test.expectedRequest,
 		}
 
 		for i, v := range test.system.backends {
