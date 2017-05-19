@@ -138,9 +138,10 @@ OUTER:
 			validator := v.Validators().GetByIndex(uint64(i))
 			m, _ := Encode(v.engine.(*core).subject)
 			if err := r0.handleCommit(&message{
-				Code:    msgCommit,
-				Msg:     m,
-				Address: validator.Address(),
+				Code:      msgCommit,
+				Msg:       m,
+				Address:   validator.Address(),
+				Signature: validator.Address().Bytes(),
 			}, validator); err != nil {
 				if err != test.expectedErr {
 					t.Error("unexpected error: ", err)
@@ -169,6 +170,24 @@ OUTER:
 
 		if len(v0.committedResults) != 1 {
 			t.Error("backend Commit() function should be called once, but got:", len(v0.committedResults))
+		}
+
+		// check signatures large than 2F+1
+		signedCount := int64(0)
+		signers := make([]common.Address, len(v0.committedResults[0].Signatures)/common.AddressLength)
+		for i := 0; i < len(signers); i++ {
+			copy(signers[i][:], v0.committedResults[0].Signatures[i*common.AddressLength:])
+		}
+		for _, validator := range v0.Validators().List() {
+			for _, signer := range signers {
+				if validator.Address() == signer {
+					signedCount++
+					break
+				}
+			}
+		}
+		if signedCount <= 2*r0.F {
+			t.Errorf("expected signed count larger than:%v, but got:%v", 2*r0.F, signedCount)
 		}
 	}
 }
