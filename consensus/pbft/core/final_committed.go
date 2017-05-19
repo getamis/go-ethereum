@@ -59,7 +59,7 @@ func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validato
 		c.startNewRound(&pbft.View{
 			Sequence: new(big.Int).Add(ev.Proposal.Number(), common.Big1),
 			Round:    common.Big0,
-		})
+		}, false)
 	}
 
 	return nil

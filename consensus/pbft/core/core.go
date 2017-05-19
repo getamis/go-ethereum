@@ -212,12 +212,10 @@ func (c *core) commit() {
 func (c *core) enterNewView(newView *pbft.View) {
 	// Clear invalid RoundChange messages
 	c.roundChangeSet.Clear(newView)
-	c.backend.ViewChanged(true)
-
-	c.startNewRound(newView)
+	c.startNewRound(newView, true)
 }
 
-func (c *core) startNewRound(newView *pbft.View) {
+func (c *core) startNewRound(newView *pbft.View, roundChange bool) {
 	var logger log.Logger
 	if c.current == nil {
 		logger = c.logger.New("old_round", -1, "old_seq", 0, "old_proposer", c.backend.Validators().GetProposer().Address().Hex())
@@ -225,11 +223,18 @@ func (c *core) startNewRound(newView *pbft.View) {
 		logger = c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence(), "old_proposer", c.backend.Validators().GetProposer().Address().Hex())
 	}
 
+	// New snapshot for new round
 	c.current = newSnapshot(newView, c.backend.Validators())
+
 	// Calculate new proposer
 	//c.backend.Validators().CalcProposer(c.proposerSeed())
 	c.waitingForRoundChange = false
 	c.setState(StateAcceptRequest)
+
+	if roundChange {
+		c.backend.ViewChanged(true)
+	}
+
 	c.newRoundChangeTimer()
 
 	logger.Debug("New round", "new_round", newView.Round, "new_seq", newView.Sequence, "new_proposer", c.backend.Validators().GetProposer().Address().Hex())

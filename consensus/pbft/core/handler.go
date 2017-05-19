@@ -38,7 +38,7 @@ func (c *core) Start(lastSequence *big.Int, lastProposer common.Address) error {
 	c.startNewRound(&pbft.View{
 		Sequence: new(big.Int).Add(lastSequence, common.Big1),
 		Round:    common.Big0,
-	})
+	}, false)
 
 	return nil
 }
