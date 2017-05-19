@@ -27,16 +27,16 @@ func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validato
 	logger := c.logger.New("state", c.state)
 	// this block is from consensus
 	if c.subject != nil &&
-		ev.BlockHash == c.subject.Digest &&
+		ev.Proposal.Hash() == c.subject.Digest &&
 		c.state == StateCommitted {
-		logger.Debug("handleFinalCommitted from consensus", "height", ev.BlockNumber, "hash", ev.BlockHash)
+		logger.Debug("handleFinalCommitted from consensus", "height", ev.Proposal.Number(), "hash", ev.Proposal.Hash())
 		// send out the checkpoint
 		c.sendCheckpoint(&pbft.Subject{
 			View: &pbft.View{
-				Sequence: ev.BlockNumber,
+				Sequence: ev.Proposal.Number(),
 				Round:    c.round,
 			},
-			Digest: ev.BlockHash,
+			Digest: ev.Proposal.Hash(),
 		})
 		c.snapshotsMu.Lock()
 		c.snapshots = append(c.snapshots, c.current)
@@ -44,19 +44,19 @@ func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validato
 
 	} else {
 		// this block is from geth sync
-		logger.Debug("handleFinalCommitted from geth sync", "height", ev.BlockNumber, "hash", ev.BlockHash)
+		logger.Debug("handleFinalCommitted from geth sync", "height", ev.Proposal.Number(), "hash", ev.Proposal.Hash())
 	}
 
-	if ev.BlockNumber.Cmp(c.sequence) >= 0 {
+	if ev.Proposal.Number().Cmp(c.sequence) >= 0 {
 		// We build stable checkpoint every 100 blocks
 		// FIXME: this should be passed by configuration
 		if new(big.Int).Mod(c.sequence, big.NewInt(int64(c.config.CheckPointPeriod))).Int64() == 0 {
 			go c.sendInternalEvent(buildCheckpointEvent{})
 		}
 
-		c.sequence = new(big.Int).Add(ev.BlockNumber, common.Big1)
+		c.sequence = new(big.Int).Add(ev.Proposal.Number(), common.Big1)
 		c.round = common.Big0
-		c.lastProposer = ev.BlockProposer
+		c.lastProposer = ev.Proposer
 		c.setState(StateAcceptRequest)
 	}
 

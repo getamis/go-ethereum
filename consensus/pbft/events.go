@@ -17,8 +17,6 @@
 package pbft
 
 import (
-	"math/big"
-
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -42,7 +40,6 @@ type MessageEvent struct {
 }
 
 type FinalCommittedEvent struct {
-	BlockNumber   *big.Int
-	BlockHash     common.Hash
-	BlockProposer common.Address
+	Proposal Proposal
+	Proposer common.Address
 }

@@ -383,8 +383,7 @@ func (sb *simpleBackend) HandleMsg(peerID string, data []byte) error {
 // NewChainHead implements consensus.PBFT.NewChainHead
 func (sb *simpleBackend) NewChainHead(block *types.Block) {
 	go sb.pbftEventMux.Post(pbft.FinalCommittedEvent{
-		BlockNumber: block.Number(),
-		BlockHash:   block.Hash(),
+		Proposal: block,
 	})
 }
 

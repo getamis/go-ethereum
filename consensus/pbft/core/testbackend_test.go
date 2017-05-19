@@ -97,8 +97,7 @@ func (self *testSystemBackend) Commit(proposal pbft.Proposal) error {
 
 	// fake new head events
 	go self.events.Post(pbft.FinalCommittedEvent{
-		BlockNumber: proposal.Number(),
-		BlockHash:   proposal.Hash(),
+		Proposal: proposal,
 	})
 	return nil
 }
