@@ -47,6 +47,10 @@ func (c *core) handleCheckpoint(msg *message, src pbft.Validator) error {
 		logger.Error("Invalid checkpoint message", "msg", msg)
 		return pbft.ErrInvalidMessage
 	}
+	if c.current == nil {
+		logger.Warn("Ignore checkpoint messsages if we don't have current snapshot")
+		return pbft.ErrIgnored
+	}
 
 	var snapshot *snapshot
 
