@@ -38,9 +38,6 @@ type Backend interface {
 	// Broadcast is to send pbft message to all peers
 	Broadcast(payload []byte) error
 
-	// UpdateState is to update the current pbft state to backend
-	UpdateState(*State) error
-
 	// Commit is to deliver a final result to write into blockchain
 	Commit(Proposal) error
 

@@ -59,6 +59,11 @@ func (s State) String() string {
 type Engine interface {
 	Start(lastSequence *big.Int, lastProposer common.Address) error
 	Stop() error
+
+	// get current state and snapshot
+	Snapshot() (State, *snapshot)
+	// get back log
+	Backlog() map[pbft.Validator]*prque.Prque
 }
 
 func New(backend pbft.Backend, config *pbft.Config) Engine {
@@ -200,4 +205,12 @@ func (c *core) setState(state State) {
 
 func (c *core) Address() common.Address {
 	return c.address
+}
+
+func (c *core) Snapshot() (State, *snapshot) {
+	return c.state, c.current
+}
+
+func (c *core) Backlog() map[pbft.Validator]*prque.Prque {
+	return c.backlogs
 }

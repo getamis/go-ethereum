@@ -54,21 +54,20 @@ func New(config *pbft.Config, eventMux *event.TypeMux, privateKey *ecdsa.Private
 
 // ----------------------------------------------------------------------------
 type simpleBackend struct {
-	config         *pbft.Config
-	peerSet        *peerSet
-	valSet         pbft.ValidatorSet
-	eventMux       *event.TypeMux
-	pbftEventMux   *event.TypeMux
-	privateKey     *ecdsa.PrivateKey
-	address        common.Address
-	consensusState *pbft.State
-	core           pbftCore.Engine
-	logger         log.Logger
-	quitSync       chan struct{}
-	db             ethdb.Database
-	timeout        uint64
-	chain          consensus.ChainReader
-	inserter       func(block *types.Block) error
+	config       *pbft.Config
+	peerSet      *peerSet
+	valSet       pbft.ValidatorSet
+	eventMux     *event.TypeMux
+	pbftEventMux *event.TypeMux
+	privateKey   *ecdsa.PrivateKey
+	address      common.Address
+	core         pbftCore.Engine
+	logger       log.Logger
+	quitSync     chan struct{}
+	db           ethdb.Database
+	timeout      uint64
+	chain        consensus.ChainReader
+	inserter     func(block *types.Block) error
 
 	// the channels for pbft engine notifications
 	viewChange chan bool
@@ -234,12 +233,6 @@ func (sb *simpleBackend) getSignatureAddress(data []byte, sig []byte) (common.Ad
 		return common.Address{}, err
 	}
 	return crypto.PubkeyToAddress(*pubkey), nil
-}
-
-// UpdateState implements pbft.Backend.UpdateState
-func (sb *simpleBackend) UpdateState(state *pbft.State) error {
-	sb.consensusState = state
-	return nil
 }
 
 func (sb *simpleBackend) IsProposer() bool {

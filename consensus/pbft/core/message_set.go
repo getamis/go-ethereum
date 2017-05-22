@@ -17,8 +17,10 @@
 package core
 
 import (
+	"fmt"
 	"io"
 	"math/big"
+	"strings"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -168,4 +170,14 @@ func (ms *messageSet) verify(msg *message) error {
 func (ms *messageSet) addVerifiedMessage(msg *message) error {
 	ms.messages[hash(msg)] = msg
 	return nil
+}
+
+func (ms *messageSet) String() string {
+	ms.messagesMu.Lock()
+	defer ms.messagesMu.Unlock()
+	addresses := make([]string, 0, len(ms.messages))
+	for _, v := range ms.messages {
+		addresses = append(addresses, v.Address.Hex())
+	}
+	return fmt.Sprintf("[%v]", strings.Join(addresses, ", "))
 }
