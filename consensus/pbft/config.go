@@ -23,7 +23,7 @@ const (
 )
 
 type Config struct {
-	RequestTimeoutMsec uint64         // The timeout for each PBFT round
+	RequestTimeoutMsec uint64         // The timeout for each PBFT round. This timeout should be larger than BlockPauseTime.
 	BlockPeriod        uint64         // Default minimum difference between two consecutive block's timestamps in second
 	BlockPauseTime     uint64         // Pause time when zero tx in previous block, values should be larger than pbft_block_period
 	ProposerPolicy     ProposerPolicy // The policy for proposer, the detail is not determined
@@ -31,7 +31,7 @@ type Config struct {
 }
 
 var DefaultConfig = &Config{
-	RequestTimeoutMsec: 2000,
+	RequestTimeoutMsec: 3000,
 	BlockPeriod:        1,
 	BlockPauseTime:     2,
 	ProposerPolicy:     RoundRobin,

@@ -88,14 +88,14 @@ func appendValidators(genesis *core.Genesis, addrs []common.Address) {
 	genesis.ExtraData = append(genesis.ExtraData, make([]byte, extraSeal)...)
 }
 
-func makeHeader(parent *types.Block) *types.Header {
+func makeHeader(parent *types.Block, config *pbft.Config) *types.Header {
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     parent.Number().Add(parent.Number(), common.Big1),
 		GasLimit:   core.CalcGasLimit(parent),
 		GasUsed:    new(big.Int),
 		Extra:      parent.Extra(),
-		Time:       big.NewInt(time.Now().Unix()),
+		Time:       new(big.Int).Add(parent.Time(), new(big.Int).SetUint64(config.BlockPeriod)),
 		Difficulty: defaultDifficulty,
 	}
 	return header
@@ -108,24 +108,16 @@ func makeBlock(chain *core.BlockChain, engine *simpleBackend, parent *types.Bloc
 }
 
 func makeBlockWithoutSeal(chain *core.BlockChain, engine *simpleBackend, parent *types.Block) *types.Block {
-	header := makeHeader(parent)
+	header := makeHeader(parent, engine.config)
 	engine.Prepare(chain, header)
 	state, _ := chain.StateAt(parent.Root())
 	block, _ := engine.Finalize(chain, header, state, nil, nil, nil)
 	return block
 }
 
-// get expected final block
-func getExpectedBlock(engine *simpleBackend, block *types.Block) *types.Block {
-	header := block.Header()
-	sighash, _ := engine.Sign(sigHash(header).Bytes())
-	copy(header.Extra[len(header.Extra)-extraSeal:], sighash)
-	return block.WithSeal(header)
-}
-
 func TestPrepare(t *testing.T) {
 	chain, engine := newBlockChain(1)
-	header := makeHeader(chain.Genesis())
+	header := makeHeader(chain.Genesis(), engine.config)
 	err := engine.Prepare(chain, header)
 	if err != nil {
 		t.Errorf("error should be nil, but got: %v", err)
@@ -257,7 +249,7 @@ func TestSealCommittedOtherHash(t *testing.T) {
 func TestSealCommitted(t *testing.T) {
 	chain, engine := newBlockChain(1)
 	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
-	expectedBlock := getExpectedBlock(engine, block)
+	expectedBlock, _ := engine.updateBlock(engine.chain.GetHeader(block.ParentHash(), block.NumberU64()-1), block)
 
 	finalBlock, err := engine.Seal(chain, block, nil)
 	if err != nil {
@@ -281,15 +273,13 @@ func TestVerifyHeader(t *testing.T) {
 	// short extra data
 	header := block.Header()
 	header.Extra = []byte{}
-	block = block.WithSeal(header)
-	err = engine.VerifyHeader(chain, block.Header(), false)
+	err = engine.VerifyHeader(chain, header, false)
 	if err != errInvalidExtraDataFormat {
 		t.Errorf("unexpected error comes, got: %v, expected: errInvalidExtraDataFormat", err)
 	}
 	// incorrect extra format
 	header.Extra = []byte("0000000000000000000000000000000012300000000000000000000000000000000000000000000000000000000000000000")
-	block = block.WithSeal(header)
-	err = engine.VerifyHeader(chain, block.Header(), false)
+	err = engine.VerifyHeader(chain, header, false)
 	if err != errInvalidExtraDataFormat {
 		t.Errorf("unexpected error comes, got: %v, expected: errInvalidExtraDataFormat", err)
 	}
@@ -298,8 +288,7 @@ func TestVerifyHeader(t *testing.T) {
 	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	header = block.Header()
 	header.Coinbase = common.StringToAddress("123456789")
-	block = block.WithSeal(header)
-	err = engine.VerifyHeader(chain, block.Header(), false)
+	err = engine.VerifyHeader(chain, header, false)
 	if err != errInvalidCoinbase {
 		t.Errorf("unexpected error comes, got: %v, expected: errInvalidCoinbase", err)
 	}
@@ -308,8 +297,7 @@ func TestVerifyHeader(t *testing.T) {
 	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	header = block.Header()
 	header.MixDigest = common.StringToHash("123456789")
-	block = block.WithSeal(header)
-	err = engine.VerifyHeader(chain, block.Header(), false)
+	err = engine.VerifyHeader(chain, header, false)
 	if err != errInvalidMixDigest {
 		t.Errorf("unexpected error comes, got: %v, expected: errInvalidMixDigest", err)
 	}
@@ -318,8 +306,7 @@ func TestVerifyHeader(t *testing.T) {
 	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	header = block.Header()
 	header.UncleHash = common.StringToHash("123456789")
-	block = block.WithSeal(header)
-	err = engine.VerifyHeader(chain, block.Header(), false)
+	err = engine.VerifyHeader(chain, header, false)
 	if err != errInvalidUncleHash {
 		t.Errorf("unexpected error comes, got: %v, expected: errInvalidUncleHash", err)
 	}
@@ -328,10 +315,27 @@ func TestVerifyHeader(t *testing.T) {
 	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	header = block.Header()
 	header.Difficulty = big.NewInt(2)
-	block = block.WithSeal(header)
-	err = engine.VerifyHeader(chain, block.Header(), false)
+	err = engine.VerifyHeader(chain, header, false)
 	if err != errInvalidDifficulty {
 		t.Errorf("unexpected error comes, got: %v, expected: errInvalidDifficulty", err)
+	}
+
+	// invalid timestamp
+	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
+	header = block.Header()
+	header.Time = new(big.Int).Add(chain.Genesis().Time(), new(big.Int).SetUint64(engine.config.BlockPeriod-1))
+	err = engine.VerifyHeader(chain, header, false)
+	if err != errInvalidTimestamp {
+		t.Errorf("unexpected error comes, got: %v, expected: errInvalidTimestamp", err)
+	}
+
+	// future block
+	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
+	header = block.Header()
+	header.Time = new(big.Int).Add(big.NewInt(now().Unix()), new(big.Int).SetUint64(10))
+	err = engine.VerifyHeader(chain, header, false)
+	if err != consensus.ErrFutureBlock {
+		t.Errorf("unexpected error comes, got: %v, expected: consensus.ErrFutureBlock", err)
 	}
 }
 
@@ -375,9 +379,13 @@ func TestVerifyHeaders(t *testing.T) {
 			blocks = append(blocks, makeBlock(chain, engine, genesis))
 		} else {
 			b := makeBlockWithoutSeal(chain, engine, blocks[i-1])
-			blocks = append(blocks, getExpectedBlock(engine, b))
+			b, _ = engine.updateBlock(blocks[i-1].Header(), b)
+			blocks = append(blocks, b)
 		}
 		headers = append(headers, blocks[i].Header())
+	}
+	now = func() time.Time {
+		return time.Unix(headers[size-1].Time.Int64(), 0)
 	}
 	_, results := engine.VerifyHeaders(chain, headers, nil)
 	const timeoutDura = 2 * time.Second
@@ -415,9 +423,7 @@ OUT2:
 			if index == 5 {
 				abort <- struct{}{}
 			}
-			// add some buffer here because we may not abort this channel immediately
-			buffer := 10
-			if index > 5+buffer {
+			if index >= size {
 				t.Errorf("verifyheaders should be aborted")
 				break OUT2
 			}

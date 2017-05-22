@@ -63,10 +63,13 @@ var (
 	errInconsistentValidatorSet = errors.New("non empty uncle hash")
 	// errCastingRequest is returned if request cannot cast specific type
 	errCastingRequest = errors.New("failed to cast the request")
+	// errInvalidTimestamp is returned if the timestamp of a block is lower than the previous block's timestamp + the minimum block period.
+	errInvalidTimestamp = errors.New("invalid timestamp")
 )
 var (
 	defaultDifficulty = big.NewInt(1)
 	nilUncleHash      = types.CalcUncleHash(nil) // Always Keccak256(RLP([])) as uncles are meaningless outside of PoW.
+	now               = time.Now
 )
 
 // Author retrieves the Ethereum address of the account that minted the given
@@ -93,12 +96,10 @@ func (sb *simpleBackend) verifyHeader(chain consensus.ChainReader, header *types
 		return errUnknownBlock
 	}
 
-	// TODO: Remove this check because the speed of PBFT is too fast.
-	//       The future blocks happen frequently.
-	// // Don't waste time checking blocks from the future
-	// if header.Time.Cmp(big.NewInt(time.Now().Unix())) > 0 {
-	// 	return consensus.ErrFutureBlock
-	// }
+	// Don't waste time checking blocks from the future
+	if header.Time.Cmp(big.NewInt(now().Unix())) > 0 {
+		return consensus.ErrFutureBlock
+	}
 
 	// Check that the extra-data contains both the vanity and signature
 	length := len(header.Extra)
@@ -142,6 +143,9 @@ func (sb *simpleBackend) verifyCascadingFields(chain consensus.ChainReader, head
 	// Ensure that the block's timestamp isn't too close to it's parent
 	if parent == nil || parent.Number.Uint64() != number-1 || parent.Hash() != header.ParentHash {
 		return consensus.ErrUnknownAncestor
+	}
+	if parent.Time.Uint64()+sb.config.BlockPeriod > header.Time.Uint64() {
+		return errInvalidTimestamp
 	}
 	// Fixed validator set
 	if bytes.Compare(sb.getValidatorBytes(header), sb.getValidatorBytes(parent)) != 0 {
@@ -286,26 +290,33 @@ func (sb *simpleBackend) newChannels() {
 // Seal generates a new block for the given input block with the local miner's
 // seal place on top.
 func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, stop <-chan struct{}) (*types.Block, error) {
+	// update the block header timestamp and signature and propose the block to core engine
+	header := block.Header()
+	number := header.Number.Uint64()
+	parent := chain.GetHeader(header.ParentHash, number-1)
+	if parent == nil {
+		return nil, consensus.ErrUnknownAncestor
+	}
+	block, err := sb.updateBlock(parent, block)
+	if err != nil {
+		return nil, err
+	}
+
+	// wait for the timestamp of header, use this to adjust the block period
+	delay := time.Unix(block.Header().Time.Int64(), 0).Sub(now())
+	select {
+	case <-time.After(delay):
+	case <-stop:
+		return nil, nil
+	}
+	// check whether a proposer
 	if !sb.IsProposer() {
 		return nil, errNotProposer
 	}
 
 	sb.newChannels()
 	defer sb.closeChannels()
-
-	// TODO: config delay time, like PoA
-	// compensation for a few milliseconds of consensus runtime
-	<-time.After(time.Duration(sb.config.BlockPeriod) * time.Second)
-
-	// step 1. sign the hash
-	header := block.Header()
-	sighash, err := sb.Sign(sigHash(header).Bytes())
-	if err != nil {
-		return nil, err
-	}
-	copy(header.Extra[len(header.Extra)-extraSeal:], sighash)
-	block = block.WithSeal(header)
-	// step 2. post block into PBFT engine
+	// post block into PBFT engine
 	go sb.EventMux().Post(pbft.RequestEvent{
 		Proposal: block,
 	})
@@ -328,6 +339,32 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 			return nil, nil
 		}
 	}
+}
+
+// update timestamp and signature of the block based on its number of transactions
+func (sb *simpleBackend) updateBlock(parent *types.Header, block *types.Block) (*types.Block, error) {
+	// set block period based the number of tx
+	var period uint64
+	if len(block.Transactions()) == 0 {
+		period = sb.config.BlockPauseTime
+	} else {
+		period = sb.config.BlockPeriod
+	}
+
+	// set header timestamp
+	header := block.Header()
+	header.Time = new(big.Int).Add(parent.Time, new(big.Int).SetUint64(period))
+	time := now().Unix()
+	if header.Time.Int64() < time {
+		header.Time = big.NewInt(time)
+	}
+	// sign the hash
+	sighash, err := sb.Sign(sigHash(header).Bytes())
+	if err != nil {
+		return nil, err
+	}
+	copy(header.Extra[len(header.Extra)-extraSeal:], sighash)
+	return block.WithSeal(header), nil
 }
 
 // APIs returns the RPC APIs this consensus engine provides.
