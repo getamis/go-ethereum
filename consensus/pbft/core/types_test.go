@@ -112,7 +112,7 @@ func testSubject(t *testing.T) {
 	}
 }
 
-func testWithSignature(t *testing.T) {
+func testSubjectWithSignature(t *testing.T) {
 	s := &pbft.Subject{
 		View: &pbft.View{
 			Round:    big.NewInt(1),
@@ -171,8 +171,79 @@ func testWithSignature(t *testing.T) {
 	}
 }
 
+func testViewChange(t *testing.T) {
+	vc := &pbft.ViewChange{
+		ViewNumber: big.NewInt(1),
+		PSet: []*pbft.Subject{&pbft.Subject{
+			View: &pbft.View{
+				Round:    big.NewInt(1),
+				Sequence: big.NewInt(2),
+			},
+			Digest: common.StringToHash("1234567890"),
+		},
+		},
+		QSet: []*pbft.Subject{&pbft.Subject{
+			View: &pbft.View{
+				Round:    big.NewInt(2),
+				Sequence: big.NewInt(3),
+			},
+			Digest: common.StringToHash("1234567890"),
+		},
+		},
+		Proposal: makeBlock(1),
+	}
+	viewChangePayload, _ := Encode(vc)
+
+	m := &message{
+		Code:    msgViewChange,
+		Msg:     viewChangePayload,
+		Address: common.HexToAddress("0x1234567890"),
+	}
+
+	msgPayload, err := m.Payload()
+	if err != nil {
+		t.Error(err)
+	}
+
+	decodedMsg := new(message)
+	err = decodedMsg.FromPayload(msgPayload, nil)
+	if err != nil {
+		t.Error(err)
+	}
+
+	var decodedVC *pbft.ViewChange
+	err = decodedMsg.Decode(&decodedVC)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// if block is encoded/decoded by rlp, we cannot to compare interface data type using reflect.DeepEqual. (like pbft.Proposal)
+	// so individual comparison here.
+	if !reflect.DeepEqual(vc.Proposal.Hash(), decodedVC.Proposal.Hash()) {
+		t.Errorf("Header are different, expected '%+v', got '%+v'", vc.Proposal, decodedVC.Proposal)
+	}
+
+	if !reflect.DeepEqual(vc.ViewNumber, decodedVC.ViewNumber) {
+		t.Errorf("View are different, expected '%+v', got '%+v'", vc.ViewNumber, decodedVC.ViewNumber)
+	}
+
+	if !reflect.DeepEqual(vc.Proposal.Number(), decodedVC.Proposal.Number()) {
+		t.Errorf("Block number are different, expected '%+v', got '%+v'", vc.Proposal.Number(), decodedVC.Proposal.Number())
+	}
+
+	if !reflect.DeepEqual(vc.PSet, decodedVC.PSet) {
+		t.Errorf("PSet are different, expected '%+v', got '%+v'", vc.PSet, decodedVC.PSet)
+	}
+
+	if !reflect.DeepEqual(vc.QSet, decodedVC.QSet) {
+		t.Errorf("QSet are different, expected '%+v', got '%+v'", vc.QSet, decodedVC.QSet)
+	}
+
+}
+
 func TestMessageEncodeDecode(t *testing.T) {
 	testPreprepare(t)
 	testSubject(t)
-	testWithSignature(t)
+	testSubjectWithSignature(t)
+	testViewChange(t)
 }
