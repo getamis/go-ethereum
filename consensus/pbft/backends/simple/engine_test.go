@@ -166,7 +166,7 @@ func TestSealRoundChange(t *testing.T) {
 			if !ok {
 				t.Errorf("unexpected event comes, got: %v, expected: pbft.RequestEvent", reflect.TypeOf(ev.Data))
 			}
-			engine.ViewChanged(false)
+			engine.RoundChanged(true)
 		}
 		eventSub.Unsubscribe()
 	}

@@ -82,7 +82,7 @@ func (self *testSystemBackend) Broadcast(message []byte) error {
 	return nil
 }
 
-func (self *testSystemBackend) ViewChanged(needNewProposal bool) error {
+func (self *testSystemBackend) RoundChanged(needNewProposal bool) error {
 	testLogger.Warn("nothing to happen")
 	return nil
 }

@@ -232,7 +232,7 @@ func (c *core) startNewRound(newView *pbft.View, roundChange bool) {
 	c.setState(StateAcceptRequest)
 
 	if roundChange {
-		c.backend.ViewChanged(true)
+		c.backend.RoundChanged(true)
 	}
 
 	c.newRoundChangeTimer()

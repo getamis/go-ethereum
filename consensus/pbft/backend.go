@@ -41,8 +41,8 @@ type Backend interface {
 	// Commit is to deliver a final result to write into blockchain
 	Commit(Proposal) error
 
-	// ViewChanged is called when view change occurred
-	ViewChanged(needNewProposal bool) error
+	// RoundChanged is called when round change occurred
+	RoundChanged(needNewProposal bool) error
 
 	// Verify is to verify the proposal request
 	Verify(Proposal) error
