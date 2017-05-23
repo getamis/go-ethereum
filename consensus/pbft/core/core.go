@@ -51,7 +51,6 @@ func New(backend pbft.Backend, config *pbft.Config) Engine {
 		backlogsMu:     new(sync.Mutex),
 		snapshotsMu:    new(sync.RWMutex),
 		roundChangeSet: newRoundChangeSet(backend.Validators()),
-		rouncChangeMu:  new(sync.RWMutex),
 	}
 }
 
@@ -84,7 +83,6 @@ type core struct {
 	snapshotsMu *sync.RWMutex
 
 	roundChangeSet   *roundChangeSet
-	rouncChangeMu    *sync.RWMutex
 	roundChangeTimer *time.Timer
 }
 
