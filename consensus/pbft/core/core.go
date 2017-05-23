@@ -33,16 +33,6 @@ const (
 	keyStableCheckpoint = "StableCheckpoint"
 )
 
-type Engine interface {
-	Start(lastSequence *big.Int, lastProposer common.Address) error
-	Stop() error
-
-	// get current state and snapshot
-	Snapshot() (State, *snapshot)
-	// get back log
-	Backlog() map[pbft.Validator]*prque.Prque
-}
-
 func New(backend pbft.Backend, config *pbft.Config) Engine {
 	// update n and f
 	n := int64(backend.Validators().Size())

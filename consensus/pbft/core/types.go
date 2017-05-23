@@ -20,9 +20,21 @@ import (
 	"io"
 	"math/big"
 
+	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
+
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/rlp"
 )
+
+type Engine interface {
+	Start(lastSequence *big.Int, lastProposer common.Address) error
+	Stop() error
+	// get current state and snapshot
+	Snapshot() (State, *snapshot)
+	// get back log
+	Backlog() map[pbft.Validator]*prque.Prque
+}
 
 type State uint64
 
