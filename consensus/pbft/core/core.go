@@ -114,9 +114,9 @@ func (c *core) send(msg *message, target common.Address) {
 		return
 	}
 
-	// Broadcast payload
+	// send payload
 	if err = c.backend.Send(payload, target); err != nil {
-		logger.Error("Failed to broadcast message", "msg", msg, "error", err)
+		logger.Error("Failed to send message", "msg", msg, "error", err)
 		return
 	}
 }
@@ -167,12 +167,6 @@ func (c *core) commit() {
 	}
 }
 
-func (c *core) enterNewView(newView *pbft.View) {
-	// Clear invalid RoundChange messages
-	c.roundChangeSet.Clear(newView)
-	c.startNewRound(newView, true)
-}
-
 func (c *core) startNewRound(newView *pbft.View, roundChange bool) {
 	var logger log.Logger
 	if c.current == nil {
@@ -181,6 +175,8 @@ func (c *core) startNewRound(newView *pbft.View, roundChange bool) {
 		logger = c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence(), "old_proposer", c.backend.Validators().GetProposer().Address().Hex())
 	}
 
+	// Clear invalid RoundChange messages
+	c.roundChangeSet.Clear(newView)
 	// New snapshot for new round
 	c.current = newSnapshot(newView, c.backend.Validators())
 
@@ -188,14 +184,21 @@ func (c *core) startNewRound(newView *pbft.View, roundChange bool) {
 	//c.backend.Validators().CalcProposer(c.proposerSeed())
 	c.waitingForRoundChange = false
 	c.setState(StateAcceptRequest)
-
 	if roundChange {
 		c.backend.RoundChanged(true)
 	}
-
 	c.newRoundChangeTimer()
 
 	logger.Debug("New round", "new_round", newView.Round, "new_seq", newView.Sequence, "new_proposer", c.backend.Validators().GetProposer().Address().Hex())
+}
+
+func (c *core) catchUpRound(view *pbft.View) {
+	logger := c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence(), "old_proposer", c.backend.Validators().GetProposer().Address().Hex())
+	c.waitingForRoundChange = true
+	c.current = newSnapshot(view, c.backend.Validators())
+	c.newRoundChangeTimer()
+
+	logger.Trace("Catch up round", "new_round", view.Round, "new_seq", view.Sequence, "new_proposer", c.backend.Validators().GetProposer().Address().Hex())
 }
 
 func (c *core) proposerSeed() uint64 {
@@ -234,7 +237,7 @@ func (c *core) newRoundChangeTimer() {
 		c.roundChangeTimer.Stop()
 	}
 
-	timeout := time.Duration(c.config.RequestTimeoutMsec) / time.Millisecond
+	timeout := time.Duration(c.config.RequestTimeoutMsec) * time.Millisecond
 	c.roundChangeTimer = time.AfterFunc(timeout, func() {
 		c.sendRoundChange()
 	})

@@ -28,18 +28,24 @@ import (
 func (c *core) sendRoundChange() {
 	logger := c.logger.New("state", c.state)
 
-	c.waitingForRoundChange = true
 	cv := c.currentView()
-	rc := &roundChange{
-		// The view number we'd like to transfer to
+	c.catchUpRound(&pbft.View{
+		// The round number we'd like to transfer to
 		Round:    new(big.Int).Add(cv.Round, common.Big1),
-		Sequence: cv.Sequence,
+		Sequence: new(big.Int).Set(cv.Sequence),
+	})
+
+	// Now we have the new round number and sequence number
+	cv = c.currentView()
+	rc := &roundChange{
+		Round:    new(big.Int).Set(cv.Round),
+		Sequence: new(big.Int).Set(cv.Sequence),
 		Digest:   common.Hash{},
 	}
 
 	payload, err := rlp.EncodeToBytes(rc)
 	if err != nil {
-		logger.Error("Failed to encode RoundChange", "vc", rc)
+		logger.Error("Failed to encode RoundChange", "rc", rc)
 		return
 	}
 
@@ -47,11 +53,13 @@ func (c *core) sendRoundChange() {
 		Code: msgRoundChange,
 		Msg:  payload,
 	})
+
+	logger.Debug("sendRoundChange")
 }
 
 func (c *core) handleRoundChange(msg *message, src pbft.Validator) error {
 	logger := c.logger.New("state", c.state)
-	logger.Trace("handleRoundChange")
+	logger.Debug("handleRoundChange")
 
 	var rc *roundChange
 	if err := msg.Decode(&rc); err != nil {
@@ -76,30 +84,29 @@ func (c *core) handleRoundChange(msg *message, src pbft.Validator) error {
 		Sequence: new(big.Int).Set(rc.Sequence),
 	}, msg)
 	if err != nil {
-		logger.Warn("Failed to add RoundChange", "from", src.Address().Hex(), "msg", rc)
+		logger.Warn("Failed to add RoundChange", "from", src.Address().Hex(), "msg", msg)
 		return err
 	}
 
 	// If we've received f+1 RoundChange messages
-	// catch up the view number
+	// catch up the round number
 	if num == int(c.F+1) {
 		if cv.Round().Cmp(rc.Round) < 0 {
-			c.current = newSnapshot(
-				&pbft.View{
-					Round:    new(big.Int).Set(rc.Round),
-					Sequence: new(big.Int).Set(rc.Sequence),
-				}, c.backend.Validators())
-			c.newRoundChangeTimer()
+			c.catchUpRound(&pbft.View{
+				Round:    new(big.Int).Sub(rc.Round, common.Big1),
+				Sequence: rc.Sequence,
+			})
+			c.sendRoundChange()
 		}
 	}
 
 	// We've received 2f+1 RoundChange messages
 	// enter new view
 	if num == int(2*c.F+1) {
-		c.enterNewView(&pbft.View{
+		c.startNewRound(&pbft.View{
 			Round:    new(big.Int).Set(rc.Round),
 			Sequence: new(big.Int).Set(rc.Sequence),
-		})
+		}, true)
 	}
 
 	return nil
