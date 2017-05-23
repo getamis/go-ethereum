@@ -45,10 +45,6 @@ var (
 	errInvalidDifficulty = errors.New("invalid difficulty")
 	// errNotProposer is returned when I'm not a proposer
 	errNotProposer = errors.New("not a proposer")
-	// errViewChanged is returned when we receive a view change event
-	errViewChanged = errors.New("view changed")
-	// errOtherBlockCommitted is returned when other block is committed.
-	errOtherBlockCommitted = errors.New("other block is committed")
 	// errInvalidPeer is returned when a message from invalid peer comes
 	errInvalidPeer = errors.New("invalid peer")
 	// errInvalidExtraDataFormat is returned when the extra data format is incorrect
@@ -270,23 +266,6 @@ func (sb *simpleBackend) Finalize(chain consensus.ChainReader, header *types.Hea
 	return types.NewBlock(header, txs, nil, receipts), nil
 }
 
-func (sb *simpleBackend) closeChannels() {
-	if sb.viewChange != nil {
-		close(sb.viewChange)
-		sb.viewChange = nil
-	}
-
-	if sb.commit != nil {
-		close(sb.commit)
-		sb.commit = nil
-	}
-}
-
-func (sb *simpleBackend) newChannels() {
-	sb.viewChange = make(chan bool, 1)
-	sb.commit = make(chan common.Hash, 1)
-}
-
 // Seal generates a new block for the given input block with the local miner's
 // seal place on top.
 func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, stop <-chan struct{}) (*types.Block, error) {
@@ -314,8 +293,15 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 		return nil, errNotProposer
 	}
 
-	sb.newChannels()
-	defer sb.closeChannels()
+	// get the proposed block hash and clear it if the seal() is completed.
+	sb.sealMu.Lock()
+	sb.proposedBlockHash = block.Hash()
+	clear := func() {
+		sb.proposedBlockHash = common.Hash{}
+		sb.sealMu.Unlock()
+	}
+	defer clear()
+
 	// post block into PBFT engine
 	go sb.EventMux().Post(pbft.RequestEvent{
 		Proposal: block,
@@ -323,18 +309,12 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 
 	for {
 		select {
-		case needNewProposal := <-sb.viewChange:
-			if needNewProposal {
-				return nil, errViewChanged
-			}
-			// if we don't need to change block, we keep waiting events.
-		case hash := <-sb.commit:
+		case hash := <-sb.commitCh:
+			// if the block hash and the hash from channel are the same,
+			// return the block. Otherwise, keep waiting the next hash.
 			if block.Hash() == hash {
-				sb.commitErr <- nil
 				return block, nil
 			}
-			sb.commitErr <- errOtherBlockCommitted
-			return nil, errOtherBlockCommitted
 		case <-stop:
 			return nil, nil
 		}
