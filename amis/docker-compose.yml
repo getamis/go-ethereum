@@ -1,0 +1,144 @@
+version: '3'
+services:
+  validator-01:
+    build:
+      dockerfile: amis/geth/Dockerfile
+      context: ../
+    image: amis_geth:latest
+    ports:
+      - '30303:30303'
+    environment:
+      - IDENTITY=validator-01
+      - NODEKEY=1862cf0b92e8da1c92521006f29a5a9cca33ee7537a23112719c41bf816832f2
+      - BOOTNODES=enode://52870b1bb7874e4ebffd708fbdea7add773912c000e54e5b504ea01ecd956ecb2b54ea4b2076fcfbd24121209dfe97ca8b6368926ce1956e53f63fd20c0e29d7@172.16.238.10:30303,enode://c8fa7bd31ac2bd271fbbc7c5503bff29a94b8301bac5fa5ab7e8787672febc0541926dcb5d8698ef36e66ccba84ef071ee1d29f9aebc9e6bbf4cfeb4e4dce8ad@172.16.238.11:30304,enode://a5a6c556e7ac360e8f2eee5d03c11f447c3d918d73692958695b429b9f0d67fbcb817aea2c169d7abd5a80bbae2adf6bf7e0237c8f78d93d6a82a27efe12ec57@172.16.238.12:30305,enode://5cd6270a6317e8bb1c8a70e5041260ae2864dc35103d27e129c6b0f9cf657cf3db866199a528b33d0ffb48f4e71b1ec8a01102e753cd527afa9c2ba3dfd4515d@172.16.238.13:30306
+      - PORT=30303
+    networks:
+      app_net:
+        ipv4_address: 172.16.238.10
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8545"]
+        interval: 30s
+        timeout: 10s
+        retries: 5
+  validator-02:
+    image: amis_geth:latest
+    ports:
+      - '30304:30304'
+    environment:
+      - IDENTITY=validator-02
+      - NODEKEY=72fa6fc77e8ea98a5adc168c0ceed63205d9580dcbb969df794248dee5a00ea5
+      - BOOTNODES=enode://52870b1bb7874e4ebffd708fbdea7add773912c000e54e5b504ea01ecd956ecb2b54ea4b2076fcfbd24121209dfe97ca8b6368926ce1956e53f63fd20c0e29d7@172.16.238.10:30303,enode://c8fa7bd31ac2bd271fbbc7c5503bff29a94b8301bac5fa5ab7e8787672febc0541926dcb5d8698ef36e66ccba84ef071ee1d29f9aebc9e6bbf4cfeb4e4dce8ad@172.16.238.11:30304,enode://a5a6c556e7ac360e8f2eee5d03c11f447c3d918d73692958695b429b9f0d67fbcb817aea2c169d7abd5a80bbae2adf6bf7e0237c8f78d93d6a82a27efe12ec57@172.16.238.12:30305,enode://5cd6270a6317e8bb1c8a70e5041260ae2864dc35103d27e129c6b0f9cf657cf3db866199a528b33d0ffb48f4e71b1ec8a01102e753cd527afa9c2ba3dfd4515d@172.16.238.13:30306
+      - PORT=30304
+    networks:
+      app_net:
+        ipv4_address: 172.16.238.11
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8545"]
+        interval: 30s
+        timeout: 10s
+        retries: 5
+    links:
+        - validator-01
+        - validator-03
+        - validator-04
+  validator-03:
+    image: amis_geth:latest
+    ports:
+      - '30305:30305'
+    environment:
+      - IDENTITY=validator-03
+      - NODEKEY=31f07e972131b6449296d519a99b0b6a4b58426f3a56093174601475efd5c944
+      - BOOTNODES=enode://52870b1bb7874e4ebffd708fbdea7add773912c000e54e5b504ea01ecd956ecb2b54ea4b2076fcfbd24121209dfe97ca8b6368926ce1956e53f63fd20c0e29d7@172.16.238.10:30303,enode://c8fa7bd31ac2bd271fbbc7c5503bff29a94b8301bac5fa5ab7e8787672febc0541926dcb5d8698ef36e66ccba84ef071ee1d29f9aebc9e6bbf4cfeb4e4dce8ad@172.16.238.11:30304,enode://a5a6c556e7ac360e8f2eee5d03c11f447c3d918d73692958695b429b9f0d67fbcb817aea2c169d7abd5a80bbae2adf6bf7e0237c8f78d93d6a82a27efe12ec57@172.16.238.12:30305,enode://5cd6270a6317e8bb1c8a70e5041260ae2864dc35103d27e129c6b0f9cf657cf3db866199a528b33d0ffb48f4e71b1ec8a01102e753cd527afa9c2ba3dfd4515d@172.16.238.13:30306
+      - PORT=30305
+    networks:
+      app_net:
+        ipv4_address: 172.16.238.12
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8545"]
+        interval: 30s
+        timeout: 10s
+        retries: 5
+    links:
+        - validator-01
+  validator-04:
+    image: amis_geth:latest
+    ports:
+      - '30306:30306'
+    environment:
+      - IDENTITY=validator-04
+      - NODEKEY=4b67c5a38c067a477088b2d2607dbec6ce2b2febcba9fe64bc27ee81e4f34532
+      - BOOTNODES=enode://52870b1bb7874e4ebffd708fbdea7add773912c000e54e5b504ea01ecd956ecb2b54ea4b2076fcfbd24121209dfe97ca8b6368926ce1956e53f63fd20c0e29d7@172.16.238.10:30303,enode://c8fa7bd31ac2bd271fbbc7c5503bff29a94b8301bac5fa5ab7e8787672febc0541926dcb5d8698ef36e66ccba84ef071ee1d29f9aebc9e6bbf4cfeb4e4dce8ad@172.16.238.11:30304,enode://a5a6c556e7ac360e8f2eee5d03c11f447c3d918d73692958695b429b9f0d67fbcb817aea2c169d7abd5a80bbae2adf6bf7e0237c8f78d93d6a82a27efe12ec57@172.16.238.12:30305,enode://5cd6270a6317e8bb1c8a70e5041260ae2864dc35103d27e129c6b0f9cf657cf3db866199a528b33d0ffb48f4e71b1ec8a01102e753cd527afa9c2ba3dfd4515d@172.16.238.13:30306
+      - PORT=30306
+    networks:
+        app_net:
+          ipv4_address: 172.16.238.13
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8545"]
+        interval: 30s
+        timeout: 10s
+        retries: 5
+    links:
+        - validator-01
+  # nodes
+  node-01:
+    build:
+      dockerfile: amis/geth_node/Dockerfile
+      context: ../
+    image: amis_geth_node:latest
+    ports:
+      - '30307:30307'
+    environment:
+      - IDENTITY=node-01
+      - NODEKEY=76fe9f521650d1d27e662a3b597ddf35b7808efe3cd359e03831d2486278936c
+      - BOOTNODES=enode://52870b1bb7874e4ebffd708fbdea7add773912c000e54e5b504ea01ecd956ecb2b54ea4b2076fcfbd24121209dfe97ca8b6368926ce1956e53f63fd20c0e29d7@172.16.238.10:30303,enode://c8fa7bd31ac2bd271fbbc7c5503bff29a94b8301bac5fa5ab7e8787672febc0541926dcb5d8698ef36e66ccba84ef071ee1d29f9aebc9e6bbf4cfeb4e4dce8ad@172.16.238.11:30304,enode://a5a6c556e7ac360e8f2eee5d03c11f447c3d918d73692958695b429b9f0d67fbcb817aea2c169d7abd5a80bbae2adf6bf7e0237c8f78d93d6a82a27efe12ec57@172.16.238.12:30305,enode://5cd6270a6317e8bb1c8a70e5041260ae2864dc35103d27e129c6b0f9cf657cf3db866199a528b33d0ffb48f4e71b1ec8a01102e753cd527afa9c2ba3dfd4515d@172.16.238.13:30306
+      - PORT=30307
+    networks:
+      app_net:
+        ipv4_address: 172.16.238.14
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8545"]
+        interval: 30s
+        timeout: 10s
+        retries: 5
+  node-02:
+    image: amis_geth_node:latest
+    ports:
+      - '30308:30308'
+    environment:
+      - IDENTITY=node-02
+      - NODEKEY=bc55080293076742083b6bfcf5c4997f7fc8d8b67ad8b95d98357a198761b227
+      - BOOTNODES=enode://52870b1bb7874e4ebffd708fbdea7add773912c000e54e5b504ea01ecd956ecb2b54ea4b2076fcfbd24121209dfe97ca8b6368926ce1956e53f63fd20c0e29d7@172.16.238.10:30303,enode://c8fa7bd31ac2bd271fbbc7c5503bff29a94b8301bac5fa5ab7e8787672febc0541926dcb5d8698ef36e66ccba84ef071ee1d29f9aebc9e6bbf4cfeb4e4dce8ad@172.16.238.11:30304,enode://a5a6c556e7ac360e8f2eee5d03c11f447c3d918d73692958695b429b9f0d67fbcb817aea2c169d7abd5a80bbae2adf6bf7e0237c8f78d93d6a82a27efe12ec57@172.16.238.12:30305,enode://5cd6270a6317e8bb1c8a70e5041260ae2864dc35103d27e129c6b0f9cf657cf3db866199a528b33d0ffb48f4e71b1ec8a01102e753cd527afa9c2ba3dfd4515d@172.16.238.13:30306
+      - PORT=30308
+    networks:
+      app_net:
+        ipv4_address: 172.16.238.15
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8545"]
+        interval: 30s
+        timeout: 10s
+        retries: 5
+  node-03:
+    image: amis_geth_node:latest
+    ports:
+      - '30309:30309'
+    environment:
+      - IDENTITY=node-03
+      - NODEKEY=3cb529ac00f009d7250e710bcde83c30b9c532a13441d5fe9765f8ba37c6943e
+      - BOOTNODES=enode://52870b1bb7874e4ebffd708fbdea7add773912c000e54e5b504ea01ecd956ecb2b54ea4b2076fcfbd24121209dfe97ca8b6368926ce1956e53f63fd20c0e29d7@172.16.238.10:30303,enode://c8fa7bd31ac2bd271fbbc7c5503bff29a94b8301bac5fa5ab7e8787672febc0541926dcb5d8698ef36e66ccba84ef071ee1d29f9aebc9e6bbf4cfeb4e4dce8ad@172.16.238.11:30304,enode://a5a6c556e7ac360e8f2eee5d03c11f447c3d918d73692958695b429b9f0d67fbcb817aea2c169d7abd5a80bbae2adf6bf7e0237c8f78d93d6a82a27efe12ec57@172.16.238.12:30305,enode://5cd6270a6317e8bb1c8a70e5041260ae2864dc35103d27e129c6b0f9cf657cf3db866199a528b33d0ffb48f4e71b1ec8a01102e753cd527afa9c2ba3dfd4515d@172.16.238.13:30306
+      - PORT=30309
+    networks:
+      app_net:
+        ipv4_address: 172.16.238.16
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8545"]
+        interval: 30s
+        timeout: 10s
+        retries: 5
+networks:
+  app_net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      -
+        subnet: 172.16.238.0/24
