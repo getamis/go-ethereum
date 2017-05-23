@@ -24,6 +24,30 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
+type State uint64
+
+const (
+	StateAcceptRequest State = iota
+	StatePreprepared
+	StatePrepared
+	StateCommitted
+	StateCheckpointReady
+)
+
+func (s State) String() string {
+	if s == StateAcceptRequest {
+		return "Accept request"
+	} else if s == StatePreprepared {
+		return "Preprepared"
+	} else if s == StatePrepared {
+		return "Prepared"
+	} else if s == StateCommitted {
+		return "Committed"
+	} else {
+		return "Unknown"
+	}
+}
+
 const (
 	msgPreprepare uint64 = iota
 	msgPrepare
