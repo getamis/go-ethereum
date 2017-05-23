@@ -46,7 +46,6 @@ func New(backend pbft.Backend, config *pbft.Config) Engine {
 		state:          StateAcceptRequest,
 		logger:         log.New("address", backend.Address().Hex()),
 		backend:        backend,
-		internalMux:    new(event.TypeMux),
 		backlogs:       make(map[pbft.Validator]*prque.Prque),
 		backlogsMu:     new(sync.Mutex),
 		snapshotsMu:    new(sync.RWMutex),
@@ -66,9 +65,6 @@ type core struct {
 
 	backend pbft.Backend
 	events  *event.TypeMuxSubscription
-
-	internalMux    *event.TypeMux
-	internalEvents *event.TypeMuxSubscription
 
 	lastProposer          common.Address
 	waitingForRoundChange bool

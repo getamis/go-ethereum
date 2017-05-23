@@ -52,7 +52,7 @@ func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validato
 		// We build stable checkpoint every 100 blocks
 		// FIXME: this should be passed by configuration
 		if new(big.Int).Mod(c.current.Sequence(), big.NewInt(int64(c.config.CheckPointPeriod))).Int64() == 0 {
-			go c.sendInternalEvent(buildCheckpointEvent{})
+			go c.sendEvent(buildCheckpointEvent{})
 		}
 
 		c.lastProposer = ev.Proposer

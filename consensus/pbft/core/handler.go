@@ -32,8 +32,7 @@ func (c *core) Start(lastSequence *big.Int, lastProposer common.Address) error {
 	// be able to call in test.
 	c.subscribeEvents()
 
-	go c.handleExternalEvent()
-	go c.handleInternalEvent()
+	go c.handleEvents()
 
 	c.startNewRound(&pbft.View{
 		Sequence: new(big.Int).Add(lastSequence, common.Big1),
@@ -57,9 +56,6 @@ func (c *core) subscribeEvents() {
 		pbft.ConnectionEvent{},
 		pbft.MessageEvent{},
 		pbft.FinalCommittedEvent{},
-	)
-
-	c.internalEvents = c.internalMux.Subscribe(
 		backlogEvent{},
 		buildCheckpointEvent{},
 	)
@@ -67,10 +63,9 @@ func (c *core) subscribeEvents() {
 
 func (c *core) unsubscribeEvents() {
 	c.events.Unsubscribe()
-	c.internalEvents.Unsubscribe()
 }
 
-func (c *core) handleExternalEvent() {
+func (c *core) handleEvents() {
 	for event := range c.events.Chan() {
 		// A real event arrived, process interesting content
 		switch ev := event.Data.(type) {
@@ -86,24 +81,16 @@ func (c *core) handleExternalEvent() {
 			}, val)
 		case pbft.MessageEvent:
 			c.handleMsg(ev.Payload)
-		}
-	}
-}
-
-func (c *core) sendInternalEvent(ev interface{}) {
-	c.internalMux.Post(ev)
-}
-
-func (c *core) handleInternalEvent() {
-	for event := range c.internalEvents.Chan() {
-		// A real event arrived, process interesting content
-		switch ev := event.Data.(type) {
 		case backlogEvent:
 			c.handle(ev.msg, ev.src)
 		case buildCheckpointEvent:
 			go c.buildStableCheckpoint()
 		}
 	}
+}
+
+func (c *core) sendEvent(ev interface{}) {
+	c.backend.EventMux().Post(ev)
 }
 
 func (c *core) handleMsg(payload []byte) error {
