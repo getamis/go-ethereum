@@ -589,13 +589,13 @@ web3._extend({
   	methods:
   	[
 		new web3._extend.Method({
-			name: 'consensusState',
-			call: 'pbft_consensusState',
+			name: 'snapshot',
+			call: 'pbft_snapshot',
 			params: 0
 		}),
 		new web3._extend.Method({
-			name: 'viewChange',
-			call: 'pbft_viewChange',
+			name: 'backlog',
+			call: 'pbft_backlog',
 			params: 0
 		}),
   	],
