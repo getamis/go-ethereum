@@ -31,8 +31,6 @@ import (
 
 const (
 	keyStableCheckpoint = "StableCheckpoint"
-
-	roundChangeTimeout = 10 * time.Second
 )
 
 type Engine interface {
@@ -251,7 +249,9 @@ func (c *core) newRoundChangeTimer() {
 	if c.roundChangeTimer != nil {
 		c.roundChangeTimer.Stop()
 	}
-	c.roundChangeTimer = time.AfterFunc(roundChangeTimeout, func() {
+
+	timeout := time.Duration(c.config.RequestTimeoutMsec) / time.Millisecond
+	c.roundChangeTimer = time.AfterFunc(timeout, func() {
 		c.sendRoundChange()
 	})
 }
