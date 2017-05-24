@@ -33,7 +33,7 @@ func newSnapshot(view *pbft.View, validatorSet pbft.ValidatorSet) *snapshot {
 		Prepares:    newMessageSet(validatorSet),
 		Commits:     newMessageSet(validatorSet),
 		Checkpoints: newMessageSet(validatorSet),
-		mu:          new(sync.Mutex),
+		mu:          new(sync.RWMutex),
 	}
 }
 
@@ -45,12 +45,12 @@ type snapshot struct {
 	Commits     *messageSet
 	Checkpoints *messageSet
 
-	mu *sync.Mutex
+	mu *sync.RWMutex
 }
 
 func (s *snapshot) Proposal() pbft.Proposal {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	if s.Preprepare != nil {
 		return s.Preprepare.Proposal
@@ -67,8 +67,8 @@ func (s *snapshot) SetRound(r *big.Int) {
 }
 
 func (s *snapshot) Round() *big.Int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	return s.round
 }
@@ -81,8 +81,8 @@ func (s *snapshot) SetSequence(seq *big.Int) {
 }
 
 func (s *snapshot) Sequence() *big.Int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	return s.sequence
 }
@@ -109,7 +109,7 @@ func (s *snapshot) DecodeRLP(stream *rlp.Stream) error {
 	s.Prepares = ss.Prepares
 	s.Commits = ss.Commits
 	s.Checkpoints = ss.Checkpoints
-	s.mu = new(sync.Mutex)
+	s.mu = new(sync.RWMutex)
 
 	return nil
 }
@@ -123,6 +123,9 @@ func (s *snapshot) DecodeRLP(stream *rlp.Stream) error {
 // recommended to write only a single value but writing multiple
 // values or no value at all is also permitted.
 func (s *snapshot) EncodeRLP(w io.Writer) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	return rlp.Encode(w, []interface{}{
 		s.round,
 		s.sequence,
