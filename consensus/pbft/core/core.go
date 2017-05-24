@@ -20,6 +20,7 @@ import (
 	"math"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
@@ -29,42 +30,8 @@ import (
 )
 
 const (
-	StateAcceptRequest State = iota
-	StatePreprepared
-	StatePrepared
-	StateCommitted
-	StateCheckpointReady
-)
-
-const (
 	keyStableCheckpoint = "StableCheckpoint"
 )
-
-type State uint64
-
-func (s State) String() string {
-	if s == StateAcceptRequest {
-		return "Accept request"
-	} else if s == StatePreprepared {
-		return "Preprepared"
-	} else if s == StatePrepared {
-		return "Prepared"
-	} else if s == StateCommitted {
-		return "Committed"
-	} else {
-		return "Unknown"
-	}
-}
-
-type Engine interface {
-	Start(lastSequence *big.Int, lastProposer common.Address) error
-	Stop() error
-
-	// get current state and snapshot
-	Snapshot() (State, *snapshot)
-	// get back log
-	Backlog() map[pbft.Validator]*prque.Prque
-}
 
 func New(backend pbft.Backend, config *pbft.Config) Engine {
 	// update n and f
@@ -72,19 +39,17 @@ func New(backend pbft.Backend, config *pbft.Config) Engine {
 	f := int64(math.Ceil(float64(n)/3) - 1)
 
 	return &core{
-		config:      config,
-		address:     backend.Address(),
-		N:           n,
-		F:           f,
-		state:       StateAcceptRequest,
-		logger:      log.New("address", backend.Address().Hex()),
-		backend:     backend,
-		sequence:    common.Big0,
-		round:       common.Big0,
-		internalMux: new(event.TypeMux),
-		backlogs:    make(map[pbft.Validator]*prque.Prque),
-		backlogsMu:  new(sync.Mutex),
-		snapshotsMu: new(sync.RWMutex),
+		config:         config,
+		address:        backend.Address(),
+		N:              n,
+		F:              f,
+		state:          StateAcceptRequest,
+		logger:         log.New("address", backend.Address().Hex()),
+		backend:        backend,
+		backlogs:       make(map[pbft.Validator]*prque.Prque),
+		backlogsMu:     new(sync.Mutex),
+		snapshotsMu:    new(sync.RWMutex),
+		roundChangeSet: newRoundChangeSet(backend.Validators()),
 	}
 }
 
@@ -101,12 +66,8 @@ type core struct {
 	backend pbft.Backend
 	events  *event.TypeMuxSubscription
 
-	internalMux    *event.TypeMux
-	internalEvents *event.TypeMuxSubscription
-
-	sequence     *big.Int
-	round        *big.Int
-	lastProposer common.Address
+	lastProposer          common.Address
+	waitingForRoundChange bool
 
 	subject *pbft.Subject
 
@@ -116,6 +77,9 @@ type core struct {
 	current     *snapshot
 	snapshots   []*snapshot
 	snapshotsMu *sync.RWMutex
+
+	roundChangeSet   *roundChangeSet
+	roundChangeTimer *time.Timer
 }
 
 func (c *core) finalizeMessage(msg *message) ([]byte, error) {
@@ -141,6 +105,22 @@ func (c *core) finalizeMessage(msg *message) ([]byte, error) {
 	return payload, nil
 }
 
+func (c *core) send(msg *message, target common.Address) {
+	logger := c.logger.New("state", c.state)
+
+	payload, err := c.finalizeMessage(msg)
+	if err != nil {
+		logger.Error("Failed to finalize message", "msg", msg, "error", err)
+		return
+	}
+
+	// send payload
+	if err = c.backend.Send(payload, target); err != nil {
+		logger.Error("Failed to send message", "msg", msg, "error", err)
+		return
+	}
+}
+
 func (c *core) broadcast(msg *message) {
 	logger := c.logger.New("state", c.state)
 
@@ -159,15 +139,15 @@ func (c *core) broadcast(msg *message) {
 
 func (c *core) currentView() *pbft.View {
 	return &pbft.View{
-		Sequence: new(big.Int).Set(c.sequence),
-		Round:    new(big.Int).Set(c.round),
+		Sequence: new(big.Int).Set(c.current.Sequence()),
+		Round:    new(big.Int).Set(c.current.Round()),
 	}
 }
 
 func (c *core) nextRound() *pbft.View {
 	return &pbft.View{
-		Sequence: new(big.Int).Set(c.sequence),
-		Round:    new(big.Int).Add(c.round, common.Big1),
+		Sequence: new(big.Int).Set(c.current.Sequence()),
+		Round:    new(big.Int).Add(c.current.Round(), common.Big1),
 	}
 }
 
@@ -177,23 +157,60 @@ func (c *core) isPrimary() bool {
 
 func (c *core) commit() {
 	c.setState(StateCommitted)
-	logger := c.logger.New("state", c.state)
-	logger.Debug("Ready to commit", "view", c.current.Preprepare.View)
-	if err := c.backend.Commit(c.current.Preprepare.Proposal); err != nil {
-		// TODO: fire a view change immediately
+
+	proposal := c.current.Proposal()
+	if proposal != nil {
+		if err := c.backend.Commit(proposal); err != nil {
+			c.sendRoundChange()
+			return
+		}
 	}
+}
+
+func (c *core) startNewRound(newView *pbft.View, roundChange bool) {
+	var logger log.Logger
+	if c.current == nil {
+		logger = c.logger.New("old_round", -1, "old_seq", 0, "old_proposer", c.backend.Validators().GetProposer().Address().Hex())
+	} else {
+		logger = c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence(), "old_proposer", c.backend.Validators().GetProposer().Address().Hex())
+	}
+
+	// Clear invalid RoundChange messages
+	c.roundChangeSet.Clear(newView)
+	// New snapshot for new round
+	c.current = newSnapshot(newView, c.backend.Validators())
+
+	// Calculate new proposer
+	//c.backend.Validators().CalcProposer(c.proposerSeed())
+	c.waitingForRoundChange = false
+	c.setState(StateAcceptRequest)
+	if roundChange {
+		c.backend.RoundChanged(true)
+	}
+	c.newRoundChangeTimer()
+
+	logger.Debug("New round", "new_round", newView.Round, "new_seq", newView.Sequence, "new_proposer", c.backend.Validators().GetProposer().Address().Hex())
+}
+
+func (c *core) catchUpRound(view *pbft.View) {
+	logger := c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence(), "old_proposer", c.backend.Validators().GetProposer().Address().Hex())
+	c.waitingForRoundChange = true
+	c.current = newSnapshot(view, c.backend.Validators())
+	c.newRoundChangeTimer()
+
+	logger.Trace("Catch up round", "new_round", view.Round, "new_seq", view.Sequence, "new_proposer", c.backend.Validators().GetProposer().Address().Hex())
 }
 
 func (c *core) proposerSeed() uint64 {
 	emptyAddr := common.Address{}
 	if c.lastProposer == emptyAddr {
-		return c.round.Uint64()
+		return c.current.Round().Uint64()
 	}
 	offset := 0
 	if idx, val := c.backend.Validators().GetByAddress(c.lastProposer); val != nil {
 		offset = idx
 	}
-	return uint64(offset) + c.round.Uint64() + 1
+	return uint64(offset) + c.current.Round().Uint64() + 1
 }
 
 func (c *core) setState(state State) {
@@ -213,4 +230,15 @@ func (c *core) Snapshot() (State, *snapshot) {
 
 func (c *core) Backlog() map[pbft.Validator]*prque.Prque {
 	return c.backlogs
+}
+
+func (c *core) newRoundChangeTimer() {
+	if c.roundChangeTimer != nil {
+		c.roundChangeTimer.Stop()
+	}
+
+	timeout := time.Duration(c.config.RequestTimeoutMsec) * time.Millisecond
+	c.roundChangeTimer = time.AfterFunc(timeout, func() {
+		c.sendRoundChange()
+	})
 }

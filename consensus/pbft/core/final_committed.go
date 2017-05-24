@@ -24,40 +24,42 @@ import (
 )
 
 func (c *core) handleFinalCommitted(ev pbft.FinalCommittedEvent, p pbft.Validator) error {
-	logger := c.logger.New("state", c.state)
+	logger := c.logger.New("state", c.state, "number", ev.Proposal.Number(), "hash", ev.Proposal.Hash())
 	// this block is from consensus
 	if c.subject != nil &&
 		ev.Proposal.Hash() == c.subject.Digest &&
 		c.state == StateCommitted {
-		logger.Debug("handleFinalCommitted from consensus", "height", ev.Proposal.Number(), "hash", ev.Proposal.Hash())
+		logger.Trace("New block from consensus")
+
 		// send out the checkpoint
 		c.sendCheckpoint(&pbft.Subject{
 			View: &pbft.View{
 				Sequence: ev.Proposal.Number(),
-				Round:    c.round,
+				Round:    c.current.Round(),
 			},
 			Digest: ev.Proposal.Hash(),
 		})
+
+		// store snapshot
 		c.snapshotsMu.Lock()
 		c.snapshots = append(c.snapshots, c.current)
 		c.snapshotsMu.Unlock()
-
-	} else {
-		// this block is from geth sync
-		logger.Debug("handleFinalCommitted from geth sync", "height", ev.Proposal.Number(), "hash", ev.Proposal.Hash())
+	} else { // this block is from geth sync
+		logger.Trace("New block from synchronization")
 	}
 
-	if ev.Proposal.Number().Cmp(c.sequence) >= 0 {
+	if ev.Proposal.Number().Cmp(c.current.Sequence()) >= 0 {
 		// We build stable checkpoint every 100 blocks
 		// FIXME: this should be passed by configuration
-		if new(big.Int).Mod(c.sequence, big.NewInt(int64(c.config.CheckPointPeriod))).Int64() == 0 {
-			go c.sendInternalEvent(buildCheckpointEvent{})
+		if new(big.Int).Mod(c.current.Sequence(), big.NewInt(int64(c.config.CheckPointPeriod))).Int64() == 0 {
+			go c.sendEvent(buildCheckpointEvent{})
 		}
 
-		c.sequence = new(big.Int).Add(ev.Proposal.Number(), common.Big1)
-		c.round = common.Big0
 		c.lastProposer = ev.Proposer
-		c.setState(StateAcceptRequest)
+		c.startNewRound(&pbft.View{
+			Sequence: new(big.Int).Add(ev.Proposal.Number(), common.Big1),
+			Round:    common.Big0,
+		}, false)
 	}
 
 	return nil

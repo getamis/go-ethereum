@@ -26,7 +26,7 @@ var (
 		StateAcceptRequest: msgPreprepare,
 		StatePreprepared:   msgPrepare,
 		StatePrepared:      msgCommit,
-		StateCommitted:     msgNewView,
+		StateCommitted:     msgAll,
 	}
 )
 
@@ -56,7 +56,7 @@ func (c *core) storeBacklog(msg *message, src pbft.Validator) {
 		return
 	}
 
-	logger.Debug("Store future message")
+	logger.Trace("Store future message")
 
 	c.backlogsMu.Lock()
 	defer c.backlogsMu.Unlock()
@@ -123,15 +123,15 @@ func (c *core) processBacklog() {
 			}
 			// Push back if it's a future message
 			if c.isFutureMessage(msg.Code, view) {
-				logger.Debug("Stop processing backlog", "msg", msg)
+				logger.Trace("Stop processing backlog", "msg", msg)
 				backlog.Push(msg, prio)
 				isFuture = true
 				break
 			}
 
-			logger.Debug("Post backlog event", "msg", msg)
+			logger.Trace("Post backlog event", "msg", msg)
 
-			go c.sendInternalEvent(backlogEvent{
+			go c.sendEvent(backlogEvent{
 				src: src,
 				msg: msg,
 			})

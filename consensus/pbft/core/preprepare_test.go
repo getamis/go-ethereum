@@ -71,7 +71,7 @@ func TestHandlePreprepare(t *testing.T) {
 							Digest: common.StringToHash("1234567890"),
 						}
 					} else {
-						c.sequence = big.NewInt(10)
+						c.current.SetSequence(big.NewInt(10))
 					}
 				}
 				return sys
@@ -110,8 +110,8 @@ func TestHandlePreprepare(t *testing.T) {
 
 					if i != 0 {
 						c.state = StatePreprepared
-						c.sequence = big.NewInt(10)
-						c.round = big.NewInt(10)
+						c.current.SetSequence(big.NewInt(10))
+						c.current.SetRound(big.NewInt(10))
 					}
 				}
 				return sys

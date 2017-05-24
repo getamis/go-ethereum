@@ -56,6 +56,25 @@ type View struct {
 	Sequence *big.Int
 }
 
+// EncodeRLP serializes b into the Ethereum RLP format.
+func (v *View) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, []interface{}{v.Round, v.Sequence})
+}
+
+// DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
+func (v *View) DecodeRLP(s *rlp.Stream) error {
+	var view struct {
+		Round    *big.Int
+		Sequence *big.Int
+	}
+
+	if err := s.Decode(&view); err != nil {
+		return err
+	}
+	v.Round, v.Sequence = view.Round, view.Sequence
+	return nil
+}
+
 type Preprepare struct {
 	View     *View
 	Proposal Proposal
@@ -102,66 +121,5 @@ func (b *Subject) DecodeRLP(s *rlp.Stream) error {
 		return err
 	}
 	b.View, b.Digest = subject.View, subject.Digest
-	return nil
-}
-
-type ViewChange struct {
-	ViewNumber *big.Int
-	PSet       []*Subject
-	QSet       []*Subject
-	Proposal   Proposal
-}
-
-// EncodeRLP serializes b into the Ethereum RLP format.
-func (b *ViewChange) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, []interface{}{b.ViewNumber, b.PSet, b.QSet, b.Proposal})
-}
-
-// DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
-func (b *ViewChange) DecodeRLP(s *rlp.Stream) error {
-	var viewChange struct {
-		ViewNumber *big.Int
-		PSet       []*Subject
-		QSet       []*Subject
-		Proposal   *types.Block
-	}
-
-	if err := s.Decode(&viewChange); err != nil {
-		return err
-	}
-	b.ViewNumber, b.PSet, b.QSet, b.Proposal = viewChange.ViewNumber, viewChange.PSet, viewChange.QSet, viewChange.Proposal
-	return nil
-}
-
-type SignedViewChange struct {
-	Data      []byte
-	Signature []byte
-}
-
-type NewView struct {
-	ViewNumber *big.Int
-	VSet       *SignedViewChange
-	XSet       *Subject
-	Proposal   Proposal
-}
-
-// EncodeRLP serializes b into the Ethereum RLP format.
-func (b *NewView) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, []interface{}{b.ViewNumber, b.VSet, b.XSet, b.Proposal})
-}
-
-// DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
-func (b *NewView) DecodeRLP(s *rlp.Stream) error {
-	var newView struct {
-		ViewNumber *big.Int
-		VSet       *SignedViewChange
-		XSet       *Subject
-		Proposal   *types.Block
-	}
-
-	if err := s.Decode(&newView); err != nil {
-		return err
-	}
-	b.ViewNumber, b.VSet, b.XSet, b.Proposal = newView.ViewNumber, newView.VSet, newView.XSet, newView.Proposal
 	return nil
 }

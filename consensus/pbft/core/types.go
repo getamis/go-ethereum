@@ -18,19 +18,55 @@ package core
 
 import (
 	"io"
+	"math/big"
+
+	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/rlp"
 )
+
+type Engine interface {
+	Start(lastSequence *big.Int, lastProposer common.Address) error
+	Stop() error
+	// get current state and snapshot
+	Snapshot() (State, *snapshot)
+	// get back log
+	Backlog() map[pbft.Validator]*prque.Prque
+}
+
+type State uint64
+
+const (
+	StateAcceptRequest State = iota
+	StatePreprepared
+	StatePrepared
+	StateCommitted
+	StateCheckpointReady
+)
+
+func (s State) String() string {
+	if s == StateAcceptRequest {
+		return "Accept request"
+	} else if s == StatePreprepared {
+		return "Preprepared"
+	} else if s == StatePrepared {
+		return "Prepared"
+	} else if s == StateCommitted {
+		return "Committed"
+	} else {
+		return "Unknown"
+	}
+}
 
 const (
 	msgPreprepare uint64 = iota
 	msgPrepare
 	msgCommit
 	msgCheckpoint
-	msgViewChange
-	msgNewView
-	msgInvalid
+	msgRoundChange
+	msgAll
 )
 
 type message struct {
@@ -112,4 +148,35 @@ func (m *message) Decode(val interface{}) error {
 
 func Encode(val interface{}) ([]byte, error) {
 	return rlp.EncodeToBytes(val)
+}
+
+// ----------------------------------------------------------------------------
+
+type roundChange struct {
+	Round    *big.Int
+	Sequence *big.Int
+	Digest   common.Hash
+}
+
+// EncodeRLP serializes b into the Ethereum RLP format.
+func (rc *roundChange) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, []interface{}{
+		rc.Round,
+		rc.Sequence,
+		rc.Digest,
+	})
+}
+
+// DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
+func (rc *roundChange) DecodeRLP(s *rlp.Stream) error {
+	var rawRoundChange struct {
+		Round    *big.Int
+		Sequence *big.Int
+		Digest   common.Hash
+	}
+	if err := s.Decode(&rawRoundChange); err != nil {
+		return err
+	}
+	rc.Round, rc.Sequence, rc.Digest = rawRoundChange.Round, rawRoundChange.Sequence, rawRoundChange.Digest
+	return nil
 }

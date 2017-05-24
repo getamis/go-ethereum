@@ -18,6 +18,7 @@ package core
 
 import (
 	"crypto/ecdsa"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
@@ -81,7 +82,7 @@ func (self *testSystemBackend) Broadcast(message []byte) error {
 	return nil
 }
 
-func (self *testSystemBackend) ViewChanged(needNewProposal bool) error {
+func (self *testSystemBackend) RoundChanged(needNewProposal bool) error {
 	testLogger.Warn("nothing to happen")
 	return nil
 }
@@ -185,6 +186,7 @@ func newTestValidatorSet(n int) pbft.ValidatorSet {
 		validators[i] = validator.New(crypto.PubkeyToAddress(privateKey.PublicKey))
 		b = append(b, validators[i].Address().Bytes()...)
 	}
+
 	vset := validator.NewSet(validator.ExtractValidators(b))
 
 	return vset
@@ -204,9 +206,9 @@ func NewTestSystemWithBackend(n, f uint64) *testSystem {
 		backend.address = vset.GetByIndex(i).Address()
 
 		core := New(backend, config).(*core)
-		core.current = newSnapshot(&pbft.Preprepare{
-			View:     &pbft.View{},
-			Proposal: makeBlock(1),
+		core.current = newSnapshot(&pbft.View{
+			Round:    big.NewInt(0),
+			Sequence: big.NewInt(1),
 		}, vset)
 		core.logger = testLogger
 		core.N = int64(n)

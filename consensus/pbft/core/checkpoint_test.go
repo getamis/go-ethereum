@@ -34,17 +34,16 @@ func TestHandleCheckpoint(t *testing.T) {
 	}
 	system := NewTestSystemWithBackend(N, F)
 	c := system.backends[0].engine.(*core)
-	c.current = newSnapshot(preprepare, system.backends[0].Validators())
-	c.snapshots = append(c.snapshots, newSnapshot(&pbft.Preprepare{
-		View: &pbft.View{
-			Round:    big.NewInt(0),
-			Sequence: big.NewInt(1),
-		},
-	}, system.backends[0].Validators()), newSnapshot(&pbft.Preprepare{
-		View: &pbft.View{
-			Round:    big.NewInt(0),
-			Sequence: big.NewInt(2),
-		},
+	c.current = newSnapshot(&pbft.View{
+		Sequence: big.NewInt(3),
+		Round:    big.NewInt(0),
+	}, system.backends[0].Validators())
+	c.snapshots = append(c.snapshots, newSnapshot(&pbft.View{
+		Round:    big.NewInt(0),
+		Sequence: big.NewInt(1),
+	}, system.backends[0].Validators()), newSnapshot(&pbft.View{
+		Round:    big.NewInt(0),
+		Sequence: big.NewInt(2),
 	}, system.backends[0].Validators()))
 
 	testCases := []struct {
@@ -55,7 +54,7 @@ func TestHandleCheckpoint(t *testing.T) {
 		expectedErr error
 	}{
 		// empty subject
-		{system, &pbft.Subject{}, system.backends[0].Validators().List()[0], nil, pbft.ErrInvalidMessage},
+		{system, &pbft.Subject{View: &pbft.View{Sequence: big.NewInt(0), Round: big.NewInt(0)}}, system.backends[0].Validators().List()[0], nil, pbft.ErrInvalidMessage},
 		// current sequence
 		{system, &pbft.Subject{View: &pbft.View{Sequence: preprepare.View.Sequence}}, system.backends[0].Validators().List()[0], c.current, nil},
 		// old sequence
@@ -102,20 +101,25 @@ func TestBuildStableCheckpoint(t *testing.T) {
 	c := system.backends[0].engine.(*core)
 	v := system.backends[0].Validators().List()[0]
 	proposal := makeBlock(1)
-	expectedStableSnapshot := newSnapshot(&pbft.Preprepare{
-		View: &pbft.View{
-			Round:    big.NewInt(0),
-			Sequence: big.NewInt(1),
-		},
+	view := &pbft.View{
+		Round:    big.NewInt(0),
+		Sequence: big.NewInt(1),
+	}
+	expectedStableSnapshot := newSnapshot(view, system.backends[0].Validators())
+	expectedStableSnapshot.Preprepare = &pbft.Preprepare{
+		View:     view,
 		Proposal: proposal,
-	}, system.backends[0].Validators())
-	c.snapshots = append(c.snapshots, expectedStableSnapshot, newSnapshot(&pbft.Preprepare{
-		View: &pbft.View{
-			Round:    big.NewInt(0),
-			Sequence: big.NewInt(2),
-		},
+	}
+	view = &pbft.View{
+		Round:    big.NewInt(0),
+		Sequence: big.NewInt(2),
+	}
+	s := newSnapshot(view, system.backends[0].Validators())
+	s.Preprepare = &pbft.Preprepare{
+		View:     view,
 		Proposal: proposal,
-	}, system.backends[0].Validators()))
+	}
+	c.snapshots = append(c.snapshots, expectedStableSnapshot, s)
 
 	sub := &pbft.Subject{View: expectedStableSnapshot.Preprepare.View}
 	b, _ := Encode(sub)
@@ -133,7 +137,7 @@ func TestBuildStableCheckpoint(t *testing.T) {
 	}
 	if stableCheckpoint == nil {
 		t.Errorf("cannot get the stable checkpoint")
-	} else if stableCheckpoint.Sequence.Cmp(expectedStableSnapshot.Sequence) != 0 {
-		t.Errorf("unexpected stable check point, got: %v, expected: %v", stableCheckpoint.Sequence, expectedStableSnapshot.Sequence)
+	} else if stableCheckpoint.Sequence().Cmp(expectedStableSnapshot.Sequence()) != 0 {
+		t.Errorf("unexpected stable check point, got: %v, expected: %v", stableCheckpoint.Sequence(), expectedStableSnapshot.Sequence())
 	}
 }

@@ -33,9 +33,11 @@ import (
 
 func TestIsFutureMessage(t *testing.T) {
 	c := &core{
-		state:    StateAcceptRequest,
-		sequence: big.NewInt(1),
-		round:    big.NewInt(0),
+		state: StateAcceptRequest,
+		current: newSnapshot(&pbft.View{
+			Sequence: big.NewInt(1),
+			Round:    big.NewInt(0),
+		}, newTestValidatorSet(4)),
 	}
 
 	// invalid view format
@@ -147,7 +149,7 @@ func TestStoreBacklog(t *testing.T) {
 	p := validator.New(common.StringToAddress("12345667890"))
 	// push preprepare msg
 	preprepare := &pbft.Preprepare{
-		View: v,
+		View:     v,
 		Proposal: makeBlock(1),
 	}
 	prepreparePayload, _ := Encode(preprepare)
@@ -192,14 +194,15 @@ func TestProcessFutureBacklog(t *testing.T) {
 		events: new(event.TypeMux),
 	}
 	c := &core{
-		logger:      log.New("backend", "test", "id", 0),
-		backlogs:    make(map[pbft.Validator]*prque.Prque),
-		backlogsMu:  new(sync.Mutex),
-		backend:     backend,
-		sequence:    big.NewInt(1),
-		round:       big.NewInt(0),
-		state:       StateAcceptRequest,
-		internalMux: new(event.TypeMux),
+		logger:     log.New("backend", "test", "id", 0),
+		backlogs:   make(map[pbft.Validator]*prque.Prque),
+		backlogsMu: new(sync.Mutex),
+		backend:    backend,
+		current: newSnapshot(&pbft.View{
+			Sequence: big.NewInt(1),
+			Round:    big.NewInt(0),
+		}, newTestValidatorSet(4)),
+		state: StateAcceptRequest,
 	}
 	c.subscribeEvents()
 	defer c.unsubscribeEvents()
@@ -225,7 +228,7 @@ func TestProcessFutureBacklog(t *testing.T) {
 	const timeoutDura = 2 * time.Second
 	timeout := time.NewTimer(timeoutDura)
 	select {
-	case <-c.internalEvents.Chan():
+	case <-c.events.Chan():
 		t.Errorf("Should not receive any events")
 
 	case <-timeout.C:
@@ -239,7 +242,7 @@ func TestProcessBacklog(t *testing.T) {
 		Sequence: big.NewInt(1),
 	}
 	preprepare := &pbft.Preprepare{
-		View: v,
+		View:     v,
 		Proposal: makeBlock(1),
 	}
 	prepreparePayload, _ := Encode(preprepare)
@@ -276,14 +279,15 @@ func testProcessBacklog(t *testing.T, msg *message) {
 		peers:  vset,
 	}
 	c := &core{
-		logger:      log.New("backend", "test", "id", 0),
-		backlogs:    make(map[pbft.Validator]*prque.Prque),
-		backlogsMu:  new(sync.Mutex),
-		backend:     backend,
-		internalMux: new(event.TypeMux),
-		state:       State(msg.Code),
-		sequence:    big.NewInt(1),
-		round:       big.NewInt(0),
+		logger:     log.New("backend", "test", "id", 0),
+		backlogs:   make(map[pbft.Validator]*prque.Prque),
+		backlogsMu: new(sync.Mutex),
+		backend:    backend,
+		state:      State(msg.Code),
+		current: newSnapshot(&pbft.View{
+			Sequence: big.NewInt(1),
+			Round:    big.NewInt(0),
+		}, newTestValidatorSet(4)),
 		subject: &pbft.Subject{
 			View: &pbft.View{
 				Sequence: big.NewInt(1),
@@ -300,7 +304,7 @@ func testProcessBacklog(t *testing.T, msg *message) {
 	const timeoutDura = 2 * time.Second
 	timeout := time.NewTimer(timeoutDura)
 	select {
-	case ev := <-c.internalEvents.Chan():
+	case ev := <-c.events.Chan():
 		e, ok := ev.Data.(backlogEvent)
 		if !ok {
 			t.Fatalf("Unexpected event comes")

@@ -52,7 +52,7 @@ type messageSet struct {
 }
 
 type storageMessageSet struct {
-	View       pbft.View
+	View       *pbft.View
 	Validators []common.Address
 	Keys       []common.Hash
 	Messages   [][]byte
@@ -98,7 +98,7 @@ func (ms *messageSet) DecodeRLP(s *rlp.Stream) error {
 	err := s.Decode(&sms)
 	if err == nil {
 		ms.valSet = validator.NewSet(sms.Validators)
-		ms.view = &sms.View
+		ms.view = sms.View
 		ms.messagesMu = new(sync.Mutex)
 		ms.messages = make(map[common.Hash]*message)
 
@@ -147,7 +147,7 @@ func (ms *messageSet) EncodeRLP(w io.Writer) error {
 	}
 
 	return rlp.Encode(w, storageMessageSet{
-		View:       *ms.view,
+		View:       ms.view,
 		Validators: addrs,
 		Keys:       keys,
 		Messages:   msgs,
