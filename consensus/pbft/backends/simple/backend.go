@@ -18,6 +18,7 @@ package simple
 
 import (
 	"crypto/ecdsa"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
@@ -48,6 +49,7 @@ func New(config *pbft.Config, eventMux *event.TypeMux, privateKey *ecdsa.Private
 		address:      crypto.PubkeyToAddress(privateKey.PublicKey),
 		logger:       log.New("backend", "simple"),
 		db:           db,
+		commitCh:     make(chan common.Hash, 1),
 	}
 	return backend
 }
@@ -70,9 +72,9 @@ type simpleBackend struct {
 	inserter     func(block *types.Block) error
 
 	// the channels for pbft engine notifications
-	viewChange chan bool
-	commit     chan common.Hash
-	commitErr  chan error
+	commitCh          chan common.Hash
+	proposedBlockHash common.Hash
+	sealMu            sync.Mutex
 }
 
 // Address implements pbft.Backend.Address
@@ -128,33 +130,28 @@ func (sb *simpleBackend) Commit(proposal pbft.Proposal) error {
 		sb.logger.Error("Failed to commit proposal since RequestContext cannot cast to *types.Block")
 		return errCastingRequest
 	}
-	// it's a proposer
-	if sb.commit != nil {
-		sb.commitErr = make(chan error, 1)
-		closeCommitErr := func() {
-			close(sb.commitErr)
-		}
-		defer closeCommitErr()
+	// - if the proposed and committed blocks are the same, send the proposed hash
+	//   to commit channel, which is being watched inside the engine.Seal() function.
+	// - otherwise, we try to insert the block.
+	// -- if success, the ChainHeadEvent event will be broadcasted and try to build
+	//    the next block. If it's a proposer, the previous Seal() will be stopped.
+	// -- otherwise, a error will be returned and a view change event will be fired.
+	if sb.proposedBlockHash == block.Hash() {
 		// feed block hash to Seal() and wait the Seal() result
-		sb.commit <- block.Hash()
+		sb.commitCh <- block.Hash()
 		// TODO: how do we check the block is inserted correctly?
-		return <-sb.commitErr
-	} else {
-		return sb.inserter(block)
+		return nil
 	}
+	return sb.inserter(block)
 }
 
 // ViewChanged implements pbft.Backend.ViewChanged
 func (sb *simpleBackend) ViewChanged(needNewProposal bool) error {
-	// step1: update proposer
-	// step2: notify proposer and validator
-	if sb.viewChange != nil {
-		go func() {
-			sb.viewChange <- needNewProposal
-		}()
-	}
-	if sb.IsProposer() {
-		go sb.eventMux.Post(core.ChainHeadEvent{})
+	if needNewProposal {
+		// if I was or I'm a proposer now, fire a ChainHeadEvent to trigger next Seal()
+		if !common.EmptyHash(sb.proposedBlockHash) || sb.IsProposer() {
+			go sb.eventMux.Post(core.ChainHeadEvent{})
+		}
 	}
 	return nil
 }

@@ -155,7 +155,7 @@ func TestSealStopChannel(t *testing.T) {
 	}
 }
 
-func TestSealViewChange(t *testing.T) {
+func TestSealRoundChange(t *testing.T) {
 	chain, engine := newBlockChain(4)
 	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	eventSub := engine.EventMux().Subscribe(pbft.RequestEvent{})
@@ -166,7 +166,7 @@ func TestSealViewChange(t *testing.T) {
 			if !ok {
 				t.Errorf("unexpected event comes, got: %v, expected: pbft.RequestEvent", reflect.TypeOf(ev.Data))
 			}
-			engine.viewChange <- false
+			engine.ViewChanged(false)
 		}
 		eventSub.Unsubscribe()
 	}
@@ -186,35 +186,10 @@ func TestSealViewChange(t *testing.T) {
 	}
 }
 
-func TestSealViewChangeNeedNewProposal(t *testing.T) {
-	chain, engine := newBlockChain(4)
-	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
-	eventSub := engine.EventMux().Subscribe(pbft.RequestEvent{})
-	eventLoop := func() {
-		select {
-		case ev := <-eventSub.Chan():
-			_, ok := ev.Data.(pbft.RequestEvent)
-			if !ok {
-				t.Errorf("unexpected event comes, got: %v, expected: pbft.RequestEvent", reflect.TypeOf(ev.Data))
-			}
-			engine.viewChange <- true
-		}
-		eventSub.Unsubscribe()
-	}
-	go eventLoop()
-
-	finalBlock, err := engine.Seal(chain, block, nil)
-	if err != errViewChanged {
-		t.Errorf("unexpected error comes, got: %v, expected: errViewChanged", err)
-	}
-	if finalBlock != nil {
-		t.Errorf("block should be nil, but got: %v", finalBlock.Hash().Hex())
-	}
-}
-
 func TestSealCommittedOtherHash(t *testing.T) {
 	chain, engine := newBlockChain(4)
 	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
+	otherBlock := makeBlockWithoutSeal(chain, engine, block)
 	eventSub := engine.EventMux().Subscribe(pbft.RequestEvent{})
 	eventLoop := func() {
 		select {
@@ -223,26 +198,22 @@ func TestSealCommittedOtherHash(t *testing.T) {
 			if !ok {
 				t.Errorf("unexpected event comes, got: %v, expected: pbft.RequestEvent", reflect.TypeOf(ev.Data))
 			}
-			engine.commitErr = make(chan error, 1)
-			closeCommitErr := func() {
-				close(engine.commitErr)
-			}
-			defer closeCommitErr()
-			engine.commit <- common.StringToHash("1234567890")
-			err := <-engine.commitErr
-			if err != errOtherBlockCommitted {
-				t.Errorf("unexpected error comes, got: %v, expected: errOtherBlockCommitted", err)
-			}
+			engine.Commit(otherBlock)
 		}
 		eventSub.Unsubscribe()
 	}
 	go eventLoop()
-	finalBlock, err := engine.Seal(chain, block, nil)
-	if err != errOtherBlockCommitted {
-		t.Errorf("unexpected error comes, got: %v, expected: errOtherBlockCommitted", err)
+	seal := func() {
+		engine.Seal(chain, block, nil)
+		t.Errorf("should not be called")
 	}
-	if finalBlock != nil {
-		t.Errorf("block should be nil, but got: %v", finalBlock)
+	go seal()
+
+	const timeoutDura = 2 * time.Second
+	timeout := time.NewTimer(timeoutDura)
+	select {
+	case <-timeout.C:
+		// wait 2 seconds to ensure we cannot get any blocks from PBFT
 	}
 }
 
