@@ -75,6 +75,20 @@ func (v *View) DecodeRLP(s *rlp.Stream) error {
 	return nil
 }
 
+// Cmp compares v and y and returns:
+//   -1 if v <  y
+//    0 if v == y
+//   +1 if v >  y
+func (v *View) Cmp(y *View) int {
+	if v.Sequence.Cmp(y.Sequence) != 0 {
+		return v.Sequence.Cmp(y.Sequence)
+	}
+	if v.Round.Cmp(y.Round) != 0 {
+		return v.Round.Cmp(y.Round)
+	}
+	return 0
+}
+
 type Preprepare struct {
 	View     *View
 	Proposal Proposal
