@@ -228,7 +228,7 @@ func TestSealCommittedOtherHash(t *testing.T) {
 				close(engine.commitErr)
 			}
 			defer closeCommitErr()
-			engine.commit <- common.StringToHash("1234567890")
+			engine.commit <- &commitResult{Hash: common.StringToHash("1234567890"), Signatures: []byte{1}}
 			err := <-engine.commitErr
 			if err != errOtherBlockCommitted {
 				t.Errorf("unexpected error comes, got: %v, expected: errOtherBlockCommitted", err)

@@ -17,14 +17,18 @@
 package simple
 
 import (
+	"bytes"
 	"crypto/ecdsa"
+	"errors"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/consensus/pbft/validator"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -106,6 +110,108 @@ func TestCheckValidatorSignature(t *testing.T) {
 	emptyAddr := common.Address{}
 	if addr != emptyAddr {
 		t.Errorf("Expected empty address, but got: %v", addr)
+	}
+}
+
+func TestCommit(t *testing.T) {
+	backend, _, _ := newSimpleBackend()
+
+	// Case: it's a proposer, so the backend.commit will receive channel result from backend.Commit function
+	testCases := []struct {
+		expectedErr       error
+		expectedSignature []byte
+		expectedBlock     func() *types.Block
+	}{
+		{
+			// normal case
+			nil,
+			[]byte{1, 2, 3},
+			func() *types.Block {
+				chain, engine := newBlockChain(1)
+				return makeBlockWithoutSeal(chain, engine, chain.Genesis())
+			},
+		},
+		{
+			// error
+			errors.New("commit error"),
+			nil,
+			func() *types.Block {
+				chain, engine := newBlockChain(1)
+				return makeBlockWithoutSeal(chain, engine, chain.Genesis())
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		backend.newChannels()
+		expBlock := test.expectedBlock()
+
+		go func() {
+			for {
+				select {
+				case result := <-backend.commit:
+					if bytes.Compare(result.Signatures, test.expectedSignature) != 0 {
+						t.Errorf("expected: %v, but got: %v", test.expectedSignature, result.Signatures)
+					}
+					if result.Hash != expBlock.Hash() {
+						t.Errorf("expected: %v, but got: %v", expBlock.Hash(), result.Hash)
+					}
+					backend.commitErr <- test.expectedErr
+					return
+				case <-time.After(time.Second):
+					t.Error("unexpected error, timeout")
+				}
+			}
+		}()
+
+		if err := backend.Commit(expBlock, test.expectedSignature); err != test.expectedErr {
+			t.Errorf("expeceted: %v, but got: %v", test.expectedErr, err)
+		}
+		backend.closeChannels()
+	}
+
+	// Case: it's not a proposer, so the backend.inserter function will be called.
+	expectedSignature := []byte{1, 2, 3}
+	unexpectedErr := errors.New("unexpected error")
+
+	// to verify whether signature is the same as expectedSignature
+	inserter := func(block *types.Block) error {
+		if bytes.Compare(block.Header().Signatures, expectedSignature) != 0 {
+			return unexpectedErr
+		}
+		return nil
+	}
+
+	testCases = []struct {
+		expectedErr       error
+		expectedSignature []byte
+		expectedBlock     func() *types.Block
+	}{
+		{
+			// normal case
+			nil,
+			expectedSignature,
+			func() *types.Block {
+				chain, engine := newBlockChain(1)
+				return makeBlockWithoutSeal(chain, engine, chain.Genesis())
+			},
+		},
+		{
+			// error
+			unexpectedErr,
+			[]byte("unexpected error"),
+			func() *types.Block {
+				chain, engine := newBlockChain(1)
+				return makeBlockWithoutSeal(chain, engine, chain.Genesis())
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		backend.inserter = inserter
+		if err := backend.Commit(test.expectedBlock(), test.expectedSignature); err != test.expectedErr {
+			t.Errorf("expeceted: %v, but got: %v", test.expectedErr, err)
+		}
 	}
 }
 

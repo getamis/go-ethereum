@@ -39,7 +39,7 @@ type Backend interface {
 	Broadcast(payload []byte) error
 
 	// Commit is to deliver a final result to write into blockchain
-	Commit(Proposal) error
+	Commit(proposal Proposal, signatures []byte) error
 
 	// ViewChanged is called when view change occurred
 	ViewChanged(needNewProposal bool) error

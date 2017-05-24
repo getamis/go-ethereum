@@ -83,6 +83,9 @@ type Header struct {
 	Extra       []byte         `json:"extraData"        gencodec:"required"`
 	MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
 	Nonce       BlockNonce     `json:"nonce"            gencodec:"required"`
+	// TODO: This might affect public chain block,
+	// need to be able to switch to old structure or make it compatible
+	Signatures []byte
 }
 
 // field type overrides for gencodec
@@ -99,7 +102,23 @@ type headerMarshaling struct {
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its
 // RLP encoding.
 func (h *Header) Hash() common.Hash {
-	return rlpHash(h)
+	return rlpHash([]interface{}{
+		h.ParentHash,
+		h.UncleHash,
+		h.Coinbase,
+		h.Root,
+		h.TxHash,
+		h.ReceiptHash,
+		h.Bloom,
+		h.Difficulty,
+		h.Number,
+		h.GasLimit,
+		h.GasUsed,
+		h.Time,
+		h.Extra,
+		h.MixDigest,
+		h.Nonce,
+	})
 }
 
 // HashNoNonce returns the hash which is used as input for the proof-of-work search.
@@ -253,6 +272,10 @@ func CopyHeader(h *Header) *Header {
 		cpy.Extra = make([]byte, len(h.Extra))
 		copy(cpy.Extra, h.Extra)
 	}
+	if len(h.Signatures) > 0 {
+		cpy.Signatures = make([]byte, len(h.Signatures))
+		copy(cpy.Signatures, h.Signatures)
+	}
 	return &cpy
 }
 
@@ -338,6 +361,11 @@ func (b *Block) Size() common.StorageSize {
 	return common.StorageSize(c)
 }
 
+// UpdateHeaderSignatures updates header signatures that store consensus proof
+func (b *Block) UpdateHeaderSignatures(signatures []byte) {
+	b.header.Signatures = signatures
+}
+
 type writeCounter common.StorageSize
 
 func (c *writeCounter) Write(b []byte) (int, error) {
@@ -381,7 +409,7 @@ func (b *Block) Hash() common.Hash {
 	if hash := b.hash.Load(); hash != nil {
 		return hash.(common.Hash)
 	}
-	v := rlpHash(b.header)
+	v := b.header.Hash()
 	b.hash.Store(v)
 	return v
 }
@@ -417,7 +445,8 @@ func (h *Header) String() string {
 	Extra:		    %s
 	MixDigest:      %x
 	Nonce:		    %x
-]`, h.Hash(), h.ParentHash, h.UncleHash, h.Coinbase, h.Root, h.TxHash, h.ReceiptHash, h.Bloom, h.Difficulty, h.Number, h.GasLimit, h.GasUsed, h.Time, h.Extra, h.MixDigest, h.Nonce)
+	Signatures:	    %s
+]`, h.Hash(), h.ParentHash, h.UncleHash, h.Coinbase, h.Root, h.TxHash, h.ReceiptHash, h.Bloom, h.Difficulty, h.Number, h.GasLimit, h.GasUsed, h.Time, h.Extra, h.MixDigest, h.Nonce, h.Signatures)
 }
 
 type Blocks []*Block

@@ -284,7 +284,7 @@ func (sb *simpleBackend) closeChannels() {
 
 func (sb *simpleBackend) newChannels() {
 	sb.viewChange = make(chan bool, 1)
-	sb.commit = make(chan common.Hash, 1)
+	sb.commit = make(chan *commitResult, 1)
 }
 
 // Seal generates a new block for the given input block with the local miner's
@@ -328,8 +328,9 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 				return nil, errViewChanged
 			}
 			// if we don't need to change block, we keep waiting events.
-		case hash := <-sb.commit:
-			if block.Hash() == hash {
+		case commitResult := <-sb.commit:
+			if block.Hash() == commitResult.Hash {
+				block.UpdateHeaderSignatures(commitResult.Signatures)
 				sb.commitErr <- nil
 				return block, nil
 			}
