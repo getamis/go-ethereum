@@ -63,7 +63,7 @@ func (c *core) handlePrepare(msg *message, src pbft.Validator) error {
 	c.acceptPrepare(msg, src)
 
 	// If 2f+1
-	if int64(c.current.Prepares.Size()) > 2*c.F && c.state == StatePreprepared {
+	if int64(c.current.Prepares.Size()) > 2*c.F && c.state != StatePrepared {
 		c.setState(StatePrepared)
 		c.sendCommit()
 	}
@@ -74,15 +74,8 @@ func (c *core) handlePrepare(msg *message, src pbft.Validator) error {
 func (c *core) verifyPrepare(prepare *pbft.Subject, src pbft.Validator) error {
 	logger := c.logger.New("from", src.Address().Hex(), "state", c.state)
 
-	if prepare.View.Sequence != nil &&
-		c.subject != nil &&
-		prepare.View.Sequence.Cmp(c.subject.View.Sequence) < 0 {
-		logger.Warn("Old message", "expected", c.subject, "got", prepare)
-		return pbft.ErrOldMessage
-	}
-
 	if !reflect.DeepEqual(prepare, c.subject) {
-		logger.Warn("Subjects do not match", "expected", c.subject, "got", prepare)
+		logger.Warn("Inconsistent subjects between prepare and proposal", "expected", c.subject, "got", prepare)
 		return pbft.ErrSubjectNotMatched
 	}
 

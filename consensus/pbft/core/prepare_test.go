@@ -229,7 +229,7 @@ func TestVerifyPrepare(t *testing.T) {
 		},
 		{
 			// old message
-			expected: pbft.ErrOldMessage,
+			expected: pbft.ErrSubjectNotMatched,
 			prepare: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
 				Digest: common.StringToHash("1234567890"),
@@ -237,6 +237,18 @@ func TestVerifyPrepare(t *testing.T) {
 			self: &pbft.Subject{
 				View:   &pbft.View{Round: big.NewInt(1), Sequence: big.NewInt(1)},
 				Digest: common.StringToHash("1234567890"),
+			},
+		},
+		{
+			// different digest
+			expected: pbft.ErrSubjectNotMatched,
+			prepare: &pbft.Subject{
+				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
+				Digest: common.StringToHash("1234567890"),
+			},
+			self: &pbft.Subject{
+				View:   &pbft.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
+				Digest: common.StringToHash("1234567888"),
 			},
 		},
 		{

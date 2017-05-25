@@ -21,8 +21,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/pbft"
 )
 
 func TestHandlePreprepare(t *testing.T) {
@@ -177,7 +177,7 @@ OUTER:
 				Address: v0.Address(),
 			}, val); err != nil {
 				if err != test.expectedErr {
-					t.Error("unexpected error: ", err)
+					t.Errorf("unexpected error, expect:%v, but got:%v", test.expectedErr, err)
 				}
 				continue OUTER
 			}

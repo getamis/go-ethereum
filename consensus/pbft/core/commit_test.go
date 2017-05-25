@@ -37,6 +37,7 @@ func TestHandleCommit(t *testing.T) {
 			Proposal: makeBlock(1),
 		}
 		c.acceptPreprepare(preprepare)
+		c.state = StatePreprepared
 	}
 
 	testCases := []struct {
@@ -84,6 +85,26 @@ func TestHandleCommit(t *testing.T) {
 			errFutureMessage,
 		},
 		{
+			// future message because still at StateAcceptRequest
+			func() *testSystem {
+				sys := NewTestSystemWithBackend(N, F)
+
+				for i, backend := range sys.backends {
+					c := backend.engine.(*core)
+
+					// replica0 is still waiting for preprepare message
+					// other replicas are at StatePrepared
+					if i != 0 {
+						toPreprepare(c)
+						// change to prepared
+						c.state = StatePrepared
+					}
+				}
+				return sys
+			}(),
+			errFutureMessage,
+		},
+		{
 			// subject not match
 			func() *testSystem {
 				sys := NewTestSystemWithBackend(N, F)
@@ -124,6 +145,26 @@ func TestHandleCommit(t *testing.T) {
 			}(),
 			nil,
 		},
+		{
+			// jump state
+			func() *testSystem {
+				sys := NewTestSystemWithBackend(N, F)
+
+				for i, backend := range sys.backends {
+					c := backend.engine.(*core)
+					// should have subject for each backend
+					toPreprepare(c)
+
+					// only replica0 stays at StatePreprepared
+					// other replicas are at StatePrepared
+					if i != 0 {
+						c.state = StatePrepared
+					}
+				}
+				return sys
+			}(),
+			nil,
+		},
 		// TODO: double send message
 	}
 
@@ -135,17 +176,20 @@ OUTER:
 		r0 := v0.engine.(*core)
 
 		for i, v := range test.system.backends {
-			validator := v.Validators().GetByIndex(uint64(i))
-			m, _ := Encode(v.engine.(*core).subject)
-			if err := r0.handleCommit(&message{
-				Code:    msgCommit,
-				Msg:     m,
-				Address: validator.Address(),
-			}, validator); err != nil {
-				if err != test.expectedErr {
-					t.Error("unexpected error: ", err)
+			// send commit message to replica0 if has subject
+			if v.engine.(*core).subject != nil {
+				validator := v.Validators().GetByIndex(uint64(i))
+				m, _ := Encode(v.engine.(*core).subject)
+				if err := r0.handleCommit(&message{
+					Code:    msgCommit,
+					Msg:     m,
+					Address: validator.Address(),
+				}, validator); err != nil {
+					if err != test.expectedErr {
+						t.Error("unexpected error: ", err)
+					}
+					continue OUTER
 				}
-				continue OUTER
 			}
 		}
 
