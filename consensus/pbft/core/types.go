@@ -17,14 +17,14 @@
 package core
 
 import (
+	"fmt"
 	"io"
 	"math/big"
-
-	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/rlp"
+	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
 type Engine interface {
@@ -140,6 +140,10 @@ func (m *message) PayloadNoSig() ([]byte, error) {
 
 func (m *message) Decode(val interface{}) error {
 	return rlp.DecodeBytes(m.Msg, val)
+}
+
+func (m *message) String() string {
+	return fmt.Sprintf("{Code: %v, Address: %v}", m.Code, m.Address.Hex())
 }
 
 // ==============================================

@@ -26,7 +26,7 @@ func (c *core) sendPreprepare(request *pbft.Request) {
 	logger := c.logger.New("state", c.state)
 	curView := c.currentView()
 
-	if c.isPrimary() {
+	if c.current.sequence.Cmp(request.Proposal.Number()) == 0 && c.isPrimary() {
 		preprepare, err := Encode(&pbft.Preprepare{
 			View:     curView,
 			Proposal: request.Proposal,

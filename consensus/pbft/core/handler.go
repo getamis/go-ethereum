@@ -28,16 +28,15 @@ func (c *core) Start(lastSequence *big.Int, lastProposer common.Address) error {
 	// initial last commit sequence and proposer
 	c.lastProposer = lastProposer
 
-	// Tests will handle events itself, so we have to make subscribeEvents()
-	// be able to call in test.
-	c.subscribeEvents()
-
-	go c.handleEvents()
-
 	c.startNewRound(&pbft.View{
 		Sequence: new(big.Int).Add(lastSequence, common.Big1),
 		Round:    common.Big0,
 	}, false)
+
+	// Tests will handle events itself, so we have to make subscribeEvents()
+	// be able to call in test.
+	c.subscribeEvents()
+	go c.handleEvents()
 
 	return nil
 }
