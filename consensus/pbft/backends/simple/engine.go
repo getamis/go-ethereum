@@ -41,6 +41,8 @@ var (
 	errUnknownBlock = errors.New("unknown block")
 	// errUnauthorized is returned if a header is signed by a non authorized entity.
 	errUnauthorized = errors.New("unauthorized")
+	// errNotInValidatorSet is returned if I'm not in validator set but try to start engine
+	errNotInValidatorSet = errors.New("not in validator set")
 	// errInvalidDifficulty is returned if the difficulty of a block is not 1
 	errInvalidDifficulty = errors.New("invalid difficulty")
 	// errNotProposer is returned when I'm not a proposer
@@ -415,6 +417,9 @@ func (sb *simpleBackend) Start(chain consensus.ChainReader, inserter func(block 
 	if err := sb.initValidatorSet(chain); err != nil {
 		return err
 	}
+	if _, v := sb.valSet.GetByAddress(sb.address); v == nil {
+		return errNotInValidatorSet
+	}
 	sb.chain = chain
 	sb.inserter = inserter
 	sb.core = pbftCore.New(sb, sb.config)
@@ -435,7 +440,10 @@ func (sb *simpleBackend) Start(chain consensus.ChainReader, inserter func(block 
 
 // Stop implements consensus.PBFT.Stop
 func (sb *simpleBackend) Stop() error {
-	return sb.core.Stop()
+	if sb.core != nil {
+		return sb.core.Stop()
+	}
+	return nil
 }
 
 func (sb *simpleBackend) initValidatorSet(chain consensus.ChainReader) error {
