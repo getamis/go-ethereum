@@ -62,8 +62,9 @@ func (c *core) handlePrepare(msg *message, src pbft.Validator) error {
 
 	c.acceptPrepare(msg, src)
 
-	// If 2f+1
-	if int64(c.current.Prepares.Size()) > 2*c.F && c.state != StatePrepared {
+	// change to StatePrepared if receving enough prepare messages
+	// and the current state is at previous state
+	if int64(c.current.Prepares.Size()) > 2*c.F && c.state.Cmp(StatePrepared) < 0 {
 		c.setState(StatePrepared)
 		c.sendCommit()
 	}
