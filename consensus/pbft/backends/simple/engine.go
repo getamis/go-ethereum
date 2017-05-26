@@ -106,12 +106,8 @@ func (sb *simpleBackend) verifyHeader(chain consensus.ChainReader, header *types
 		return consensus.ErrFutureBlock
 	}
 
-	// Check that the extra-data contains vanity, validator size, and signature
-	length := len(header.Extra)
-	if length < extraVanity+extraValidatorSize+extraSeal {
-		return errInvalidExtraDataFormat
-	}
-	if !validator.ValidExtraData(sb.getValidatorBytes(header)) {
+	// Ensure that the extra data format is satisfied
+	if !sb.validExtraFormat(header) {
 		return errInvalidExtraDataFormat
 	}
 
@@ -466,6 +462,25 @@ func (sb *simpleBackend) initValidatorSet(chain consensus.ChainReader) error {
 	return nil
 }
 
+func (sb *simpleBackend) validExtraFormat(header *types.Header) bool {
+	length := len(header.Extra)
+	// ensure the bytes is enough
+	if length < extraVanity+extraValidatorSize+extraSeal {
+		return false
+	}
+
+	vl := sb.validatorLength(header)
+	// validator length cannot be 0
+	if vl == 0 {
+		return false
+	}
+	if length != extraVanity+extraValidatorSize+vl+extraSeal {
+		return false
+	}
+
+	return true
+}
+
 func (sb *simpleBackend) getValidatorBytes(header *types.Header) []byte {
 	return header.Extra[extraVanity+extraValidatorSize : extraVanity+extraValidatorSize+sb.validatorLength(header)]
 }
@@ -482,7 +497,7 @@ func (sb *simpleBackend) prepareExtra(header *types.Header) []byte {
 	return buf
 }
 
-// signaturePosition returns a signature start and end position for the given header
+// signaturePosition returns start and end position for the given header
 func (sb *simpleBackend) signaturePosition(header *types.Header) (int, int) {
 	start := extraVanity + extraValidatorSize + sb.validatorLength(header)
 	end := start + extraSeal
