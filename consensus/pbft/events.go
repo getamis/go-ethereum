@@ -1,4 +1,4 @@
-// Copyright 2017 The go-ethereum Authors
+// Copyright 2017 AMIS Technologies
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -14,24 +14,32 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package consensus
+package pbft
 
-import "errors"
-
-var (
-	// ErrUnknownAncestor is returned when validating a block requires an ancestor
-	// that is unknown.
-	ErrUnknownAncestor = errors.New("unknown ancestor")
-
-	// ErrFutureBlock is returned when a block's timestamp is in the future according
-	// to the current node.
-	ErrFutureBlock = errors.New("block in the future")
-
-	// ErrInvalidNumber is returned if a block's number doesn't equal it's parent's
-	// plus one.
-	ErrInvalidNumber = errors.New("invalid block number")
-
-	// ErrMissingSignature is returned if a block's extra-data section doesn't seem
-	// to contain a 65 byte secp256k1 signature.
-	ErrMissingSignature = errors.New("extra-data 65 byte suffix signature missing")
+import (
+	"github.com/ethereum/go-ethereum/common"
 )
+
+type ConsensusDataEvent struct {
+	// peer id for send p2p message
+	PeerID string
+	// consensus message data
+	Data []byte
+}
+
+type RequestEvent struct {
+	Proposal Proposal
+}
+
+type ConnectionEvent struct {
+	Address common.Address
+}
+
+type MessageEvent struct {
+	Payload []byte
+}
+
+type FinalCommittedEvent struct {
+	Proposal Proposal
+	Proposer common.Address
+}

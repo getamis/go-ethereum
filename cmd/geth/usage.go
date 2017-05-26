@@ -190,7 +190,11 @@ var AppHelpFlagGroups = []flagGroup{
 	{
 		Name: "PBFT",
 		Flags: []cli.Flag{
-			utils.PBFTTimeoutFlag,
+			utils.PBFTRequestTimeoutFlag,
+			utils.PBFTBlockPeriodFlag,
+			utils.PBFTBlockPauseTimeFlag,
+			utils.PBFTProposerPolicyFlag,
+			utils.PBFTCheckPointPeriodFlag,
 		},
 	},
 }

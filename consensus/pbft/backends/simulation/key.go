@@ -1,4 +1,4 @@
-// Copyright 2017 The go-ethereum Authors
+// Copyright 2017 AMIS Technologies
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -14,24 +14,34 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package consensus
+package simulation
 
-import "errors"
+import (
+	"crypto/ecdsa"
 
-var (
-	// ErrUnknownAncestor is returned when validating a block requires an ancestor
-	// that is unknown.
-	ErrUnknownAncestor = errors.New("unknown ancestor")
-
-	// ErrFutureBlock is returned when a block's timestamp is in the future according
-	// to the current node.
-	ErrFutureBlock = errors.New("block in the future")
-
-	// ErrInvalidNumber is returned if a block's number doesn't equal it's parent's
-	// plus one.
-	ErrInvalidNumber = errors.New("invalid block number")
-
-	// ErrMissingSignature is returned if a block's extra-data section doesn't seem
-	// to contain a 65 byte secp256k1 signature.
-	ErrMissingSignature = errors.New("extra-data 65 byte suffix signature missing")
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
+
+func NewNodeKey() *NodeKey {
+	key, _ := crypto.GenerateKey()
+	return &NodeKey{
+		key: key,
+	}
+}
+
+type NodeKey struct {
+	key *ecdsa.PrivateKey
+}
+
+func (p *NodeKey) Address() common.Address {
+	return crypto.PubkeyToAddress(p.key.PublicKey)
+}
+
+func (p *NodeKey) PublicKey() *ecdsa.PublicKey {
+	return &p.key.PublicKey
+}
+
+func (p *NodeKey) PrivateKey() *ecdsa.PrivateKey {
+	return p.key
+}

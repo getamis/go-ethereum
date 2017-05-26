@@ -11,6 +11,11 @@
 GOBIN = build/bin
 GO ?= latest
 
+pbft:
+	build/env.sh go run build/ci.go install ./consensus/pbft/example/simplenode
+	@echo "Done building."
+	@echo "Run \"$(GOBIN)/simplenode\" to launch simplenode."
+
 geth:
 	build/env.sh go run build/ci.go install ./cmd/geth
 	@echo "Done building."

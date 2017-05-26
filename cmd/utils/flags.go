@@ -32,6 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
+	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -424,10 +425,30 @@ var (
 	}
 
 	// PBFT settings
-	PBFTTimeoutFlag = cli.IntFlag{
-		Name:  "pbft_timeout",
+	PBFTRequestTimeoutFlag = cli.Uint64Flag{
+		Name:  "pbft_request_timeout",
 		Usage: "The timeout for each PBFT round in millisecond",
-		Value: 2000,
+		Value: eth.DefaultConfig.PBFT.RequestTimeoutMsec,
+	}
+	PBFTBlockPeriodFlag = cli.Uint64Flag{
+		Name:  "pbft_block_period",
+		Usage: "Default minimum difference between two consecutive block's timestamps in second",
+		Value: eth.DefaultConfig.PBFT.BlockPeriod,
+	}
+	PBFTBlockPauseTimeFlag = cli.Uint64Flag{
+		Name:  "pbft_block_pause_time",
+		Usage: "Pause time when zero tx in previous block, values should be larger than pbft_block_period",
+		Value: eth.DefaultConfig.PBFT.BlockPauseTime,
+	}
+	PBFTProposerPolicyFlag = cli.IntFlag{
+		Name:  "pbft_proposer_policy",
+		Usage: "The policy for proposer, the detail is not determined",
+		Value: int(eth.DefaultConfig.PBFT.ProposerPolicy),
+	}
+	PBFTCheckPointPeriodFlag = cli.IntFlag{
+		Name:  "pbft_cp_period",
+		Usage: "Synchronizes the mapping's checkpoint to the blocks on each round",
+		Value: eth.DefaultConfig.PBFT.CheckPointPeriod,
 	}
 )
 
@@ -808,6 +829,24 @@ func setEthash(ctx *cli.Context, cfg *eth.Config) {
 	}
 }
 
+func setPBFT(ctx *cli.Context, cfg *eth.Config) {
+	if ctx.GlobalIsSet(PBFTRequestTimeoutFlag.Name) {
+		cfg.PBFT.RequestTimeoutMsec = ctx.GlobalUint64(PBFTRequestTimeoutFlag.Name)
+	}
+	if ctx.GlobalIsSet(PBFTBlockPeriodFlag.Name) {
+		cfg.PBFT.BlockPeriod = ctx.GlobalUint64(PBFTBlockPeriodFlag.Name)
+	}
+	if ctx.GlobalIsSet(PBFTBlockPauseTimeFlag.Name) {
+		cfg.PBFT.BlockPauseTime = ctx.GlobalUint64(PBFTBlockPauseTimeFlag.Name)
+	}
+	if ctx.GlobalIsSet(PBFTProposerPolicyFlag.Name) {
+		cfg.PBFT.ProposerPolicy = pbft.ProposerPolicy(ctx.GlobalInt(PBFTProposerPolicyFlag.Name))
+	}
+	if ctx.GlobalIsSet(PBFTCheckPointPeriodFlag.Name) {
+		cfg.PBFT.CheckPointPeriod = ctx.GlobalInt(PBFTCheckPointPeriodFlag.Name)
+	}
+}
+
 func checkExclusive(ctx *cli.Context, flags ...cli.Flag) {
 	set := make([]string, 0, 1)
 	for _, flag := range flags {
@@ -830,7 +869,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 	setEtherbase(ctx, ks, cfg)
 	setGPO(ctx, &cfg.GPO)
 	setEthash(ctx, cfg)
-
+	setPBFT(ctx, cfg)
 	switch {
 	case ctx.GlobalIsSet(SyncModeFlag.Name):
 		cfg.SyncMode = *GlobalTextMarshaler(ctx, SyncModeFlag.Name).(*downloader.SyncMode)
@@ -873,9 +912,6 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 	if ctx.GlobalIsSet(VMEnableDebugFlag.Name) {
 		// TODO(fjl): force-enable this in --dev mode
 		cfg.EnablePreimageRecording = ctx.GlobalBool(VMEnableDebugFlag.Name)
-	}
-	if ctx.GlobalIsSet(PBFTTimeoutFlag.Name) {
-		cfg.PBFTTimeout = ctx.GlobalInt(PBFTTimeoutFlag.Name)
 	}
 
 	// Override any default configs for hard coded networks.

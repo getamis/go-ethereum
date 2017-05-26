@@ -18,6 +18,8 @@
 package consensus
 
 import (
+	"crypto/ecdsa"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -99,4 +101,27 @@ type PoW interface {
 
 	// Hashrate returns the current mining hashrate of a PoW consensus engine.
 	Hashrate() float64
+}
+
+// PBFT is a consensus engine to avoid byzantine failure
+type PBFT interface {
+	Engine
+
+	// Add a peer
+	AddPeer(peerID string, publicKey *ecdsa.PublicKey) error
+
+	// Remove a peer
+	RemovePeer(peerID string) error
+
+	// Handle a message from peer
+	HandleMsg(peerID string, data []byte) error
+
+	// Receive new chain head block
+	NewChainHead(block *types.Block)
+
+	// Start the engine
+	Start(chain ChainReader, inserter func(block *types.Block) error) error
+
+	// Stop the engine
+	Stop() error
 }

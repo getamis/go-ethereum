@@ -18,17 +18,15 @@ package eth
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"math"
 	"math/big"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
+	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/downloader"
@@ -43,101 +41,32 @@ import (
 )
 
 const (
-	softResponseLimit = 2 * 1024 * 1024 // Target maximum size of returned blocks, headers or node data.
-	estHeaderRlpSize  = 500             // Approximate size of an RLP encoded block header
+	// support eth/63 protocol
+	pbftName           = "pbft"
+	pbftVersion        = 64
+	pbftProtocolLength = 18
+
+	PBFTMsg = 0x11
 )
 
-var (
-	daoChallengeTimeout = 15 * time.Second // Time allowance for a node to reply to the DAO handshake challenge
-)
+type pbftProtocolManager struct {
+	*protocolManager
 
-// errIncompatibleConfig is returned if the requested protocols and configs are
-// not compatible (low protocol version restrictions and high requirements).
-var errIncompatibleConfig = errors.New("incompatible configuration")
-
-func errResp(code errCode, format string, v ...interface{}) error {
-	return fmt.Errorf("%v - %v", code, fmt.Sprintf(format, v...))
+	engine   consensus.PBFT
+	eventSub *event.TypeMuxSubscription
 }
 
-type ProtocolManager interface {
-	// Start protocol manager
-	Start()
-
-	// Stop protocol manager
-	Stop()
-
-	// BroadcastBlock will either propagate a block to a subset of it's peers, or
-	// will only announce it's availability (depending what's requested).
-	BroadcastBlock(block *types.Block, propagate bool)
-
-	// BroadcastTx will propagate a transaction to all peers which are not known to
-	// already have the given transaction.
-	BroadcastTx(hash common.Hash, tx *types.Transaction)
-
-	// NodeInfo retrieves some protocol metadata about the running host node.
-	NodeInfo() *EthNodeInfo
-
-	// Set les server
-	SetLesServer(l LesServer)
-
-	// Return downloader
-	Downloader() *downloader.Downloader
-
-	// Set acceptTxs
-	SetAcceptTxs(uint32)
-
-	// Return SubProtocols
-	Protocols() []p2p.Protocol
+// PBFTEvent is posted
+type PBFTEvent struct {
+	// peer public key
+	PeerPublicKey string
+	// PBFT message data
+	Data []byte
 }
 
-type protocolManager struct {
-	networkId uint64
-
-	fastSync  uint32 // Flag whether fast sync is enabled (gets disabled if we already have blocks)
-	acceptTxs uint32 // Flag whether we're considered synchronised (enables transaction processing)
-
-	txpool      txPool
-	blockchain  *core.BlockChain
-	chaindb     ethdb.Database
-	chainconfig *params.ChainConfig
-	maxPeers    int
-
-	downloader *downloader.Downloader
-	fetcher    *fetcher.Fetcher
-	peers      *peerSet
-
-	SubProtocols []p2p.Protocol
-
-	eventMux      *event.TypeMux
-	txSub         *event.TypeMuxSubscription
-	minedBlockSub *event.TypeMuxSubscription
-
-	// channels for fetcher, syncer, txsyncLoop
-	newPeerCh   chan *peer
-	txsyncCh    chan *txsync
-	quitSync    chan struct{}
-	noMorePeers chan struct{}
-
-	lesServer LesServer
-
-	// wait group is used for graceful shutdowns during downloading
-	// and processing
-	wg sync.WaitGroup
-}
-
-// NewProtocolManager returns a new ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
-// with the ethereum network.
-func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, networkId uint64, maxPeers int, mux *event.TypeMux, txpool txPool, engine consensus.Engine, blockchain *core.BlockChain, chaindb ethdb.Database) (ProtocolManager, error) {
-	if e, ok := engine.(consensus.PBFT); ok {
-		return newPBFTProtocolManager(config, mode, networkId, maxPeers, mux, txpool, e, blockchain, chaindb)
-	} else {
-		return newProtocolManager(config, mode, networkId, maxPeers, mux, txpool, engine, blockchain, chaindb)
-	}
-}
-
-func newProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, networkId uint64, maxPeers int, mux *event.TypeMux, txpool txPool, engine consensus.Engine, blockchain *core.BlockChain, chaindb ethdb.Database) (*protocolManager, error) {
+func newPBFTProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, networkId uint64, maxPeers int, mux *event.TypeMux, txpool txPool, engine consensus.PBFT, blockchain *core.BlockChain, chaindb ethdb.Database) (*pbftProtocolManager, error) {
 	// Create the protocol manager with the base fields
-	manager := &protocolManager{
+	m := &protocolManager{
 		networkId:   networkId,
 		eventMux:    mux,
 		txpool:      txpool,
@@ -151,6 +80,13 @@ func newProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 		txsyncCh:    make(chan *txsync),
 		quitSync:    make(chan struct{}),
 	}
+
+	// Create the pbft protocol manager
+	manager := &pbftProtocolManager{
+		protocolManager: m,
+		engine:          engine,
+	}
+
 	// Figure out whether to allow fast sync or not
 	if mode == downloader.FastSync && blockchain.CurrentBlock().NumberU64() > 0 {
 		log.Warn("Blockchain not empty, fast sync disabled")
@@ -159,21 +95,15 @@ func newProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 	if mode == downloader.FastSync {
 		manager.fastSync = uint32(1)
 	}
-	// Initiate a sub-protocol for every implemented version we can handle
-	manager.SubProtocols = make([]p2p.Protocol, 0, len(ProtocolVersions))
-	for i, version := range ProtocolVersions {
-		// Skip protocol version if incompatible with the mode of operation
-		if mode == downloader.FastSync && version < eth63 {
-			continue
-		}
-		// Compatible; initialise the sub-protocol
-		version := version // Closure for the run
-		manager.SubProtocols = append(manager.SubProtocols, p2p.Protocol{
-			Name:    ProtocolName,
-			Version: version,
-			Length:  ProtocolLengths[i],
+
+	// Only support 1 pbft protocol
+	manager.SubProtocols = []p2p.Protocol{
+		p2p.Protocol{
+			Name:    pbftName,
+			Version: pbftVersion,
+			Length:  pbftProtocolLength,
 			Run: func(p *p2p.Peer, rw p2p.MsgReadWriter) error {
-				peer := manager.newPeer(int(version), p, rw)
+				peer := manager.newPeer(int(pbftVersion), p, rw)
 				select {
 				case manager.newPeerCh <- peer:
 					manager.wg.Add(1)
@@ -192,13 +122,14 @@ func newProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 				}
 				return nil
 			},
-		})
+		},
 	}
+
 	if len(manager.SubProtocols) == 0 {
 		return nil, errIncompatibleConfig
 	}
 	// Construct the different synchronisation mechanisms
-	manager.downloader = downloader.New(mode, chaindb, manager.eventMux, blockchain.HasHeader, blockchain.HasBlockAndState, blockchain.GetHeaderByHash,
+	manager.downloader = downloader.New(downloader.FullSync, chaindb, manager.eventMux, blockchain.HasHeader, blockchain.HasBlockAndState, blockchain.GetHeaderByHash,
 		blockchain.GetBlockByHash, blockchain.CurrentHeader, blockchain.CurrentBlock, blockchain.CurrentFastBlock, blockchain.FastSyncCommitHead,
 		blockchain.GetTdByHash, blockchain.InsertHeaderChain, manager.blockchain.InsertChain, blockchain.InsertReceiptChain, blockchain.Rollback,
 		manager.removePeer)
@@ -218,70 +149,24 @@ func newProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 	return manager, nil
 }
 
-func (pm *protocolManager) removePeer(id string) {
-	// Short circuit if the peer was already removed
-	peer := pm.peers.Peer(id)
-	if peer == nil {
-		return
-	}
-	log.Debug("Removing Ethereum peer", "peer", id)
-
-	// Unregister the peer from the downloader and Ethereum peer set
-	pm.downloader.UnregisterPeer(id)
-	if err := pm.peers.Unregister(id); err != nil {
-		log.Error("Peer removal failed", "peer", id, "err", err)
-	}
-	// Hard disconnect at the networking layer
-	if peer != nil {
-		peer.Peer.Disconnect(p2p.DiscUselessPeer)
-	}
+func (pm *pbftProtocolManager) Start() {
+	// receive the PBFT event
+	pm.eventSub = pm.eventMux.Subscribe(pbft.ConsensusDataEvent{}, core.ChainHeadEvent{})
+	go pm.eventLoop()
+	pm.protocolManager.Start()
+	pm.engine.Start(pm.protocolManager.blockchain, pm.commitBlock)
 }
 
-func (pm *protocolManager) Start() {
-	// broadcast transactions
-	pm.txSub = pm.eventMux.Subscribe(core.TxPreEvent{})
-	go pm.txBroadcastLoop()
-	// broadcast mined blocks
-	pm.minedBlockSub = pm.eventMux.Subscribe(core.NewMinedBlockEvent{})
-	go pm.minedBroadcastLoop()
-
-	// start sync handlers
-	go pm.syncer()
-	go pm.txsyncLoop()
-}
-
-func (pm *protocolManager) Stop() {
+func (pm *pbftProtocolManager) Stop() {
 	log.Info("Stopping Ethereum protocol")
-
-	pm.txSub.Unsubscribe()         // quits txBroadcastLoop
-	pm.minedBlockSub.Unsubscribe() // quits blockBroadcastLoop
-
-	// Quit the sync loop.
-	// After this send has completed, no new peers will be accepted.
-	pm.noMorePeers <- struct{}{}
-
-	// Quit fetcher, txsyncLoop.
-	close(pm.quitSync)
-
-	// Disconnect existing sessions.
-	// This also closes the gate for any new registrations on the peer set.
-	// sessions which are already established but not added to pm.peers yet
-	// will exit when they try to register.
-	pm.peers.Close()
-
-	// Wait for all peer handler goroutines and the loops to come down.
-	pm.wg.Wait()
-
-	log.Info("Ethereum protocol stopped")
-}
-
-func (pm *protocolManager) newPeer(pv int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
-	return newPeer(pv, p, newMeteredMsgWriter(rw))
+	pm.engine.Stop()
+	pm.protocolManager.Stop()
+	pm.eventSub.Unsubscribe() // quits eventLoop
 }
 
 // handle is the callback invoked to manage the life cycle of an eth peer. When
 // this function terminates, the peer is disconnected.
-func (pm *protocolManager) handle(p *peer) error {
+func (pm *pbftProtocolManager) handle(p *peer) error {
 	if pm.peers.Len() >= pm.maxPeers {
 		return p2p.DiscTooManyPeers
 	}
@@ -301,6 +186,12 @@ func (pm *protocolManager) handle(p *peer) error {
 		p.Log().Error("Ethereum peer registration failed", "err", err)
 		return err
 	}
+	pubKey, err := p.ID().Pubkey()
+	if err != nil {
+		p.Log().Error("Ethereum peer get public key failed", "err", err)
+		return err
+	}
+	pm.engine.AddPeer(p.id, pubKey)
 	defer pm.removePeer(p.id)
 
 	// Register the peer in the downloader. If the downloader considers it banned, we disconnect
@@ -341,7 +232,7 @@ func (pm *protocolManager) handle(p *peer) error {
 
 // handleMsg is invoked whenever an inbound message is received from a remote
 // peer. The remote connection is torn down upon returning any error.
-func (pm *protocolManager) handleMsg(p *peer) error {
+func (pm *pbftProtocolManager) handleMsg(p *peer) error {
 	// Read the next message from the remote peer, and ensure it's fully consumed
 	msg, err := p.rw.ReadMsg()
 	if err != nil {
@@ -699,103 +590,61 @@ func (pm *protocolManager) handleMsg(p *peer) error {
 		}
 		pm.txpool.AddBatch(txs)
 
+	case msg.Code == PBFTMsg:
+		var data []byte
+		if err := msg.Decode(&data); err != nil {
+			return errResp(ErrDecode, "msg %v: %v", msg, err)
+		}
+		pm.engine.HandleMsg(p.id, data)
 	default:
 		return errResp(ErrInvalidMsgCode, "%v", msg.Code)
 	}
 	return nil
 }
 
-func (pm *protocolManager) BroadcastBlock(block *types.Block, propagate bool) {
-	hash := block.Hash()
-	peers := pm.peers.PeersWithoutBlock(hash)
-
-	// If propagation is requested, send to a subset of the peer
-	if propagate {
-		// Calculate the TD of the block (it's not imported yet, so block.Td is not valid)
-		var td *big.Int
-		if parent := pm.blockchain.GetBlock(block.ParentHash(), block.NumberU64()-1); parent != nil {
-			td = new(big.Int).Add(block.Difficulty(), pm.blockchain.GetTd(block.ParentHash(), block.NumberU64()-1))
-		} else {
-			log.Error("Propagating dangling block", "number", block.Number(), "hash", hash)
-			return
-		}
-		// Send the block to a subset of our peers
-		transfer := peers[:int(math.Sqrt(float64(len(peers))))]
-		for _, peer := range transfer {
-			peer.SendNewBlock(block, td)
-		}
-		log.Trace("Propagated block", "hash", hash, "recipients", len(transfer), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
-	}
-	// Otherwise if the block is indeed in out own chain, announce it
-	if pm.blockchain.HasBlock(hash) {
-		for _, peer := range peers {
-			peer.SendNewBlockHashes([]common.Hash{hash}, []uint64{block.NumberU64()})
-		}
-		log.Trace("Announced block", "hash", hash, "recipients", len(peers), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
-	}
-}
-
-func (pm *protocolManager) BroadcastTx(hash common.Hash, tx *types.Transaction) {
-	// Broadcast transaction to a batch of peers not knowing about it
-	peers := pm.peers.PeersWithoutTx(hash)
-	//FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
-	for _, peer := range peers {
-		peer.SendTransactions(types.Transactions{tx})
-	}
-	log.Trace("Broadcast transaction", "hash", hash, "recipients", len(peers))
-}
-
-// Mined broadcast loop
-func (self *protocolManager) minedBroadcastLoop() {
+// event loop for PBFT
+func (pm *pbftProtocolManager) eventLoop() {
 	// automatically stops if unsubscribe
-	for obj := range self.minedBlockSub.Chan() {
+	for obj := range pm.eventSub.Chan() {
 		switch ev := obj.Data.(type) {
-		case core.NewMinedBlockEvent:
-			self.BroadcastBlock(ev.Block, true)  // First propagate block to peers
-			self.BroadcastBlock(ev.Block, false) // Only then announce to the rest
+		case pbft.ConsensusDataEvent:
+			pm.sendEvent(ev)
+		case core.ChainHeadEvent:
+			pm.newHead(ev)
 		}
 	}
 }
 
-func (self *protocolManager) txBroadcastLoop() {
-	// automatically stops if unsubscribe
-	for obj := range self.txSub.Chan() {
-		event := obj.Data.(core.TxPreEvent)
-		self.BroadcastTx(event.Tx.Hash(), event.Tx)
+// event loop for PBFT events
+func (pm *pbftProtocolManager) sendEvent(event pbft.ConsensusDataEvent) {
+	p := pm.peers.Peer(event.PeerID)
+	if p == nil {
+		log.Warn("Failed to send event to peer", "id", event.PeerID)
+		return
+	}
+	p2p.Send(p.rw, PBFTMsg, event.Data)
+}
+
+func (pm *pbftProtocolManager) commitBlock(block *types.Block) error {
+	// TODO: find a better way to handle validator insert block
+	if _, err := pm.blockchain.InsertChain(types.Blocks{block}); err != nil {
+		log.Debug("Block insert failed", "number", block.Number(), "hash", block.Hash(), "err", err)
+		return err
+	}
+	// Only announce the block, not broadcast it
+	go pm.BroadcastBlock(block, false)
+	return nil
+}
+
+func (pm *pbftProtocolManager) newHead(event core.ChainHeadEvent) {
+	block := event.Block
+	if block != nil {
+		pm.engine.NewChainHead(block)
 	}
 }
 
-// EthNodeInfo represents a short summary of the Ethereum sub-protocol metadata known
-// about the host peer.
-type EthNodeInfo struct {
-	Network    uint64      `json:"network"`    // Ethereum network ID (1=Frontier, 2=Morden, Ropsten=3)
-	Difficulty *big.Int    `json:"difficulty"` // Total difficulty of the host's blockchain
-	Genesis    common.Hash `json:"genesis"`    // SHA3 hash of the host's genesis block
-	Head       common.Hash `json:"head"`       // SHA3 hash of the host's best owned block
-}
-
-func (self *protocolManager) NodeInfo() *EthNodeInfo {
-	currentBlock := self.blockchain.CurrentBlock()
-	return &EthNodeInfo{
-		Network:    self.networkId,
-		Difficulty: self.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64()),
-		Genesis:    self.blockchain.Genesis().Hash(),
-		Head:       currentBlock.Hash(),
-	}
-}
-
-func (self *protocolManager) SetLesServer(l LesServer) {
-	self.lesServer = l
-}
-
-func (self *protocolManager) Downloader() *downloader.Downloader {
-	return self.downloader
-}
-
-func (self *protocolManager) SetAcceptTxs(i uint32) {
-	atomic.StoreUint32(&self.acceptTxs, i)
-}
-
-func (self *protocolManager) Protocols() []p2p.Protocol {
-	return self.SubProtocols
+func (pm *pbftProtocolManager) removePeer(id string) {
+	// peer id is equal to peer public key
+	pm.engine.RemovePeer(id)
+	pm.protocolManager.removePeer(id)
 }

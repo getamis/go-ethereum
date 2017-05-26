@@ -43,7 +43,7 @@ type txsync struct {
 }
 
 // syncTransactions starts sending all currently pending transactions to the given peer.
-func (pm *ProtocolManager) syncTransactions(p *peer) {
+func (pm *protocolManager) syncTransactions(p *peer) {
 	var txs types.Transactions
 	pending, _ := pm.txpool.Pending()
 	for _, batch := range pending {
@@ -62,7 +62,7 @@ func (pm *ProtocolManager) syncTransactions(p *peer) {
 // connection. When a new peer appears, we relay all currently pending
 // transactions. In order to minimise egress bandwidth usage, we send
 // the transactions in small packs to one peer at a time.
-func (pm *ProtocolManager) txsyncLoop() {
+func (pm *protocolManager) txsyncLoop() {
 	var (
 		pending = make(map[discover.NodeID]*txsync)
 		sending = false               // whether a send is active
@@ -131,7 +131,7 @@ func (pm *ProtocolManager) txsyncLoop() {
 
 // syncer is responsible for periodically synchronising with the network, both
 // downloading hashes and blocks as well as handling the announcement handler.
-func (pm *ProtocolManager) syncer() {
+func (pm *protocolManager) syncer() {
 	// Start and ensure cleanup of sync mechanisms
 	pm.fetcher.Start()
 	defer pm.fetcher.Stop()
@@ -159,7 +159,7 @@ func (pm *ProtocolManager) syncer() {
 }
 
 // synchronise tries to sync up our local block chain with a remote peer.
-func (pm *ProtocolManager) synchronise(peer *peer) {
+func (pm *protocolManager) synchronise(peer *peer) {
 	// Short circuit if no peers are available
 	if peer == nil {
 		return
