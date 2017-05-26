@@ -99,14 +99,8 @@ func TestIsFutureMessage(t *testing.T) {
 	c.state = StatePreprepared
 	for i := 0; i < len(testCode); i++ {
 		r = c.isFutureMessage(testCode[i], v)
-		if testCode[i] <= msgPrepare {
-			if r {
-				t.Error("Should return false because we can execute it now")
-			}
-		} else {
-			if !r {
-				t.Error("Should return true because it's a future round")
-			}
+		if r {
+			t.Error("Should return false because we can execute it now")
 		}
 	}
 
@@ -114,14 +108,8 @@ func TestIsFutureMessage(t *testing.T) {
 	c.state = StatePrepared
 	for i := 0; i < len(testCode); i++ {
 		r = c.isFutureMessage(testCode[i], v)
-		if testCode[i] <= msgCommit {
-			if r {
-				t.Error("Should return false because we can execute it now")
-			}
-		} else {
-			if !r {
-				t.Error("Should return true because it's a future round")
-			}
+		if r {
+			t.Error("Should return false because we can execute it now")
 		}
 	}
 

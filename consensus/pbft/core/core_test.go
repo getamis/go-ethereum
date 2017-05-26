@@ -68,10 +68,10 @@ func TestNewRequest(t *testing.T) {
 			t.Error("expected execution of requests should be 2, but got:", len(backend.commitMsgs))
 		}
 		if !reflect.DeepEqual(request1.Number(), backend.commitMsgs[0].Number()) {
-			t.Error("payload is not the same (1)")
+			t.Errorf("request number should be equal, expect:%v, but got:%v", request1.Number(), backend.commitMsgs[0].Number())
 		}
 		if !reflect.DeepEqual(request2.Number(), backend.commitMsgs[1].Number()) {
-			t.Error("payload is not the same (2)")
+			t.Errorf("request number should be equal, expect:%v, but got:%v", request2.Number(), backend.commitMsgs[1].Number())
 		}
 	}
 }

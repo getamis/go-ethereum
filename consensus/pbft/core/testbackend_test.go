@@ -206,6 +206,7 @@ func NewTestSystemWithBackend(n, f uint64) *testSystem {
 		backend.address = vset.GetByIndex(i).Address()
 
 		core := New(backend, config).(*core)
+		core.state = StateAcceptRequest
 		core.current = newSnapshot(&pbft.View{
 			Round:    big.NewInt(0),
 			Sequence: big.NewInt(1),

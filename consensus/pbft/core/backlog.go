@@ -22,11 +22,12 @@ import (
 )
 
 var (
-	waitFor = map[State]uint64{
-		StateAcceptRequest: msgPreprepare,
-		StatePreprepared:   msgPrepare,
-		StatePrepared:      msgCommit,
-		StateCommitted:     msgAll,
+	// msgPriority is defined for calculating processing priority to speedup consensus
+	// msgPreprepare > msgCommit > msgPrepare
+	msgPriority = map[uint64]int{
+		msgPreprepare: 1,
+		msgCommit:     2,
+		msgPrepare:    3,
 	}
 )
 
@@ -37,15 +38,23 @@ func (c *core) isFutureMessage(msgCode uint64, view *pbft.View) bool {
 		return false
 	}
 
-	waitMsgCode, ok := waitFor[c.state]
-	// don't check if not in pre-defined state
-	if !ok {
+	if view.Cmp(c.currentView()) > 0 {
+		return true
+	}
+
+	if view.Cmp(c.currentView()) < 0 {
 		return false
 	}
-	priority := toPriority(waitMsgCode, c.currentView())
-	newPriority := toPriority(msgCode, view)
 
-	return priority > newPriority
+	// StateAcceptRequest only accepts msgPreprepare
+	// other messages are future messages
+	if c.state == StateAcceptRequest {
+		return msgCode > msgPreprepare
+	}
+
+	// For states(StatePreprepared, StatePrepared, StateCommitted),
+	// can accept all message types if processing with same view
+	return false
 }
 
 func (c *core) storeBacklog(msg *message, src pbft.Validator) {
@@ -143,5 +152,5 @@ func toPriority(msgCode uint64, view *pbft.View) float32 {
 	// FIXME: round will be reset as 0 while new sequence
 	// 10 * Round limits the range of message code is from 0 to 9
 	// 1000 * Sequence limits the range of round is from 0 to 99
-	return -float32(view.Sequence.Uint64()*1000 + view.Round.Uint64()*10 + msgCode)
+	return -float32(view.Sequence.Uint64()*1000 + view.Round.Uint64()*10 + uint64(msgPriority[msgCode]))
 }
