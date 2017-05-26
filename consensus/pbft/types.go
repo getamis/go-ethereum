@@ -17,6 +17,7 @@
 package pbft
 
 import (
+	"fmt"
 	"io"
 	"math/big"
 
@@ -45,6 +46,8 @@ type Proposal interface {
 	EncodeRLP(w io.Writer) error
 
 	DecodeRLP(s *rlp.Stream) error
+
+	String() string
 }
 
 type Request struct {
@@ -136,4 +139,8 @@ func (b *Subject) DecodeRLP(s *rlp.Stream) error {
 	}
 	b.View, b.Digest = subject.View, subject.Digest
 	return nil
+}
+
+func (b *Subject) String() string {
+	return fmt.Sprintf("{View: %v, Digest: %v}", b.View, b.Digest.Hex())
 }
