@@ -34,11 +34,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-const (
-	extraVanity = 32 // Fixed number of extra-data prefix bytes reserved for signer vanity
-	extraSeal   = 65 // Fixed number of extra-data suffix bytes reserved for signer seal
-)
-
 func New(config *pbft.Config, eventMux *event.TypeMux, privateKey *ecdsa.PrivateKey, db ethdb.Database) consensus.PBFT {
 	backend := &simpleBackend{
 		config:       config,

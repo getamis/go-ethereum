@@ -82,6 +82,9 @@ func appendValidators(genesis *core.Genesis, addrs []common.Address) {
 	}
 	genesis.ExtraData = genesis.ExtraData[:extraVanity]
 
+	validatorSize := byte(len(addrs))
+	genesis.ExtraData = append(genesis.ExtraData, validatorSize)
+
 	for _, addr := range addrs {
 		genesis.ExtraData = append(genesis.ExtraData, addr[:]...)
 	}
@@ -426,5 +429,53 @@ OUT3:
 		case <-timeout.C:
 			break OUT3
 		}
+	}
+}
+
+func TestPrepareExtra(t *testing.T) {
+	validatorN := 4
+	buf := make([]byte, 0)
+	buf = append(buf, common.StringToHash("123").Bytes()...)
+	buf = append(buf, byte(validatorN))
+	buf = append(buf, make([]byte, validatorN*common.AddressLength)...)
+	buf = append(buf, make([]byte, extraSeal)...)
+
+	header := &types.Header{}
+	header.Extra = buf
+
+	b, _, _ := newSimpleBackend()
+	extra := b.prepareExtra(header)
+	if bytes.Compare(extra, buf) != 0 {
+		t.Errorf("expected: %v, got: %v", buf, extra)
+	}
+
+	// append useless information
+	buf = append(buf, make([]byte, 15)...)
+	header.Extra = buf
+
+	extra = b.prepareExtra(header)
+	if bytes.Compare(extra, buf) == 0 {
+		t.Errorf("expected: %v, got: %v", extra, buf)
+	}
+}
+
+func TestSignaturePosition(t *testing.T) {
+	validatorN := 2
+	buf := make([]byte, 0)
+	buf = append(buf, common.StringToHash("123").Bytes()...)
+	buf = append(buf, byte(validatorN))
+	buf = append(buf, make([]byte, validatorN*common.AddressLength)...)
+	buf = append(buf, make([]byte, extraSeal)...)
+
+	expectedStart := extraVanity + extraValidatorSize + validatorN*common.AddressLength
+	expectetEnd := expectedStart + extraSeal
+
+	header := &types.Header{}
+	header.Extra = buf
+
+	b, _, _ := newSimpleBackend()
+	start, end := b.signaturePosition(header)
+	if expectedStart != start && expectetEnd != end {
+		t.Errorf("expected start: %v, got: %v, expected end: %v, got: %v", expectedStart, start, expectetEnd, end)
 	}
 }

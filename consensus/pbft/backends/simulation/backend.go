@@ -234,6 +234,9 @@ func AppendValidators(genesis *core.Genesis, addrs []common.Address) {
 	}
 	genesis.ExtraData = genesis.ExtraData[:extraVanity]
 
+	validatorSize := byte(len(addrs))
+	genesis.ExtraData = append(genesis.ExtraData, validatorSize)
+
 	for _, addr := range addrs {
 		genesis.ExtraData = append(genesis.ExtraData, addr[:]...)
 	}

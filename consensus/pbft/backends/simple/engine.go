@@ -35,6 +35,13 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
+const (
+	extraVanity        = 32 // Fixed number of extra-data prefix bytes reserved for signer vanity
+	extraValidatorSize = 1  // Fixed number of extra-data infix bytes reserved for validator size
+	extraSeal          = 65 // Fixed number of extra-data suffix bytes reserved for signer seal
+
+)
+
 var (
 	// errUnknownBlock is returned when the list of signers is requested for a block
 	// that is not part of the local blockchain.
@@ -99,9 +106,9 @@ func (sb *simpleBackend) verifyHeader(chain consensus.ChainReader, header *types
 		return consensus.ErrFutureBlock
 	}
 
-	// Check that the extra-data contains both the vanity and signature
+	// Check that the extra-data contains vanity, validator size, and signature
 	length := len(header.Extra)
-	if length < extraVanity+extraSeal {
+	if length < extraVanity+extraValidatorSize+extraSeal {
 		return errInvalidExtraDataFormat
 	}
 	if !validator.ValidExtraData(sb.getValidatorBytes(header)) {
@@ -244,10 +251,8 @@ func (sb *simpleBackend) Prepare(chain consensus.ChainReader, header *types.Head
 		return consensus.ErrUnknownAncestor
 	}
 	// Ensure the extra data has all it's components
-	length := len(parent.Extra)
 	header.Extra = make([]byte, 0)
-	header.Extra = append(header.Extra, parent.Extra[:length-extraSeal]...)
-	header.Extra = append(header.Extra, make([]byte, extraSeal)...)
+	header.Extra = append(header.Extra, sb.prepareExtra(parent)...)
 	// use the same difficulty for all blocks
 	header.Difficulty = defaultDifficulty
 	return nil
@@ -345,7 +350,10 @@ func (sb *simpleBackend) updateBlock(parent *types.Header, block *types.Block) (
 	if err != nil {
 		return nil, err
 	}
-	copy(header.Extra[len(header.Extra)-extraSeal:], sighash)
+
+	start, end := sb.signaturePosition(header)
+	copy(header.Extra[start:end], sighash)
+
 	return block.WithSeal(header), nil
 }
 
@@ -459,8 +467,33 @@ func (sb *simpleBackend) initValidatorSet(chain consensus.ChainReader) error {
 }
 
 func (sb *simpleBackend) getValidatorBytes(header *types.Header) []byte {
-	length := len(header.Extra)
-	return header.Extra[extraVanity : length-extraSeal]
+	return header.Extra[extraVanity+extraValidatorSize : extraVanity+extraValidatorSize+sb.validatorLength(header)]
+}
+
+// prepareExtra creates a copy that includes vanity, validators, and a clean seal for the given header
+//
+// note that the header.Extra consisted of vanity, validator size, validators, seal, and committed signatures
+func (sb *simpleBackend) prepareExtra(header *types.Header) []byte {
+	buf := make([]byte, 0)
+	buf = append(buf, header.Extra[:extraVanity]...)
+
+	buf = append(buf, header.Extra[extraVanity:extraVanity+extraValidatorSize+sb.validatorLength(header)]...)
+	buf = append(buf, make([]byte, extraSeal)...)
+	return buf
+}
+
+// signaturePosition returns a signature start and end position for the given header
+func (sb *simpleBackend) signaturePosition(header *types.Header) (int, int) {
+	start := extraVanity + extraValidatorSize + sb.validatorLength(header)
+	end := start + extraSeal
+	return int(start), int(end)
+}
+
+// validatorLength returns the validator length for the given header
+func (sb *simpleBackend) validatorLength(header *types.Header) int {
+	validatorSize := int(header.Extra[extraVanity : extraVanity+extraValidatorSize][0])
+	validatorLength := validatorSize * common.AddressLength
+	return int(validatorLength)
 }
 
 // FIXME: Need to update this for PBFT
@@ -501,6 +534,7 @@ func (sb *simpleBackend) ecrecover(header *types.Header) (common.Address, error)
 	if len(header.Extra) < extraSeal {
 		return common.Address{}, consensus.ErrMissingSignature
 	}
-	signature := header.Extra[len(header.Extra)-extraSeal:]
+	start, end := sb.signaturePosition(header)
+	signature := header.Extra[start:end]
 	return sb.getSignatureAddress(sigHash(header).Bytes(), signature)
 }
