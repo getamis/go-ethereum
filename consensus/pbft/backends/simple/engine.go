@@ -39,7 +39,6 @@ const (
 	extraVanity        = 32 // Fixed number of extra-data prefix bytes reserved for signer vanity
 	extraValidatorSize = 1  // Fixed number of extra-data infix bytes reserved for validator size
 	extraSeal          = 65 // Fixed number of extra-data suffix bytes reserved for signer seal
-
 )
 
 var (
@@ -247,8 +246,7 @@ func (sb *simpleBackend) Prepare(chain consensus.ChainReader, header *types.Head
 		return consensus.ErrUnknownAncestor
 	}
 	// Ensure the extra data has all it's components
-	header.Extra = make([]byte, 0)
-	header.Extra = append(header.Extra, sb.prepareExtra(parent)...)
+	header.Extra = sb.prepareExtra(parent)
 	// use the same difficulty for all blocks
 	header.Difficulty = defaultDifficulty
 	return nil
