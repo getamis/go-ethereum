@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 	istanbulCore "github.com/ethereum/go-ethereum/consensus/istanbul/core"
@@ -63,18 +64,27 @@ var (
 	errInconsistentValidatorSet = errors.New("non empty uncle hash")
 	// errInvalidTimestamp is returned if the timestamp of a block is lower than the previous block's timestamp + the minimum block period.
 	errInvalidTimestamp = errors.New("invalid timestamp")
+	// errInvalidVotingChain is returned if an authorization list is attempted to
+	// be modified via out-of-range or non-contiguous headers.
+	errInvalidVotingChain = errors.New("invalid voting chain")
+	// errInvalidVote is returned if a nonce value is something else that the two
+	// allowed constants of 0x00..0 or 0xff..f.
+	errInvalidVote = errors.New("vote nonce not 0x00..0 or 0xff..f")
 )
 var (
 	defaultDifficulty = big.NewInt(1)
 	nilUncleHash      = types.CalcUncleHash(nil) // Always Keccak256(RLP([])) as uncles are meaningless outside of PoW.
 	now               = time.Now
+
+	nonceAuthVote = hexutil.MustDecode("0xffffffffffffffff") // Magic nonce number to vote on adding a new signer
+	nonceDropVote = hexutil.MustDecode("0x0000000000000000") // Magic nonce number to vote on removing a signer.
 )
 
 // Author retrieves the Ethereum address of the account that minted the given
 // block, which may be different from the header's coinbase if a consensus
 // engine is based on signatures.
 func (sb *simpleBackend) Author(header *types.Header) (common.Address, error) {
-	return sb.ecrecover(header)
+	return ecrecover(header)
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules of a
@@ -187,7 +197,7 @@ func (sb *simpleBackend) VerifyUncles(chain consensus.ChainReader, block *types.
 // verifySigner checks whether the signer is in parent's validator set
 func (sb *simpleBackend) verifySigner(chain consensus.ChainReader, header *types.Header, parent *types.Header) error {
 	// resolve the authorization key and check against signers
-	signer, err := sb.ecrecover(header)
+	signer, err := ecrecover(header)
 	if err != nil {
 		return err
 	}
@@ -338,7 +348,7 @@ func (sb *simpleBackend) updateBlock(parent *types.Header, block *types.Block) (
 		return nil, err
 	}
 
-	start, end := sb.signaturePosition(header)
+	start, end := signaturePosition(header)
 	copy(header.Extra[start:end], sighash)
 
 	return block.WithSeal(header), nil
@@ -434,7 +444,7 @@ func (sb *simpleBackend) validExtraFormat(header *types.Header) bool {
 		return false
 	}
 
-	vl := sb.validatorLength(header)
+	vl := validatorLength(header)
 	// validator length cannot be 0
 	if vl == 0 {
 		return false
@@ -447,7 +457,7 @@ func (sb *simpleBackend) validExtraFormat(header *types.Header) bool {
 }
 
 func (sb *simpleBackend) getValidatorBytes(header *types.Header) []byte {
-	return header.Extra[types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize : types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+sb.validatorLength(header)]
+	return header.Extra[types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize : types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+validatorLength(header)]
 }
 
 // prepareExtra creates a copy that includes vanity, validators, and a clean seal for the given header
@@ -460,20 +470,20 @@ func (sb *simpleBackend) prepareExtra(header, parent *types.Header) []byte {
 	}
 	buf = header.Extra[:types.IstanbulExtraVanity]
 
-	buf = append(buf, parent.Extra[types.IstanbulExtraVanity:types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+sb.validatorLength(parent)]...)
+	buf = append(buf, parent.Extra[types.IstanbulExtraVanity:types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+validatorLength(parent)]...)
 	buf = append(buf, make([]byte, types.IstanbulExtraSeal)...)
 	return buf
 }
 
 // signaturePosition returns start and end position for the given header
-func (sb *simpleBackend) signaturePosition(header *types.Header) (int, int) {
-	start := types.IstanbulExtraVanity + types.IstanbulExtraValidatorSize + sb.validatorLength(header)
+func signaturePosition(header *types.Header) (int, int) {
+	start := types.IstanbulExtraVanity + types.IstanbulExtraValidatorSize + validatorLength(header)
 	end := start + types.IstanbulExtraSeal
 	return int(start), int(end)
 }
 
 // validatorLength returns the validator length for the given header
-func (sb *simpleBackend) validatorLength(header *types.Header) int {
+func validatorLength(header *types.Header) int {
 	validatorSize := int(header.Extra[types.IstanbulExtraVanity : types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize][0])
 	validatorLength := validatorSize * common.AddressLength
 	return int(validatorLength)
@@ -512,12 +522,12 @@ func sigHash(header *types.Header) (hash common.Hash) {
 }
 
 // ecrecover extracts the Ethereum account address from a signed header.
-func (sb *simpleBackend) ecrecover(header *types.Header) (common.Address, error) {
+func ecrecover(header *types.Header) (common.Address, error) {
 	// Retrieve the signature from the header extra-data
 	if len(header.Extra) < types.IstanbulExtraSeal {
 		return common.Address{}, consensus.ErrMissingSignature
 	}
-	start, end := sb.signaturePosition(header)
+	start, end := signaturePosition(header)
 	signature := header.Extra[start:end]
-	return sb.getSignatureAddress(sigHash(header).Bytes(), signature)
+	return getSignatureAddress(sigHash(header).Bytes(), signature)
 }
