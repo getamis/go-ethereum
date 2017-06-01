@@ -480,8 +480,7 @@ func TestSignaturePosition(t *testing.T) {
 	header := &types.Header{}
 	header.Extra = buf
 
-	b, _, _ := newSimpleBackend()
-	start, end := b.signaturePosition(header)
+	start, end := signaturePosition(header)
 	if expectedStart != start && expectedtEnd != end {
 		t.Errorf("expected start: %v, got: %v, expected end: %v, got: %v", expectedStart, start, expectedtEnd, end)
 	}
