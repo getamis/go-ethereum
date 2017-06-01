@@ -245,8 +245,11 @@ func (sb *simpleBackend) Prepare(chain consensus.ChainReader, header *types.Head
 	if parent == nil {
 		return consensus.ErrUnknownAncestor
 	}
+	if !sb.validExtraFormat(parent) {
+		return errInvalidExtraDataFormat
+	}
 	// Ensure the extra data has all it's components
-	header.Extra = sb.prepareExtra(parent)
+	header.Extra = sb.prepareExtra(header, parent)
 	// use the same difficulty for all blocks
 	header.Difficulty = defaultDifficulty
 	return nil
@@ -486,11 +489,14 @@ func (sb *simpleBackend) getValidatorBytes(header *types.Header) []byte {
 // prepareExtra creates a copy that includes vanity, validators, and a clean seal for the given header
 //
 // note that the header.Extra consisted of vanity, validator size, validators, seal, and committed signatures
-func (sb *simpleBackend) prepareExtra(header *types.Header) []byte {
+func (sb *simpleBackend) prepareExtra(header, parent *types.Header) []byte {
 	buf := make([]byte, 0)
-	buf = append(buf, header.Extra[:extraVanity]...)
+	if len(header.Extra) < extraVanity {
+		buf = append(header.Extra, bytes.Repeat([]byte{0x00}, extraVanity-len(header.Extra))...)
+	}
+	buf = buf[:extraVanity]
 
-	buf = append(buf, header.Extra[extraVanity:extraVanity+extraValidatorSize+sb.validatorLength(header)]...)
+	buf = append(buf, parent.Extra[extraVanity:extraVanity+extraValidatorSize+sb.validatorLength(parent)]...)
 	buf = append(buf, make([]byte, extraSeal)...)
 	return buf
 }
