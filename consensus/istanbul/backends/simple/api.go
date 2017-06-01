@@ -20,20 +20,21 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/log"
 )
 
 // API is a user facing RPC API to dump Istanbul state
 type API struct {
-	chain   consensus.ChainReader
-	backend *simpleBackend
+	chain consensus.ChainReader
+	pbft  *simpleBackend
 }
 
 // Snapshot returns current state and proposer
 func (api *API) Snapshot() {
-	state, snapshot := api.backend.core.Snapshot()
-	p := api.backend.valSet.GetProposer().Address()
+	state, snapshot := api.pbft.core.Snapshot()
+	p := api.pbft.valSet.GetProposer().Address()
 	log.Info("Snapshot", "sequence", snapshot.Sequence, "Round", snapshot.Round,
 		"state", state, "proposer", p,
 		"hash", snapshot.Preprepare.Proposal.Hash(),
@@ -43,10 +44,40 @@ func (api *API) Snapshot() {
 
 // Backlog returns backlogs
 func (api *API) Backlog() {
-	backlog := api.backend.core.Backlog()
+	backlog := api.pbft.core.Backlog()
 	logs := make([]string, 0, len(backlog))
 	for validator, q := range backlog {
 		logs = append(logs, fmt.Sprintf("{%v, %v}", validator, q.Size()))
 	}
 	log.Info("Backlog", "logs", fmt.Sprintf("[%v]", strings.Join(logs, ", ")))
+}
+
+// Candidates returns the current candidates the node tries to uphold and vote on.
+func (api *API) Candidates() map[common.Address]bool {
+	api.pbft.candidatesLock.RLock()
+	defer api.pbft.candidatesLock.RUnlock()
+
+	proposals := make(map[common.Address]bool)
+	for address, auth := range api.pbft.candidates {
+		proposals[address] = auth
+	}
+	return proposals
+}
+
+// Propose injects a new authorization candidate that the signer will attempt to
+// push through.
+func (api *API) Propose(address common.Address, auth bool) {
+	api.pbft.candidatesLock.Lock()
+	defer api.pbft.candidatesLock.Unlock()
+
+	api.pbft.candidates[address] = auth
+}
+
+// Discard drops a currently running candidate, stopping the signer from casting
+// further votes (either for or against).
+func (api *API) Discard(address common.Address) {
+	api.pbft.candidatesLock.Lock()
+	defer api.pbft.candidatesLock.Unlock()
+
+	delete(api.pbft.candidates, address)
 }
