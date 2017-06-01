@@ -23,11 +23,13 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/pbft"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/event"
 )
 
 type testerVote struct {
@@ -55,8 +57,9 @@ func (ap *testerAccountPool) sign(header *types.Header, signer string) {
 		ap.accounts[signer], _ = crypto.GenerateKey()
 	}
 	// Sign the header and embed the signature in extra data
-	sig, _ := crypto.Sign(sigHash(header).Bytes(), ap.accounts[signer])
-	copy(header.Extra[len(header.Extra)-65:], sig)
+	hashData := crypto.Keccak256([]byte(sigHash(header).Bytes()))
+	sig, _ := crypto.Sign(hashData, ap.accounts[signer])
+	copy(header.Extra[len(header.Extra)-extraSeal:], sig)
 }
 
 func (ap *testerAccountPool) address(account string) common.Address {
@@ -66,24 +69,6 @@ func (ap *testerAccountPool) address(account string) common.Address {
 	}
 	// Resolve and return the Ethereum address
 	return crypto.PubkeyToAddress(ap.accounts[account].PublicKey)
-}
-
-// testerChainReader implements consensus.ChainReader to access the genesis
-// block. All other methods and requests will panic.
-type testerChainReader struct {
-	db ethdb.Database
-}
-
-func (r *testerChainReader) Config() *params.ChainConfig                 { panic("not supported") }
-func (r *testerChainReader) CurrentHeader() *types.Header                { panic("not supported") }
-func (r *testerChainReader) GetHeader(common.Hash, uint64) *types.Header { panic("not supported") }
-func (r *testerChainReader) GetBlock(common.Hash, uint64) *types.Block   { panic("not supported") }
-func (r *testerChainReader) GetHeaderByHash(common.Hash) *types.Header   { panic("not supported") }
-func (r *testerChainReader) GetHeaderByNumber(number uint64) *types.Header {
-	if number == 0 {
-		return core.GetHeader(r.db, core.GetCanonicalHash(r.db, 0), 0)
-	}
-	panic("not supported")
 }
 
 // Tests that voting is evaluated correctly for various simple and complex scenarios.
@@ -345,7 +330,8 @@ func TestVoting(t *testing.T) {
 		}
 		// Create the genesis block with the initial set of signers
 		genesis := &core.Genesis{
-			ExtraData: make([]byte, extraVanity+common.AddressLength*len(signers)+extraSeal),
+			Difficulty: defaultDifficulty,
+			ExtraData:  make([]byte, extraVanity+common.AddressLength*len(signers)+extraSeal),
 		}
 		for j, signer := range signers {
 			copy(genesis.ExtraData[extraVanity+j*common.AddressLength:], signer[:])
@@ -354,14 +340,23 @@ func TestVoting(t *testing.T) {
 		db, _ := ethdb.NewMemDatabase()
 		genesis.Commit(db)
 
+		eventMux := new(event.TypeMux)
+		config := pbft.DefaultConfig
+		if tt.epoch != 0 {
+			config.Epoch = tt.epoch
+		}
+		engine := New(config, eventMux, accounts.accounts[tt.signers[0]], db).(*simpleBackend)
+		chain, err := core.NewBlockChain(db, genesis.Config, engine, eventMux, vm.Config{})
+
 		// Assemble a chain of headers from the cast votes
 		headers := make([]*types.Header, len(tt.votes))
 		for j, vote := range tt.votes {
 			headers[j] = &types.Header{
-				Number:   big.NewInt(int64(j) + 1),
-				Time:     big.NewInt(int64(j) * int64(blockPeriod)),
-				Coinbase: accounts.address(vote.voted),
-				Extra:    make([]byte, extraVanity+extraSeal),
+				Number:     big.NewInt(int64(j) + 1),
+				Time:       big.NewInt(int64(j) * int64(config.BlockPauseTime)),
+				Coinbase:   accounts.address(vote.voted),
+				Extra:      make([]byte, extraVanity+extraSeal),
+				Difficulty: defaultDifficulty,
 			}
 			if j > 0 {
 				headers[j].ParentHash = headers[j-1].Hash()
@@ -374,7 +369,7 @@ func TestVoting(t *testing.T) {
 		// Pass all the headers through clique and ensure tallying succeeds
 		head := headers[len(headers)-1]
 
-		snap, err := New(&params.CliqueConfig{Epoch: tt.epoch}, db).snapshot(&testerChainReader{db: db}, head.Number.Uint64(), head.Hash(), headers)
+		snap, err := engine.snapshot(chain, head.Number.Uint64(), head.Hash(), headers)
 		if err != nil {
 			t.Errorf("test %d: failed to create voting snapshot: %v", i, err)
 			continue

@@ -30,10 +30,13 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 // New creates an Ethereum backend for Istanbul core engine.
 func New(config *istanbul.Config, eventMux *event.TypeMux, privateKey *ecdsa.PrivateKey, db ethdb.Database) consensus.Istanbul {
+	// Allocate the snapshot caches and create the engine
+	recents, _ := lru.NewARC(inmemorySnapshots)
 	backend := &simpleBackend{
 		config:           config,
 		eventMux:         eventMux,
@@ -43,6 +46,7 @@ func New(config *istanbul.Config, eventMux *event.TypeMux, privateKey *ecdsa.Pri
 		logger:           log.New("backend", "simple"),
 		db:               db,
 		commitCh:         make(chan common.Hash, 1),
+		recents:          recents,
 	}
 	return backend
 }
@@ -73,6 +77,8 @@ type simpleBackend struct {
 	candidates map[common.Address]bool
 	// Protects the signer fields
 	candidatesLock sync.RWMutex
+	// Snapshots for recent block to speed up reorgs
+	recents *lru.ARCCache
 }
 
 // Address implements istanbul.Backend.Address
