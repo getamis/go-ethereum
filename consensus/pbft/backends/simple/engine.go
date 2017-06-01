@@ -492,9 +492,9 @@ func (sb *simpleBackend) getValidatorBytes(header *types.Header) []byte {
 func (sb *simpleBackend) prepareExtra(header, parent *types.Header) []byte {
 	buf := make([]byte, 0)
 	if len(header.Extra) < extraVanity {
-		buf = append(header.Extra, bytes.Repeat([]byte{0x00}, extraVanity-len(header.Extra))...)
+		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, extraVanity-len(header.Extra))...)
 	}
-	buf = buf[:extraVanity]
+	buf = header.Extra[:extraVanity]
 
 	buf = append(buf, parent.Extra[extraVanity:extraVanity+extraValidatorSize+sb.validatorLength(parent)]...)
 	buf = append(buf, make([]byte, extraSeal)...)

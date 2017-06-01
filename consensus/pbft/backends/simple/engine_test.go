@@ -435,27 +435,33 @@ OUT3:
 func TestPrepareExtra(t *testing.T) {
 	validatorN := 4
 	buf := make([]byte, 0)
-	buf = append(buf, common.StringToHash("123").Bytes()...)
+	buf = append(buf, make([]byte, extraVanity)...)
 	buf = append(buf, byte(validatorN))
 	buf = append(buf, make([]byte, validatorN*common.AddressLength)...)
 	buf = append(buf, make([]byte, extraSeal)...)
 
+	parentHeader := &types.Header{}
+	parentHeader.Extra = buf
+
 	header := &types.Header{}
-	header.Extra = buf
+	header.Extra = common.StringToHash("123").Bytes()
+
+	expectedExtra := parentHeader.Extra
+	copy(expectedExtra[0:extraVanity], header.Extra)
 
 	b, _, _ := newSimpleBackend()
-	extra := b.prepareExtra(header)
-	if bytes.Compare(extra, buf) != 0 {
-		t.Errorf("expected: %v, got: %v", buf, extra)
+	extra := b.prepareExtra(header, parentHeader)
+	if bytes.Compare(extra, expectedExtra) != 0 {
+		t.Errorf("expected: %v, got: %v", expectedExtra, extra)
 	}
 
 	// append useless information
 	buf = append(buf, make([]byte, 15)...)
 	header.Extra = buf
 
-	extra = b.prepareExtra(header)
-	if bytes.Compare(extra, buf) == 0 {
-		t.Errorf("expected: %v, got: %v", extra, buf)
+	extra = b.prepareExtra(header, parentHeader)
+	if bytes.Compare(extra, expectedExtra) != 0 {
+		t.Errorf("expected: %v, got: %v", expectedExtra, extra)
 	}
 }
 
