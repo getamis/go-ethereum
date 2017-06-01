@@ -71,6 +71,7 @@ func getGenesisAndKeys(n int) (*core.Genesis, []*ecdsa.PrivateKey) {
 	// force enable Istanbul engine
 	genesis.Config.Istanbul = &params.IstanbulConfig{}
 	genesis.Config.Ethash = nil
+	genesis.Difficulty = defaultDifficulty
 
 	appendValidators(genesis, addrs)
 	return genesis, nodeKeys
