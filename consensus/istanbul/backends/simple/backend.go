@@ -171,7 +171,7 @@ func (sb *simpleBackend) Sign(data []byte) ([]byte, error) {
 
 // CheckSignature implements istanbul.Backend.CheckSignature
 func (sb *simpleBackend) CheckSignature(data []byte, address common.Address, sig []byte) error {
-	signer, err := sb.getSignatureAddress(data, sig)
+	signer, err := getSignatureAddress(data, sig)
 	if err != nil {
 		log.Error("Failed to get signer address", "err", err)
 		return err
@@ -186,7 +186,7 @@ func (sb *simpleBackend) CheckSignature(data []byte, address common.Address, sig
 // CheckValidatorSignature implements istanbul.Backend.CheckValidatorSignature
 func (sb *simpleBackend) CheckValidatorSignature(data []byte, sig []byte) (common.Address, error) {
 	// 1. Get signature address
-	signer, err := sb.getSignatureAddress(data, sig)
+	signer, err := getSignatureAddress(data, sig)
 	if err != nil {
 		log.Error("Failed to get signer address", "err", err)
 		return common.Address{}, err
@@ -201,7 +201,7 @@ func (sb *simpleBackend) CheckValidatorSignature(data []byte, sig []byte) (commo
 }
 
 // get the signer address from the signature
-func (sb *simpleBackend) getSignatureAddress(data []byte, sig []byte) (common.Address, error) {
+func getSignatureAddress(data []byte, sig []byte) (common.Address, error) {
 	// 1. Keccak data
 	hashData := crypto.Keccak256([]byte(data))
 	// 2. Recover public key
