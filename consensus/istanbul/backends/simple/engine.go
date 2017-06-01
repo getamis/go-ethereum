@@ -349,7 +349,7 @@ func (sb *simpleBackend) APIs(chain consensus.ChainReader) []rpc.API {
 	return []rpc.API{{
 		Namespace: "istanbul",
 		Version:   "1.0",
-		Service:   &API{chain: chain, backend: sb},
+		Service:   &API{chain: chain, pbft: sb},
 		Public:    true,
 	}}
 }

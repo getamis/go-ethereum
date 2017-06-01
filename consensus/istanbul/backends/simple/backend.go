@@ -68,6 +68,11 @@ type simpleBackend struct {
 	commitCh          chan common.Hash
 	proposedBlockHash common.Hash
 	sealMu            sync.Mutex
+
+	// Current list of candidates we are pushing
+	candidates map[common.Address]bool
+	// Protects the signer fields
+	candidatesLock sync.RWMutex
 }
 
 // Address implements istanbul.Backend.Address
