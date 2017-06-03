@@ -115,7 +115,7 @@ func (sb *simpleBackend) verifyHeader(chain consensus.ChainReader, header *types
 	}
 
 	// Ensure that the extra data format is satisfied
-	if !sb.validExtraFormat(header) {
+	if err := types.ValidateIstanbulSeal(header); err != nil {
 		return errInvalidExtraDataFormat
 	}
 
@@ -265,9 +265,6 @@ func (sb *simpleBackend) Prepare(chain consensus.ChainReader, header *types.Head
 	if parent == nil {
 		return consensus.ErrUnknownAncestor
 	}
-	if !sb.validExtraFormat(parent) {
-		return errInvalidExtraDataFormat
-	}
 	// use the same difficulty for all blocks
 	header.Difficulty = defaultDifficulty
 
@@ -413,8 +410,8 @@ func (sb *simpleBackend) updateBlock(parent *types.Header, block *types.Block) (
 		return nil, err
 	}
 
-	start, end := signaturePosition(header)
-	copy(header.Extra[start:end], sighash)
+	index := types.ExtractToIstanbulIndex(header)
+	copy(header.Extra[index.Seal:index.Seal+types.IstanbulExtraSeal], sighash)
 
 	return block.WithSeal(header), nil
 }
@@ -493,43 +490,6 @@ func (sb *simpleBackend) Stop() error {
 	return nil
 }
 
-func (sb *simpleBackend) validExtraFormat(header *types.Header) bool {
-	length := len(header.Extra)
-	// ensure the bytes is enough
-	if length < types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+types.IstanbulExtraSeal {
-		return false
-	}
-
-	vl := validatorLength(header)
-	// validator length cannot be 0
-	if vl == 0 {
-		return false
-	}
-	if length != types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+vl+types.IstanbulExtraSeal {
-		return false
-	}
-
-	return true
-}
-
-func (sb *simpleBackend) getValidatorBytes(header *types.Header) []byte {
-	return header.Extra[types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize : types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+validatorLength(header)]
-}
-
-// signaturePosition returns start and end position for the given header
-func signaturePosition(header *types.Header) (int, int) {
-	start := types.IstanbulExtraVanity + types.IstanbulExtraValidatorSize + validatorLength(header)
-	end := start + types.IstanbulExtraSeal
-	return int(start), int(end)
-}
-
-// validatorLength returns the validator length for the given header
-func validatorLength(header *types.Header) int {
-	validatorSize := int(header.Extra[types.IstanbulExtraVanity : types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize][0])
-	validatorLength := validatorSize * common.AddressLength
-	return int(validatorLength)
-}
-
 // snapshot retrieves the authorization snapshot at a given point in time.
 func (sb *simpleBackend) snapshot(chain consensus.ChainReader, number uint64, hash common.Hash, parents []*types.Header) (*Snapshot, error) {
 	// Search for a snapshot in memory or on disk for checkpoints
@@ -557,8 +517,8 @@ func (sb *simpleBackend) snapshot(chain consensus.ChainReader, number uint64, ha
 			if err := sb.VerifyHeader(chain, genesis, false); err != nil {
 				return nil, err
 			}
-			validators := validator.ExtractValidators(sb.getValidatorBytes(genesis))
-			snap = newSnapshot(sb.config.Epoch, 0, genesis.Hash(), validator.NewSet(validators, sb.config.ProposerPolicy))
+			istanbul := types.ExtractToIstanbul(genesis)
+			snap = newSnapshot(sb.config.Epoch, 0, genesis.Hash(), validator.NewSet(istanbul.Validators, sb.config.ProposerPolicy))
 			if err := snap.store(sb.db); err != nil {
 				return nil, err
 			}
@@ -639,10 +599,7 @@ func sigHash(header *types.Header) (hash common.Hash) {
 // ecrecover extracts the Ethereum account address from a signed header.
 func ecrecover(header *types.Header) (common.Address, error) {
 	// Retrieve the signature from the header extra-data
-	if len(header.Extra) < types.IstanbulExtraSeal {
-		return common.Address{}, consensus.ErrMissingSignature
-	}
-	start, end := signaturePosition(header)
-	signature := header.Extra[start:end]
+	index := types.ExtractToIstanbulIndex(header)
+	signature := header.Extra[index.Seal : index.Seal+types.IstanbulExtraSeal]
 	return istanbul.GetSignatureAddress(sigHash(header).Bytes(), signature)
 }

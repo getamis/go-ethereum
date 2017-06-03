@@ -116,6 +116,10 @@ func appendValidators(genesis *core.Genesis, addrs []common.Address) {
 		genesis.ExtraData = append(genesis.ExtraData, addr[:]...)
 	}
 	genesis.ExtraData = append(genesis.ExtraData, make([]byte, types.IstanbulExtraSeal)...)
+
+	// committed seal
+	genesis.ExtraData = append(genesis.ExtraData, byte(0x01))
+	genesis.ExtraData = append(genesis.ExtraData, make([]byte, types.IstanbulExtraCommittedSeal)...)
 }
 
 func makeHeader(parent *types.Block, config *istanbul.Config) *types.Header {
@@ -456,118 +460,6 @@ OUT3:
 			}
 		case <-timeout.C:
 			break OUT3
-		}
-	}
-}
-
-func TestSignaturePosition(t *testing.T) {
-	validatorN := 2
-	buf := make([]byte, 0)
-	buf = append(buf, common.StringToHash("123").Bytes()...)
-	buf = append(buf, byte(validatorN))
-	buf = append(buf, make([]byte, validatorN*common.AddressLength)...)
-	buf = append(buf, make([]byte, types.IstanbulExtraSeal)...)
-
-	expectedStart := types.IstanbulExtraVanity + types.IstanbulExtraValidatorSize + validatorN*common.AddressLength
-	expectedtEnd := expectedStart + types.IstanbulExtraSeal
-
-	header := &types.Header{}
-	header.Extra = buf
-
-	start, end := signaturePosition(header)
-	if expectedStart != start && expectedtEnd != end {
-		t.Errorf("expected start: %v, got: %v, expected end: %v, got: %v", expectedStart, start, expectedtEnd, end)
-	}
-}
-
-func TestValidExtra(t *testing.T) {
-
-	testCases := []struct {
-		extra         []byte
-		expectedValid bool
-	}{
-		{
-			// normal case
-			func() []byte {
-				validatorN := 4
-				buf := make([]byte, 0)
-				buf = append(buf, common.StringToHash("123").Bytes()...)
-				buf = append(buf, byte(validatorN))
-				buf = append(buf, make([]byte, validatorN*common.AddressLength)...)
-				buf = append(buf, make([]byte, types.IstanbulExtraSeal)...)
-				return buf
-			}(),
-			true,
-		},
-		{
-			// missing validator
-			func() []byte {
-				validatorN := 4
-				buf := make([]byte, 0)
-				buf = append(buf, common.StringToHash("123").Bytes()...)
-				buf = append(buf, byte(validatorN))
-				buf = append(buf, make([]byte, types.IstanbulExtraSeal)...)
-				return buf
-			}(),
-			false,
-		},
-		{
-			// validator N is 0
-			func() []byte {
-				validatorN := 0
-				buf := make([]byte, 0)
-				buf = append(buf, common.StringToHash("123").Bytes()...)
-				buf = append(buf, byte(validatorN))
-				buf = append(buf, make([]byte, validatorN*common.AddressLength)...)
-				buf = append(buf, make([]byte, types.IstanbulExtraSeal)...)
-				return buf
-			}(),
-			false,
-		},
-		{
-			// validator N is 0, but have 1 validator in field
-			func() []byte {
-				validatorN := 0
-				buf := make([]byte, 0)
-				buf = append(buf, common.StringToHash("123").Bytes()...)
-				buf = append(buf, byte(validatorN))
-				buf = append(buf, make([]byte, common.AddressLength)...)
-				buf = append(buf, make([]byte, types.IstanbulExtraSeal)...)
-				return buf
-			}(),
-			false,
-		},
-		{
-			// missing seal
-			func() []byte {
-				validatorN := 4
-				buf := make([]byte, 0)
-				buf = append(buf, common.StringToHash("123").Bytes()...)
-				buf = append(buf, byte(validatorN))
-				buf = append(buf, make([]byte, validatorN*common.AddressLength)...)
-				return buf
-			}(),
-			false,
-		},
-		{
-			// missing few data
-			func() []byte {
-				buf := make([]byte, 0)
-				return buf
-			}(),
-			false,
-		},
-	}
-
-	b, _, _ := newSimpleBackend()
-
-	for _, test := range testCases {
-		header := &types.Header{}
-		header.Extra = test.extra
-
-		valid := b.validExtraFormat(header)
-		if valid != test.expectedValid {
-			t.Errorf("expected: %v, but: %v", test.expectedValid, valid)
 		}
 	}
 }
