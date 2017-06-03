@@ -16,11 +16,7 @@
 
 package core
 
-import (
-	"reflect"
-
-	"github.com/ethereum/go-ethereum/consensus/istanbul"
-)
+import "github.com/ethereum/go-ethereum/consensus/istanbul"
 
 func (c *core) sendPreprepare(request *istanbul.Request) {
 	logger := c.logger.New("state", c.state)
@@ -61,6 +57,7 @@ func (c *core) handlePreprepare(msg *message, src istanbul.Validator) error {
 		return errFailedDecodePreprepare
 	}
 
+	// Ensure we have the same view with the preprepare message
 	if err := c.checkMessage(msgPreprepare, preprepare.View); err != nil {
 		return err
 	}
@@ -74,14 +71,8 @@ func (c *core) handlePreprepare(msg *message, src istanbul.Validator) error {
 	// Verify the proposal we received
 	if err := c.backend.Verify(preprepare.Proposal); err != nil {
 		logger.Warn("Failed to verify proposal", "err", err)
+		c.sendRoundChange()
 		return err
-	}
-
-	// Ensure we have the same view with the preprepare message
-	view := c.currentView()
-	if !reflect.DeepEqual(preprepare.View, view) {
-		logger.Warn("Inconsistent view", "expected", view, "got", preprepare.View)
-		return errInvalidMessage
 	}
 
 	if c.state == StateAcceptRequest {
