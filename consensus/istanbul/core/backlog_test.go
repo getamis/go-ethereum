@@ -79,6 +79,23 @@ func TestCheckMessage(t *testing.T) {
 		}
 	}
 
+	// current view but waiting for round change
+	v = &istanbul.View{
+		Sequence: big.NewInt(1),
+		Round:    big.NewInt(0),
+	}
+	c.waitingForRoundChange = true
+	for i := 0; i < len(testStates); i++ {
+		c.state = testStates[i]
+		for j := 0; j < len(testCode); j++ {
+			err := c.checkMessage(testCode[j], v)
+			if err != errFutureMessage {
+				t.Error("Should return errFutureMessage because it's a current round but waiting for round change")
+			}
+		}
+	}
+	c.waitingForRoundChange = false
+
 	v = c.currentView()
 	// current view, state = StateAcceptRequest
 	c.state = StateAcceptRequest

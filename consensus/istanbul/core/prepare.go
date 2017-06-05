@@ -42,11 +42,6 @@ func (c *core) handlePrepare(msg *message, src istanbul.Validator) error {
 	logger := c.logger.New("from", src, "state", c.state)
 	logger.Trace("handlePrepare")
 
-	if c.waitingForRoundChange {
-		logger.Warn("Waiting for a round change, ignore", "msg", msg)
-		return errIgnored
-	}
-
 	// Decode prepare message
 	var prepare *istanbul.Subject
 	err := msg.Decode(&prepare)
