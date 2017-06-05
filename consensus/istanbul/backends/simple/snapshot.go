@@ -31,10 +31,10 @@ const (
 	dbKeySnapshotPrefix = "istanbul-snapshot"
 )
 
-// Vote represents a single vote that an authorized signer made to modify the
+// Vote represents a single vote that an authorized validator made to modify the
 // list of authorizations.
 type Vote struct {
-	Signer    common.Address `json:"signer"`    // Authorized signer that cast this vote
+	Validator common.Address `json:"validator"` // Authorized validator that cast this vote
 	Block     uint64         `json:"block"`     // Block number the vote was cast in (expire old votes)
 	Address   common.Address `json:"address"`   // Account being voted on to change its authorization
 	Authorize bool           `json:"authorize"` // Whether to authorize or deauthorize the voted account
@@ -51,22 +51,22 @@ type Tally struct {
 type Snapshot struct {
 	Epoch uint64 // The number of blocks after which to checkpoint and reset the pending votes
 
-	Number uint64                   `json:"number"`  // Block number where the snapshot was created
-	Hash   common.Hash              `json:"hash"`    // Block hash where the snapshot was created
-	Votes  []*Vote                  `json:"votes"`   // List of votes cast in chronological order
-	Tally  map[common.Address]Tally `json:"tally"`   // Current vote tally to avoid recalculating
-	ValSet istanbul.ValidatorSet    `json:"signers"` // Set of authorized signers at this moment
+	Number uint64                   `json:"number"`     // Block number where the snapshot was created
+	Hash   common.Hash              `json:"hash"`       // Block hash where the snapshot was created
+	Votes  []*Vote                  `json:"votes"`      // List of votes cast in chronological order
+	Tally  map[common.Address]Tally `json:"tally"`      // Current vote tally to avoid recalculating
+	ValSet istanbul.ValidatorSet    `json:"validators"` // Set of authorized validators at this moment
 }
 
 // newSnapshot create a new snapshot with the specified startup parameters. This
-// method does not initialize the set of recent signers, so only ever use if for
+// method does not initialize the set of recent validators, so only ever use if for
 // the genesis block.
-func newSnapshot(epoch uint64, number uint64, hash common.Hash, signers []common.Address) *Snapshot {
+func newSnapshot(epoch uint64, number uint64, hash common.Hash, validators []common.Address) *Snapshot {
 	snap := &Snapshot{
 		Epoch:  epoch,
 		Number: number,
 		Hash:   hash,
-		ValSet: validator.NewSet(signers),
+		ValSet: validator.NewSet(validators),
 		Tally:  make(map[common.Address]Tally),
 	}
 	return snap
@@ -106,8 +106,8 @@ func (s *Snapshot) copy() *Snapshot {
 		Votes:  make([]*Vote, len(s.Votes)),
 		Tally:  make(map[common.Address]Tally),
 	}
-	for _, signer := range s.ValSet.List() {
-		cpy.ValSet.AddValidator(signer.Address())
+	for _, validator := range s.ValSet.List() {
+		cpy.ValSet.AddValidator(validator.Address())
 	}
 	for address, tally := range s.Tally {
 		cpy.Tally[address] = tally
@@ -120,8 +120,8 @@ func (s *Snapshot) copy() *Snapshot {
 // cast adds a new vote into the tally.
 func (s *Snapshot) cast(address common.Address, authorize bool) bool {
 	// Ensure the vote is meaningful
-	_, signer := s.ValSet.GetByAddress(address)
-	if (signer != nil && authorize) || (signer == nil && !authorize) {
+	_, validator := s.ValSet.GetByAddress(address)
+	if (validator != nil && authorize) || (validator == nil && !authorize) {
 		return false
 	}
 	// Cast the vote into an existing or new tally
@@ -181,18 +181,18 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 			snap.Votes = nil
 			snap.Tally = make(map[common.Address]Tally)
 		}
-		// Resolve the authorization key and check against signers
-		signer, err := ecrecover(header)
+		// Resolve the authorization key and check against validators
+		validator, err := ecrecover(header)
 		if err != nil {
 			return nil, err
 		}
-		if _, v := snap.ValSet.GetByAddress(signer); v == nil {
+		if _, v := snap.ValSet.GetByAddress(validator); v == nil {
 			return nil, errUnauthorized
 		}
 
-		// Header authorized, discard any previous votes from the signer
+		// Header authorized, discard any previous votes from the validator
 		for i, vote := range snap.Votes {
-			if vote.Signer == signer && vote.Address == header.Coinbase {
+			if vote.Validator == validator && vote.Address == header.Coinbase {
 				// Uncast the vote from the cached tally
 				snap.uncast(vote.Address, vote.Authorize)
 
@@ -201,7 +201,7 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 				break // only one vote allowed
 			}
 		}
-		// Tally up the new vote from the signer
+		// Tally up the new vote from the validator
 		var authorize bool
 		switch {
 		case bytes.Compare(header.Nonce[:], nonceAuthVote) == 0:
@@ -213,22 +213,22 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 		}
 		if snap.cast(header.Coinbase, authorize) {
 			snap.Votes = append(snap.Votes, &Vote{
-				Signer:    signer,
+				Validator: validator,
 				Block:     number,
 				Address:   header.Coinbase,
 				Authorize: authorize,
 			})
 		}
-		// If the vote passed, update the list of signers
+		// If the vote passed, update the list of validators
 		if tally := snap.Tally[header.Coinbase]; tally.Votes > snap.ValSet.Size()/2 {
 			if tally.Authorize {
 				snap.ValSet.AddValidator(header.Coinbase)
 			} else {
 				snap.ValSet.RemoveValidator(header.Coinbase)
 
-				// Discard any previous votes the deauthorized signer cast
+				// Discard any previous votes the deauthorized validator cast
 				for i := 0; i < len(snap.Votes); i++ {
-					if snap.Votes[i].Signer == header.Coinbase {
+					if snap.Votes[i].Validator == header.Coinbase {
 						// Uncast the vote from the cached tally
 						snap.uncast(snap.Votes[i].Address, snap.Votes[i].Authorize)
 
@@ -255,18 +255,18 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 	return snap, nil
 }
 
-// signers retrieves the list of authorized signers in ascending order.
-func (s *Snapshot) signers() []common.Address {
-	signers := make([]common.Address, 0, s.ValSet.Size())
-	for _, signer := range s.ValSet.List() {
-		signers = append(signers, signer.Address())
+// validators retrieves the list of authorized validators in ascending order.
+func (s *Snapshot) validators() []common.Address {
+	validators := make([]common.Address, 0, s.ValSet.Size())
+	for _, validator := range s.ValSet.List() {
+		validators = append(validators, validator.Address())
 	}
-	for i := 0; i < len(signers); i++ {
-		for j := i + 1; j < len(signers); j++ {
-			if bytes.Compare(signers[i][:], signers[j][:]) > 0 {
-				signers[i], signers[j] = signers[j], signers[i]
+	for i := 0; i < len(validators); i++ {
+		for j := i + 1; j < len(validators); j++ {
+			if bytes.Compare(validators[i][:], validators[j][:]) > 0 {
+				validators[i], validators[j] = validators[j], validators[i]
 			}
 		}
 	}
-	return signers
+	return validators
 }

@@ -43,7 +43,15 @@ func newBlockChain(n int) (*core.BlockChain, *simpleBackend) {
 
 	b, _ := backend.(*simpleBackend)
 
-	proposerAddr := b.valSet.GetProposer().Address()
+	snap, err := b.snapshot(blockchain, 0, common.Hash{}, nil)
+	if err != nil {
+		panic(err)
+	}
+	if snap == nil {
+		panic("nil snap")
+	}
+	proposerAddr := snap.ValSet.GetProposer().Address()
+
 	// find proposer key
 	for _, key := range nodeKeys {
 		addr := crypto.PubkeyToAddress(key.PublicKey)
@@ -72,6 +80,7 @@ func getGenesisAndKeys(n int) (*core.Genesis, []*ecdsa.PrivateKey) {
 	genesis.Config.Istanbul = &params.IstanbulConfig{}
 	genesis.Config.Ethash = nil
 	genesis.Difficulty = defaultDifficulty
+	genesis.Nonce = emptyNonce.Uint64()
 
 	appendValidators(genesis, addrs)
 	return genesis, nodeKeys
@@ -259,15 +268,6 @@ func TestVerifyHeader(t *testing.T) {
 		t.Errorf("unexpected error comes, got: %v, expected: errInvalidExtraDataFormat", err)
 	}
 
-	// non zero coinbase
-	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
-	header = block.Header()
-	header.Coinbase = common.StringToAddress("123456789")
-	err = engine.VerifyHeader(chain, header, false)
-	if err != errInvalidCoinbase {
-		t.Errorf("unexpected error comes, got: %v, expected: errInvalidCoinbase", err)
-	}
-
 	// non zero MixDigest
 	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	header = block.Header()
@@ -311,6 +311,17 @@ func TestVerifyHeader(t *testing.T) {
 	err = engine.VerifyHeader(chain, header, false)
 	if err != consensus.ErrFutureBlock {
 		t.Errorf("unexpected error comes, got: %v, expected: consensus.ErrFutureBlock", err)
+	}
+
+	// check point block
+	// non zero coinbase
+	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
+	header = block.Header()
+	header.Coinbase = common.StringToAddress("123456789")
+	header.Number = big.NewInt(int64(engine.config.Epoch))
+	err = engine.VerifyHeader(chain, header, false)
+	if err != errInvalidCoinbase {
+		t.Errorf("unexpected error comes, got: %v, expected: errInvalidCoinbase", err)
 	}
 }
 

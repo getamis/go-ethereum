@@ -33,9 +33,9 @@ import (
 )
 
 type testerVote struct {
-	signer string
-	voted  string
-	auth   bool
+	validator string
+	voted     string
+	auth      bool
 }
 
 // testerAccountPool is a pool to maintain currently active tester accounts,
@@ -51,14 +51,14 @@ func newTesterAccountPool() *testerAccountPool {
 	}
 }
 
-func (ap *testerAccountPool) sign(header *types.Header, signer string) {
-	// Ensure we have a persistent key for the signer
-	if ap.accounts[signer] == nil {
-		ap.accounts[signer], _ = crypto.GenerateKey()
+func (ap *testerAccountPool) sign(header *types.Header, validator string) {
+	// Ensure we have a persistent key for the validator
+	if ap.accounts[validator] == nil {
+		ap.accounts[validator], _ = crypto.GenerateKey()
 	}
 	// Sign the header and embed the signature in extra data
 	hashData := crypto.Keccak256([]byte(sigHash(header).Bytes()))
-	sig, _ := crypto.Sign(hashData, ap.accounts[signer])
+	sig, _ := crypto.Sign(hashData, ap.accounts[validator])
 	copy(header.Extra[len(header.Extra)-extraSeal:], sig)
 }
 
@@ -75,266 +75,268 @@ func (ap *testerAccountPool) address(account string) common.Address {
 func TestVoting(t *testing.T) {
 	// Define the various voting scenarios to test
 	tests := []struct {
-		epoch   uint64
-		signers []string
-		votes   []testerVote
-		results []string
+		epoch      uint64
+		validators []string
+		votes      []testerVote
+		results    []string
 	}{
 		{
-			// Single signer, no votes cast
-			signers: []string{"A"},
-			votes:   []testerVote{{signer: "A"}},
-			results: []string{"A"},
+			// Single validator, no votes cast
+			validators: []string{"A"},
+			votes:      []testerVote{{validator: "A"}},
+			results:    []string{"A"},
 		}, {
-			// Single signer, voting to add two others (only accept first, second needs 2 votes)
-			signers: []string{"A"},
+			// Single validator, voting to add two others (only accept first, second needs 2 votes)
+			validators: []string{"A"},
 			votes: []testerVote{
-				{signer: "A", voted: "B", auth: true},
-				{signer: "B"},
-				{signer: "A", voted: "C", auth: true},
+				{validator: "A", voted: "B", auth: true},
+				{validator: "B"},
+				{validator: "A", voted: "C", auth: true},
 			},
 			results: []string{"A", "B"},
 		}, {
-			// Two signers, voting to add three others (only accept first two, third needs 3 votes already)
-			signers: []string{"A", "B"},
+			// Two validators, voting to add three others (only accept first two, third needs 3 votes already)
+			validators: []string{"A", "B"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: true},
-				{signer: "B", voted: "C", auth: true},
-				{signer: "A", voted: "D", auth: true},
-				{signer: "B", voted: "D", auth: true},
-				{signer: "C"},
-				{signer: "A", voted: "E", auth: true},
-				{signer: "B", voted: "E", auth: true},
+				{validator: "A", voted: "C", auth: true},
+				{validator: "B", voted: "C", auth: true},
+				{validator: "A", voted: "D", auth: true},
+				{validator: "B", voted: "D", auth: true},
+				{validator: "C"},
+				{validator: "A", voted: "E", auth: true},
+				{validator: "B", voted: "E", auth: true},
 			},
 			results: []string{"A", "B", "C", "D"},
 		}, {
-			// Single signer, dropping itself (weird, but one less cornercase by explicitly allowing this)
-			signers: []string{"A"},
+			// Single validator, dropping itself (weird, but one less cornercase by explicitly allowing this)
+			validators: []string{"A"},
 			votes: []testerVote{
-				{signer: "A", voted: "A", auth: false},
+				{validator: "A", voted: "A", auth: false},
 			},
 			results: []string{},
 		}, {
-			// Two signers, actually needing mutual consent to drop either of them (not fulfilled)
-			signers: []string{"A", "B"},
+			// Two validators, actually needing mutual consent to drop either of them (not fulfilled)
+			validators: []string{"A", "B"},
 			votes: []testerVote{
-				{signer: "A", voted: "B", auth: false},
+				{validator: "A", voted: "B", auth: false},
 			},
 			results: []string{"A", "B"},
 		}, {
-			// Two signers, actually needing mutual consent to drop either of them (fulfilled)
-			signers: []string{"A", "B"},
+			// Two validators, actually needing mutual consent to drop either of them (fulfilled)
+			validators: []string{"A", "B"},
 			votes: []testerVote{
-				{signer: "A", voted: "B", auth: false},
-				{signer: "B", voted: "B", auth: false},
+				{validator: "A", voted: "B", auth: false},
+				{validator: "B", voted: "B", auth: false},
 			},
 			results: []string{"A"},
 		}, {
-			// Three signers, two of them deciding to drop the third
-			signers: []string{"A", "B", "C"},
+			// Three validators, two of them deciding to drop the third
+			validators: []string{"A", "B", "C"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: false},
-				{signer: "B", voted: "C", auth: false},
+				{validator: "A", voted: "C", auth: false},
+				{validator: "B", voted: "C", auth: false},
 			},
 			results: []string{"A", "B"},
 		}, {
-			// Four signers, consensus of two not being enough to drop anyone
-			signers: []string{"A", "B", "C", "D"},
+			// Four validators, consensus of two not being enough to drop anyone
+			validators: []string{"A", "B", "C", "D"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: false},
-				{signer: "B", voted: "C", auth: false},
+				{validator: "A", voted: "C", auth: false},
+				{validator: "B", voted: "C", auth: false},
 			},
 			results: []string{"A", "B", "C", "D"},
 		}, {
-			// Four signers, consensus of three already being enough to drop someone
-			signers: []string{"A", "B", "C", "D"},
+			// Four validators, consensus of three already being enough to drop someone
+			validators: []string{"A", "B", "C", "D"},
 			votes: []testerVote{
-				{signer: "A", voted: "D", auth: false},
-				{signer: "B", voted: "D", auth: false},
-				{signer: "C", voted: "D", auth: false},
+				{validator: "A", voted: "D", auth: false},
+				{validator: "B", voted: "D", auth: false},
+				{validator: "C", voted: "D", auth: false},
 			},
 			results: []string{"A", "B", "C"},
 		}, {
-			// Authorizations are counted once per signer per target
-			signers: []string{"A", "B"},
+			// Authorizations are counted once per validator per target
+			validators: []string{"A", "B"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: true},
-				{signer: "B"},
-				{signer: "A", voted: "C", auth: true},
-				{signer: "B"},
-				{signer: "A", voted: "C", auth: true},
+				{validator: "A", voted: "C", auth: true},
+				{validator: "B"},
+				{validator: "A", voted: "C", auth: true},
+				{validator: "B"},
+				{validator: "A", voted: "C", auth: true},
 			},
 			results: []string{"A", "B"},
 		}, {
 			// Authorizing multiple accounts concurrently is permitted
-			signers: []string{"A", "B"},
+			validators: []string{"A", "B"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: true},
-				{signer: "B"},
-				{signer: "A", voted: "D", auth: true},
-				{signer: "B"},
-				{signer: "A"},
-				{signer: "B", voted: "D", auth: true},
-				{signer: "A"},
-				{signer: "B", voted: "C", auth: true},
+				{validator: "A", voted: "C", auth: true},
+				{validator: "B"},
+				{validator: "A", voted: "D", auth: true},
+				{validator: "B"},
+				{validator: "A"},
+				{validator: "B", voted: "D", auth: true},
+				{validator: "A"},
+				{validator: "B", voted: "C", auth: true},
 			},
 			results: []string{"A", "B", "C", "D"},
 		}, {
-			// Deauthorizations are counted once per signer per target
-			signers: []string{"A", "B"},
+			// Deauthorizations are counted once per validator per target
+			validators: []string{"A", "B"},
 			votes: []testerVote{
-				{signer: "A", voted: "B", auth: false},
-				{signer: "B"},
-				{signer: "A", voted: "B", auth: false},
-				{signer: "B"},
-				{signer: "A", voted: "B", auth: false},
+				{validator: "A", voted: "B", auth: false},
+				{validator: "B"},
+				{validator: "A", voted: "B", auth: false},
+				{validator: "B"},
+				{validator: "A", voted: "B", auth: false},
 			},
 			results: []string{"A", "B"},
 		}, {
 			// Deauthorizing multiple accounts concurrently is permitted
-			signers: []string{"A", "B", "C", "D"},
+			validators: []string{"A", "B", "C", "D"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: false},
-				{signer: "B"},
-				{signer: "C"},
-				{signer: "A", voted: "D", auth: false},
-				{signer: "B"},
-				{signer: "C"},
-				{signer: "A"},
-				{signer: "B", voted: "D", auth: false},
-				{signer: "C", voted: "D", auth: false},
-				{signer: "A"},
-				{signer: "B", voted: "C", auth: false},
+				{validator: "A", voted: "C", auth: false},
+				{validator: "B"},
+				{validator: "C"},
+				{validator: "A", voted: "D", auth: false},
+				{validator: "B"},
+				{validator: "C"},
+				{validator: "A"},
+				{validator: "B", voted: "D", auth: false},
+				{validator: "C", voted: "D", auth: false},
+				{validator: "A"},
+				{validator: "B", voted: "C", auth: false},
 			},
 			results: []string{"A", "B"},
 		}, {
-			// Votes from deauthorized signers are discarded immediately (deauth votes)
-			signers: []string{"A", "B", "C"},
+			// Votes from deauthorized validators are discarded immediately (deauth votes)
+			validators: []string{"A", "B", "C"},
 			votes: []testerVote{
-				{signer: "C", voted: "B", auth: false},
-				{signer: "A", voted: "C", auth: false},
-				{signer: "B", voted: "C", auth: false},
-				{signer: "A", voted: "B", auth: false},
+				{validator: "C", voted: "B", auth: false},
+				{validator: "A", voted: "C", auth: false},
+				{validator: "B", voted: "C", auth: false},
+				{validator: "A", voted: "B", auth: false},
 			},
 			results: []string{"A", "B"},
 		}, {
-			// Votes from deauthorized signers are discarded immediately (auth votes)
-			signers: []string{"A", "B", "C"},
+			// Votes from deauthorized validators are discarded immediately (auth votes)
+			validators: []string{"A", "B", "C"},
 			votes: []testerVote{
-				{signer: "C", voted: "B", auth: false},
-				{signer: "A", voted: "C", auth: false},
-				{signer: "B", voted: "C", auth: false},
-				{signer: "A", voted: "B", auth: false},
+				{validator: "C", voted: "B", auth: false},
+				{validator: "A", voted: "C", auth: false},
+				{validator: "B", voted: "C", auth: false},
+				{validator: "A", voted: "B", auth: false},
 			},
 			results: []string{"A", "B"},
 		}, {
 			// Cascading changes are not allowed, only the the account being voted on may change
-			signers: []string{"A", "B", "C", "D"},
+			validators: []string{"A", "B", "C", "D"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: false},
-				{signer: "B"},
-				{signer: "C"},
-				{signer: "A", voted: "D", auth: false},
-				{signer: "B", voted: "C", auth: false},
-				{signer: "C"},
-				{signer: "A"},
-				{signer: "B", voted: "D", auth: false},
-				{signer: "C", voted: "D", auth: false},
+				{validator: "A", voted: "C", auth: false},
+				{validator: "B"},
+				{validator: "C"},
+				{validator: "A", voted: "D", auth: false},
+				{validator: "B", voted: "C", auth: false},
+				{validator: "C"},
+				{validator: "A"},
+				{validator: "B", voted: "D", auth: false},
+				{validator: "C", voted: "D", auth: false},
 			},
 			results: []string{"A", "B", "C"},
 		}, {
 			// Changes reaching consensus out of bounds (via a deauth) execute on touch
-			signers: []string{"A", "B", "C", "D"},
+			validators: []string{"A", "B", "C", "D"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: false},
-				{signer: "B"},
-				{signer: "C"},
-				{signer: "A", voted: "D", auth: false},
-				{signer: "B", voted: "C", auth: false},
-				{signer: "C"},
-				{signer: "A"},
-				{signer: "B", voted: "D", auth: false},
-				{signer: "C", voted: "D", auth: false},
-				{signer: "A"},
-				{signer: "C", voted: "C", auth: true},
+				{validator: "A", voted: "C", auth: false},
+				{validator: "B"},
+				{validator: "C"},
+				{validator: "A", voted: "D", auth: false},
+				{validator: "B", voted: "C", auth: false},
+				{validator: "C"},
+				{validator: "A"},
+				{validator: "B", voted: "D", auth: false},
+				{validator: "C", voted: "D", auth: false},
+				{validator: "A"},
+				{validator: "C", voted: "C", auth: true},
 			},
 			results: []string{"A", "B"},
 		}, {
 			// Changes reaching consensus out of bounds (via a deauth) may go out of consensus on first touch
-			signers: []string{"A", "B", "C", "D"},
+			validators: []string{"A", "B", "C", "D"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: false},
-				{signer: "B"},
-				{signer: "C"},
-				{signer: "A", voted: "D", auth: false},
-				{signer: "B", voted: "C", auth: false},
-				{signer: "C"},
-				{signer: "A"},
-				{signer: "B", voted: "D", auth: false},
-				{signer: "C", voted: "D", auth: false},
-				{signer: "A"},
-				{signer: "B", voted: "C", auth: true},
+				{validator: "A", voted: "C", auth: false},
+				{validator: "B"},
+				{validator: "C"},
+				{validator: "A", voted: "D", auth: false},
+				{validator: "B", voted: "C", auth: false},
+				{validator: "C"},
+				{validator: "A"},
+				{validator: "B", voted: "D", auth: false},
+				{validator: "C", voted: "D", auth: false},
+				{validator: "A"},
+				{validator: "B", voted: "C", auth: true},
 			},
 			results: []string{"A", "B", "C"},
 		}, {
 			// Ensure that pending votes don't survive authorization status changes. This
-			// corner case can only appear if a signer is quickly added, remove and then
+			// corner case can only appear if a validator is quickly added, remove and then
 			// readded (or the inverse), while one of the original voters dropped. If a
 			// past vote is left cached in the system somewhere, this will interfere with
-			// the final signer outcome.
-			signers: []string{"A", "B", "C", "D", "E"},
+			// the final validator outcome.
+			validators: []string{"A", "B", "C", "D", "E"},
 			votes: []testerVote{
-				{signer: "A", voted: "F", auth: true}, // Authorize F, 3 votes needed
-				{signer: "B", voted: "F", auth: true},
-				{signer: "C", voted: "F", auth: true},
-				{signer: "D", voted: "F", auth: false}, // Deauthorize F, 4 votes needed (leave A's previous vote "unchanged")
-				{signer: "E", voted: "F", auth: false},
-				{signer: "B", voted: "F", auth: false},
-				{signer: "C", voted: "F", auth: false},
-				{signer: "D", voted: "F", auth: true}, // Almost authorize F, 2/3 votes needed
-				{signer: "E", voted: "F", auth: true},
-				{signer: "B", voted: "A", auth: false}, // Deauthorize A, 3 votes needed
-				{signer: "C", voted: "A", auth: false},
-				{signer: "D", voted: "A", auth: false},
-				{signer: "B", voted: "F", auth: true}, // Finish authorizing F, 3/3 votes needed
+				{validator: "A", voted: "F", auth: true}, // Authorize F, 3 votes needed
+				{validator: "B", voted: "F", auth: true},
+				{validator: "C", voted: "F", auth: true},
+				{validator: "D", voted: "F", auth: false}, // Deauthorize F, 4 votes needed (leave A's previous vote "unchanged")
+				{validator: "E", voted: "F", auth: false},
+				{validator: "B", voted: "F", auth: false},
+				{validator: "C", voted: "F", auth: false},
+				{validator: "D", voted: "F", auth: true}, // Almost authorize F, 2/3 votes needed
+				{validator: "E", voted: "F", auth: true},
+				{validator: "B", voted: "A", auth: false}, // Deauthorize A, 3 votes needed
+				{validator: "C", voted: "A", auth: false},
+				{validator: "D", voted: "A", auth: false},
+				{validator: "B", voted: "F", auth: true}, // Finish authorizing F, 3/3 votes needed
 			},
 			results: []string{"B", "C", "D", "E", "F"},
 		}, {
 			// Epoch transitions reset all votes to allow chain checkpointing
-			epoch:   3,
-			signers: []string{"A", "B"},
+			epoch:      3,
+			validators: []string{"A", "B"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: true},
-				{signer: "B"},
-				{signer: "A"}, // Checkpoint block, (don't vote here, it's validated outside of snapshots)
-				{signer: "B", voted: "C", auth: true},
+				{validator: "A", voted: "C", auth: true},
+				{validator: "B"},
+				{validator: "A"}, // Checkpoint block, (don't vote here, it's validated outside of snapshots)
+				{validator: "B", voted: "C", auth: true},
 			},
 			results: []string{"A", "B"},
 		},
 	}
 	// Run through the scenarios and test them
 	for i, tt := range tests {
-		// Create the account pool and generate the initial set of signers
+		// Create the account pool and generate the initial set of validators
 		accounts := newTesterAccountPool()
 
-		signers := make([]common.Address, len(tt.signers))
-		for j, signer := range tt.signers {
-			signers[j] = accounts.address(signer)
+		validators := make([]common.Address, len(tt.validators))
+		for j, validator := range tt.validators {
+			validators[j] = accounts.address(validator)
 		}
-		for j := 0; j < len(signers); j++ {
-			for k := j + 1; k < len(signers); k++ {
-				if bytes.Compare(signers[j][:], signers[k][:]) > 0 {
-					signers[j], signers[k] = signers[k], signers[j]
+		for j := 0; j < len(validators); j++ {
+			for k := j + 1; k < len(validators); k++ {
+				if bytes.Compare(validators[j][:], validators[k][:]) > 0 {
+					validators[j], validators[k] = validators[k], validators[j]
 				}
 			}
 		}
-		// Create the genesis block with the initial set of signers
+		// Create the genesis block with the initial set of validators
 		genesis := &core.Genesis{
 			Difficulty: defaultDifficulty,
-			ExtraData:  make([]byte, extraVanity+common.AddressLength*len(signers)+extraSeal),
+			ExtraData:  make([]byte, extraVanity+extraValidatorSize+common.AddressLength*len(validators)+extraSeal),
 		}
-		for j, signer := range signers {
-			copy(genesis.ExtraData[extraVanity+j*common.AddressLength:], signer[:])
+		// set validator size
+		genesis.ExtraData[extraVanity] = byte(len(validators))
+		for j, validator := range validators {
+			copy(genesis.ExtraData[extraVanity+extraValidatorSize+j*common.AddressLength:], validator[:])
 		}
 		// Create a pristine blockchain with the genesis injected
 		db, _ := ethdb.NewMemDatabase()
@@ -345,7 +347,7 @@ func TestVoting(t *testing.T) {
 		if tt.epoch != 0 {
 			config.Epoch = tt.epoch
 		}
-		engine := New(config, eventMux, accounts.accounts[tt.signers[0]], db).(*simpleBackend)
+		engine := New(config, eventMux, accounts.accounts[tt.validators[0]], db).(*simpleBackend)
 		chain, err := core.NewBlockChain(db, genesis.Config, engine, eventMux, vm.Config{})
 
 		// Assemble a chain of headers from the cast votes
@@ -355,7 +357,7 @@ func TestVoting(t *testing.T) {
 				Number:     big.NewInt(int64(j) + 1),
 				Time:       big.NewInt(int64(j) * int64(config.BlockPauseTime)),
 				Coinbase:   accounts.address(vote.voted),
-				Extra:      make([]byte, extraVanity+extraSeal),
+				Extra:      make([]byte, extraVanity+extraValidatorSize+common.AddressLength*len(validators)+extraSeal),
 				Difficulty: defaultDifficulty,
 			}
 			if j > 0 {
@@ -364,7 +366,8 @@ func TestVoting(t *testing.T) {
 			if vote.auth {
 				copy(headers[j].Nonce[:], nonceAuthVote)
 			}
-			accounts.sign(headers[j], vote.signer)
+			copy(headers[j].Extra, genesis.ExtraData)
+			accounts.sign(headers[j], vote.validator)
 		}
 		// Pass all the headers through clique and ensure tallying succeeds
 		head := headers[len(headers)-1]
@@ -374,26 +377,26 @@ func TestVoting(t *testing.T) {
 			t.Errorf("test %d: failed to create voting snapshot: %v", i, err)
 			continue
 		}
-		// Verify the final list of signers against the expected ones
-		signers = make([]common.Address, len(tt.results))
-		for j, signer := range tt.results {
-			signers[j] = accounts.address(signer)
+		// Verify the final list of validators against the expected ones
+		validators = make([]common.Address, len(tt.results))
+		for j, validator := range tt.results {
+			validators[j] = accounts.address(validator)
 		}
-		for j := 0; j < len(signers); j++ {
-			for k := j + 1; k < len(signers); k++ {
-				if bytes.Compare(signers[j][:], signers[k][:]) > 0 {
-					signers[j], signers[k] = signers[k], signers[j]
+		for j := 0; j < len(validators); j++ {
+			for k := j + 1; k < len(validators); k++ {
+				if bytes.Compare(validators[j][:], validators[k][:]) > 0 {
+					validators[j], validators[k] = validators[k], validators[j]
 				}
 			}
 		}
-		result := snap.signers()
-		if len(result) != len(signers) {
-			t.Errorf("test %d: signers mismatch: have %x, want %x", i, result, signers)
+		result := snap.validators()
+		if len(result) != len(validators) {
+			t.Errorf("test %d: validators mismatch: have %x, want %x", i, result, validators)
 			continue
 		}
 		for j := 0; j < len(result); j++ {
-			if !bytes.Equal(result[j][:], signers[j][:]) {
-				t.Errorf("test %d, signer %d: signer mismatch: have %x, want %x", i, j, result[j], signers[j])
+			if !bytes.Equal(result[j][:], validators[j][:]) {
+				t.Errorf("test %d, validator %d: validator mismatch: have %x, want %x", i, j, result[j], validators[j])
 			}
 		}
 	}

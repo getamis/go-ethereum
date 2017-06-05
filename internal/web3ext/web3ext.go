@@ -714,14 +714,14 @@ web3._extend({
 			params: 1
 		}),
 		new web3._extend.Method({
-			name: 'getSigners',
-			call: 'istanbul_getSigners',
+			name: 'getValidators',
+			call: 'istanbul_getValidators',
 			params: 1,
 			inputFormatter: [null]
 		}),
 		new web3._extend.Method({
-			name: 'getSignersAtHash',
-			call: 'istanbul_getSignersAtHash',
+			name: 'getValidatorsAtHash',
+			call: 'istanbul_getValidatorsAtHash',
 			params: 1
 		}),
 		new web3._extend.Method({
