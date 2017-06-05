@@ -467,27 +467,27 @@ var (
 
 	// Istanbul settings
 	IstanbulRequestTimeoutFlag = cli.Uint64Flag{
-		Name:  "istanbul_request_timeout",
-		Usage: "The timeout for each Istanbul round in millisecond",
+		Name:  "istanbul.requesttimeout",
+		Usage: "Timeout for each Istanbul round in milliseconds",
 		Value: eth.DefaultConfig.Istanbul.RequestTimeoutMsec,
 	}
 	IstanbulBlockPeriodFlag = cli.Uint64Flag{
-		Name:  "istanbul_block_period",
-		Usage: "Default minimum difference between two consecutive block's timestamps in second",
+		Name:  "istanbul.blockperiod",
+		Usage: "Default minimum difference between two consecutive block's timestamps in seconds",
 		Value: eth.DefaultConfig.Istanbul.BlockPeriod,
 	}
 	IstanbulBlockPauseTimeFlag = cli.Uint64Flag{
-		Name:  "istanbul_block_pause_time",
-		Usage: "Pause time when zero tx in previous block, values should be larger than istanbul_block_period",
+		Name:  "istanbul.blockpausetime",
+		Usage: "Pause time when zero tx in previous block, values should be larger than istanbul.blockperiod",
 		Value: eth.DefaultConfig.Istanbul.BlockPauseTime,
 	}
 	IstanbulProposerPolicyFlag = cli.IntFlag{
-		Name:  "istanbul_proposer_policy",
-		Usage: "The policy for proposer, the detail is not determined",
+		Name:  "istanbul.proposerpolicy",
+		Usage: "Policy of proposer selection, the detail is not determined",
 		Value: int(eth.DefaultConfig.Istanbul.ProposerPolicy),
 	}
 	IstanbulCheckPointPeriodFlag = cli.IntFlag{
-		Name:  "istanbul_cp_period",
+		Name:  "istanbul.cpperiod",
 		Usage: "Synchronizes the mapping's checkpoint to the blocks on each round",
 		Value: eth.DefaultConfig.Istanbul.CheckPointPeriod,
 	}
