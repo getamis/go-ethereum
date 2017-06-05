@@ -221,7 +221,7 @@ func CreateConsensusEngine(ctx *node.ServiceContext, config *Config, chainConfig
 	}
 	// If Istanbul is requested, set it up
 	if chainConfig.Istanbul != nil {
-		return istanbul.New(config.Istanbul, ctx.EventMux, ctx.NodeKey(), db)
+		return istanbul.New(&config.Istanbul, ctx.EventMux, ctx.NodeKey(), db)
 	}
 
 	// Otherwise assume proof-of-work
