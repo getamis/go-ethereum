@@ -21,12 +21,14 @@ import (
 	"encoding/json"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/istanbul"
+	"github.com/ethereum/go-ethereum/consensus/istanbul/validator"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 const (
-	dbKeySnapshotPrefix = "pbft-snapshot"
+	dbKeySnapshotPrefix = "istanbul-snapshot"
 )
 
 // Vote represents a single vote that an authorized signer made to modify the
@@ -49,11 +51,11 @@ type Tally struct {
 type Snapshot struct {
 	Epoch uint64 // The number of blocks after which to checkpoint and reset the pending votes
 
-	Number  uint64                      `json:"number"`  // Block number where the snapshot was created
-	Hash    common.Hash                 `json:"hash"`    // Block hash where the snapshot was created
-	Signers map[common.Address]struct{} `json:"signers"` // Set of authorized signers at this moment
-	Votes   []*Vote                     `json:"votes"`   // List of votes cast in chronological order
-	Tally   map[common.Address]Tally    `json:"tally"`   // Current vote tally to avoid recalculating
+	Number uint64                   `json:"number"`  // Block number where the snapshot was created
+	Hash   common.Hash              `json:"hash"`    // Block hash where the snapshot was created
+	Votes  []*Vote                  `json:"votes"`   // List of votes cast in chronological order
+	Tally  map[common.Address]Tally `json:"tally"`   // Current vote tally to avoid recalculating
+	ValSet istanbul.ValidatorSet    `json:"signers"` // Set of authorized signers at this moment
 }
 
 // newSnapshot create a new snapshot with the specified startup parameters. This
@@ -61,14 +63,11 @@ type Snapshot struct {
 // the genesis block.
 func newSnapshot(epoch uint64, number uint64, hash common.Hash, signers []common.Address) *Snapshot {
 	snap := &Snapshot{
-		Epoch:   epoch,
-		Number:  number,
-		Hash:    hash,
-		Signers: make(map[common.Address]struct{}),
-		Tally:   make(map[common.Address]Tally),
-	}
-	for _, signer := range signers {
-		snap.Signers[signer] = struct{}{}
+		Epoch:  epoch,
+		Number: number,
+		Hash:   hash,
+		ValSet: validator.NewSet(signers),
+		Tally:  make(map[common.Address]Tally),
 	}
 	return snap
 }
@@ -100,15 +99,15 @@ func (s *Snapshot) store(db ethdb.Database) error {
 // copy creates a deep copy of the snapshot, though not the individual votes.
 func (s *Snapshot) copy() *Snapshot {
 	cpy := &Snapshot{
-		Epoch:   s.Epoch,
-		Number:  s.Number,
-		Hash:    s.Hash,
-		Signers: make(map[common.Address]struct{}),
-		Votes:   make([]*Vote, len(s.Votes)),
-		Tally:   make(map[common.Address]Tally),
+		Epoch:  s.Epoch,
+		Number: s.Number,
+		Hash:   s.Hash,
+		ValSet: validator.NewSet(nil),
+		Votes:  make([]*Vote, len(s.Votes)),
+		Tally:  make(map[common.Address]Tally),
 	}
-	for signer := range s.Signers {
-		cpy.Signers[signer] = struct{}{}
+	for _, signer := range s.ValSet.List() {
+		cpy.ValSet.AddValidator(signer.Address())
 	}
 	for address, tally := range s.Tally {
 		cpy.Tally[address] = tally
@@ -121,8 +120,8 @@ func (s *Snapshot) copy() *Snapshot {
 // cast adds a new vote into the tally.
 func (s *Snapshot) cast(address common.Address, authorize bool) bool {
 	// Ensure the vote is meaningful
-	_, signer := s.Signers[address]
-	if (signer && authorize) || (!signer && !authorize) {
+	_, signer := s.ValSet.GetByAddress(address)
+	if (signer != nil && authorize) || (signer == nil && !authorize) {
 		return false
 	}
 	// Cast the vote into an existing or new tally
@@ -187,7 +186,7 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 		if err != nil {
 			return nil, err
 		}
-		if _, ok := snap.Signers[signer]; !ok {
+		if _, v := snap.ValSet.GetByAddress(signer); v == nil {
 			return nil, errUnauthorized
 		}
 
@@ -221,11 +220,11 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 			})
 		}
 		// If the vote passed, update the list of signers
-		if tally := snap.Tally[header.Coinbase]; tally.Votes > len(snap.Signers)/2 {
+		if tally := snap.Tally[header.Coinbase]; tally.Votes > snap.ValSet.Size()/2 {
 			if tally.Authorize {
-				snap.Signers[header.Coinbase] = struct{}{}
+				snap.ValSet.AddValidator(header.Coinbase)
 			} else {
-				delete(snap.Signers, header.Coinbase)
+				snap.ValSet.RemoveValidator(header.Coinbase)
 
 				// Discard any previous votes the deauthorized signer cast
 				for i := 0; i < len(snap.Votes); i++ {
@@ -258,9 +257,9 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 
 // signers retrieves the list of authorized signers in ascending order.
 func (s *Snapshot) signers() []common.Address {
-	signers := make([]common.Address, 0, len(s.Signers))
-	for signer := range s.Signers {
-		signers = append(signers, signer)
+	signers := make([]common.Address, 0, s.ValSet.Size())
+	for _, signer := range s.ValSet.List() {
+		signers = append(signers, signer.Address())
 	}
 	for i := 0; i < len(signers); i++ {
 		for j := i + 1; j < len(signers); j++ {

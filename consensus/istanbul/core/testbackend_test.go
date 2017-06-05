@@ -56,7 +56,7 @@ func (self *testSystemBackend) Address() common.Address {
 }
 
 // Peers returns all connected peers
-func (self *testSystemBackend) Validators() istanbul.ValidatorSet {
+func (self *testSystemBackend) Validators(proposal istanbul.Proposal) istanbul.ValidatorSet {
 	return self.peers
 }
 
@@ -204,8 +204,6 @@ func NewTestSystemWithBackend(n, f uint64) *testSystem {
 			Sequence: big.NewInt(1),
 		}, vset)
 		core.logger = testLogger
-		core.N = int64(n)
-		core.F = int64(f)
 
 		backend.engine = core
 	}
@@ -235,7 +233,7 @@ func (t *testSystem) listen() {
 func (t *testSystem) Run(core bool) func() {
 	for _, b := range t.backends {
 		if core {
-			b.engine.Start(common.Big0, common.Address{}) // start Istanbul core
+			b.engine.Start(common.Big0, common.Address{}, nil) // start Istanbul core
 		}
 	}
 

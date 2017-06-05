@@ -20,6 +20,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 )
 
@@ -34,17 +35,14 @@ func TestHandleCheckpoint(t *testing.T) {
 	}
 	system := NewTestSystemWithBackend(N, F)
 	c := system.backends[0].engine.(*core)
-	c.current = newSnapshot(&istanbul.View{
-		Sequence: big.NewInt(3),
-		Round:    big.NewInt(0),
-	}, system.backends[0].Validators())
+	c.Start(big.NewInt(2), common.Address{}, nil)
 	c.snapshots = append(c.snapshots, newSnapshot(&istanbul.View{
 		Round:    big.NewInt(0),
 		Sequence: big.NewInt(1),
-	}, system.backends[0].Validators()), newSnapshot(&istanbul.View{
+	}, c.valSet), newSnapshot(&istanbul.View{
 		Round:    big.NewInt(0),
 		Sequence: big.NewInt(2),
-	}, system.backends[0].Validators()))
+	}, c.valSet))
 
 	testCases := []struct {
 		system      *testSystem
@@ -54,15 +52,15 @@ func TestHandleCheckpoint(t *testing.T) {
 		expectedErr error
 	}{
 		// empty subject
-		{system, &istanbul.Subject{View: &istanbul.View{Sequence: big.NewInt(0), Round: big.NewInt(0)}}, system.backends[0].Validators().List()[0], nil, errInvalidMessage},
+		{system, &istanbul.Subject{View: &istanbul.View{Sequence: big.NewInt(0), Round: big.NewInt(0)}}, c.valSet.List()[0], nil, errInvalidMessage},
 		// current sequence
-		{system, &istanbul.Subject{View: &istanbul.View{Sequence: preprepare.View.Sequence}}, system.backends[0].Validators().List()[0], c.current, nil},
+		{system, &istanbul.Subject{View: &istanbul.View{Sequence: preprepare.View.Sequence}}, c.valSet.List()[0], c.current, nil},
 		// old sequence
-		{system, &istanbul.Subject{View: &istanbul.View{Sequence: big.NewInt(2)}}, system.backends[0].Validators().List()[0], c.snapshots[1], nil},
+		{system, &istanbul.Subject{View: &istanbul.View{Sequence: big.NewInt(2)}}, c.valSet.List()[0], c.snapshots[1], nil},
 		// old sequence without snapshot
-		{system, &istanbul.Subject{View: &istanbul.View{Sequence: big.NewInt(0)}}, system.backends[0].Validators().List()[0], nil, errInvalidMessage},
+		{system, &istanbul.Subject{View: &istanbul.View{Sequence: big.NewInt(0)}}, c.valSet.List()[0], nil, errInvalidMessage},
 		// future sequence
-		{system, &istanbul.Subject{View: &istanbul.View{Sequence: big.NewInt(4)}}, system.backends[0].Validators().List()[0], nil, errInvalidMessage},
+		{system, &istanbul.Subject{View: &istanbul.View{Sequence: big.NewInt(4)}}, c.valSet.List()[0], nil, errInvalidMessage},
 	}
 
 	for _, test := range testCases {
@@ -99,13 +97,14 @@ func TestBuildStableCheckpoint(t *testing.T) {
 	F := uint64(0)
 	system := NewTestSystemWithBackend(N, F)
 	c := system.backends[0].engine.(*core)
-	v := system.backends[0].Validators().List()[0]
+	c.valSet = system.backends[0].Validators(nil)
+	v := c.valSet.List()[0]
 	proposal := makeBlock(1)
 	view := &istanbul.View{
 		Round:    big.NewInt(0),
 		Sequence: big.NewInt(1),
 	}
-	expectedStableSnapshot := newSnapshot(view, system.backends[0].Validators())
+	expectedStableSnapshot := newSnapshot(view, c.valSet)
 	expectedStableSnapshot.Preprepare = &istanbul.Preprepare{
 		View:     view,
 		Proposal: proposal,
@@ -114,7 +113,7 @@ func TestBuildStableCheckpoint(t *testing.T) {
 		Round:    big.NewInt(0),
 		Sequence: big.NewInt(2),
 	}
-	s := newSnapshot(view, system.backends[0].Validators())
+	s := newSnapshot(view, c.valSet)
 	s.Preprepare = &istanbul.Preprepare{
 		View:     view,
 		Proposal: proposal,

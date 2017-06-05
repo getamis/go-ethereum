@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
@@ -56,8 +57,9 @@ func (val *defaultValidator) String() string {
 // ----------------------------------------------------------------------------
 
 type defaultSet struct {
-	validators Validators
-	proposer   istanbul.Validator
+	validators  Validators
+	proposer    istanbul.Validator
+	validatorMu sync.Mutex
 }
 
 func newDefaultSet(addrs []common.Address) *defaultSet {
@@ -76,7 +78,7 @@ func newDefaultSet(addrs []common.Address) *defaultSet {
 	return valSet
 }
 
-func (valSet *defaultSet) Size() int              { return len(valSet.validators) }
+func (valSet *defaultSet) Size() int                  { return len(valSet.validators) }
 func (valSet *defaultSet) List() []istanbul.Validator { return valSet.validators }
 
 func (valSet *defaultSet) GetByIndex(i uint64) istanbul.Validator {
@@ -109,4 +111,32 @@ func (valSet *defaultSet) CalcProposer(seed uint64) {
 		pick := seed % uint64(valSet.Size())
 		valSet.proposer = valSet.validators[pick]
 	}
+}
+
+func (valSet *defaultSet) AddValidator(address common.Address) bool {
+	valSet.validatorMu.Lock()
+	defer valSet.validatorMu.Unlock()
+	for _, v := range valSet.validators {
+		if v.Address() == address {
+			return false
+		}
+	}
+	valSet.validators = append(valSet.validators, New(address))
+	// TODO: we may not need to re-sort it again
+	// sort validator
+	sort.Sort(valSet.validators)
+	return true
+}
+
+func (valSet *defaultSet) RemoveValidator(address common.Address) bool {
+	valSet.validatorMu.Lock()
+	defer valSet.validatorMu.Unlock()
+
+	for i, v := range valSet.validators {
+		if v.Address() == address {
+			valSet.validators = append(valSet.validators[:i], valSet.validators[i+1:]...)
+			return true
+		}
+	}
+	return false
 }

@@ -41,4 +41,8 @@ type ValidatorSet interface {
 	GetProposer() Validator
 	// Check whether the validator with given address is a proposer
 	IsProposer(address common.Address) bool
+	// Add validator
+	AddValidator(address common.Address) bool
+	// Remove validator
+	RemoveValidator(address common.Address) bool
 }
