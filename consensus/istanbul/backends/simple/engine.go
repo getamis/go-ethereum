@@ -50,7 +50,7 @@ var (
 	// errInvalidSignature is returned when given signature is not signed by given
 	// address.
 	errInvalidSignature = errors.New("invalid signature")
-	// errUnknownBlock is returned when the list of signers is requested for a block
+	// errUnknownBlock is returned when the list of validators is requested for a block
 	// that is not part of the local blockchain.
 	errUnknownBlock = errors.New("unknown block")
 	// errUnauthorized is returned if a header is signed by a non authorized entity.
@@ -86,8 +86,8 @@ var (
 	emptyNonce        = types.BlockNonce{}
 	now               = time.Now
 
-	nonceAuthVote = hexutil.MustDecode("0xffffffffffffffff") // Magic nonce number to vote on adding a new signer
-	nonceDropVote = hexutil.MustDecode("0x0000000000000000") // Magic nonce number to vote on removing a signer.
+	nonceAuthVote = hexutil.MustDecode("0xffffffffffffffff") // Magic nonce number to vote on adding a new validator
+	nonceDropVote = hexutil.MustDecode("0x0000000000000000") // Magic nonce number to vote on removing a validator.
 )
 
 // Author retrieves the Ethereum address of the account that minted the given
@@ -173,10 +173,19 @@ func (sb *simpleBackend) verifyCascadingFields(chain consensus.ChainReader, head
 	if parent.Time.Uint64()+sb.config.BlockPeriod > header.Time.Uint64() {
 		return errInvalidTimestamp
 	}
-	// // Fixed validator set
-	// if bytes.Compare(sb.getValidatorBytes(header), sb.getValidatorBytes(parent)) != 0 {
-	// 	return errInconsistentValidatorSet
-	// }
+	// Retrieve the snapshot needed to verify this header and cache it
+	snap, err := sb.snapshot(chain, number-1, header.ParentHash, []*types.Header{parent})
+	if err != nil {
+		return err
+	}
+	validators := make([]byte, len(snap.validators())*common.AddressLength)
+	for i, validator := range snap.validators() {
+		copy(validators[i*common.AddressLength:], validator[:])
+	}
+	extraSuffix := len(header.Extra) - types.IstanbulExtraSeal
+	if !bytes.Equal(header.Extra[types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize:extraSuffix], validators) {
+		return errInvalidExtraDataFormat
+	}
 	return sb.verifySigner(chain, header, parent)
 }
 
@@ -218,19 +227,25 @@ func (sb *simpleBackend) VerifyUncles(chain consensus.ChainReader, block *types.
 
 // verifySigner checks whether the signer is in parent's validator set
 func (sb *simpleBackend) verifySigner(chain consensus.ChainReader, header *types.Header, parent *types.Header) error {
+	// Verifying the genesis block is not supported
+	number := header.Number.Uint64()
+	if number == 0 {
+		return errUnknownBlock
+	}
+
+	// Retrieve the snapshot needed to verify this header and cache it
+	snap, err := sb.snapshot(chain, number-1, header.ParentHash, []*types.Header{parent})
+	if err != nil {
+		return err
+	}
+
 	// resolve the authorization key and check against signers
 	signer, err := ecrecover(header)
 	if err != nil {
 		return err
 	}
 
-	validatorAddresses := validator.ExtractValidators(sb.getValidatorBytes(parent))
-	// ensure the signer is in parent's validator set
-	parentValSet := validator.NewSet(validatorAddresses, sb.config.ProposerPolicy)
-	if parentValSet == nil {
-		return errInvalidExtraDataFormat
-	}
-	if _, v := parentValSet.GetByAddress(signer); v == nil {
+	if _, v := snap.ValSet.GetByAddress(signer); v == nil {
 		return errUnauthorized
 	}
 	return nil
@@ -274,9 +289,6 @@ func (sb *simpleBackend) Prepare(chain consensus.ChainReader, header *types.Head
 	if !sb.validExtraFormat(parent) {
 		return errInvalidExtraDataFormat
 	}
-	// TODO: we may only insert validator list in epoch block
-	// Ensure the extra data has all it's components
-	header.Extra = sb.prepareExtra(header, parent)
 	// use the same difficulty for all blocks
 	header.Difficulty = defaultDifficulty
 
@@ -297,6 +309,22 @@ func (sb *simpleBackend) Prepare(chain consensus.ChainReader, header *types.Head
 			sb.logger.Info("Vote", "coinbase", header.Coinbase, "nonce", header.Nonce, "candidates", sb.candidates)
 		}
 		sb.candidatesLock.RUnlock()
+	}
+
+	// TODO: we may only insert validator list in epoch block
+	// Ensure the extra data has all it's components
+	snap, err := sb.snapshot(chain, number-1, header.ParentHash, nil)
+	if err != nil {
+		return err
+	}
+	size := snap.ValSet.Size()
+	expectedSize := types.IstanbulExtraVanity + types.IstanbulExtraValidatorSize + size*common.AddressLength + types.IstanbulExtraSeal
+	if len(header.Extra) < expectedSize {
+		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, expectedSize-len(header.Extra))...)
+	}
+	header.Extra[types.IstanbulExtraVanity] = byte(snap.ValSet.Size())
+	for i, validator := range snap.ValSet.List() {
+		copy(header.Extra[types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+i*common.AddressLength:], validator.Address().Bytes())
 	}
 	return nil
 }
@@ -503,21 +531,6 @@ func (sb *simpleBackend) getValidatorBytes(header *types.Header) []byte {
 	return header.Extra[types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize : types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+validatorLength(header)]
 }
 
-// prepareExtra creates a copy that includes vanity, validators, and a clean seal for the given header
-//
-// note that the header.Extra consisted of vanity, validator size, validators, seal, and committed signatures
-func (sb *simpleBackend) prepareExtra(header, parent *types.Header) []byte {
-	buf := make([]byte, 0)
-	if len(header.Extra) < types.IstanbulExtraVanity {
-		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, types.IstanbulExtraVanity-len(header.Extra))...)
-	}
-	buf = header.Extra[:types.IstanbulExtraVanity]
-
-	buf = append(buf, parent.Extra[types.IstanbulExtraVanity:types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+validatorLength(parent)]...)
-	buf = append(buf, make([]byte, types.IstanbulExtraSeal)...)
-	return buf
-}
-
 // signaturePosition returns start and end position for the given header
 func signaturePosition(header *types.Header) (int, int) {
 	start := types.IstanbulExtraVanity + types.IstanbulExtraValidatorSize + validatorLength(header)
@@ -560,7 +573,7 @@ func (sb *simpleBackend) snapshot(chain consensus.ChainReader, number uint64, ha
 				return nil, err
 			}
 			validators := validator.ExtractValidators(sb.getValidatorBytes(genesis))
-			snap = newSnapshot(sb.config.Epoch, 0, genesis.Hash(), validators)
+			snap = newSnapshot(sb.config.Epoch, 0, genesis.Hash(), validator.NewSet(validators, sb.config.ProposerPolicy))
 			if err := snap.store(sb.db); err != nil {
 				return nil, err
 			}
