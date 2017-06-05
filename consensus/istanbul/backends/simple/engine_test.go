@@ -444,39 +444,6 @@ OUT3:
 	}
 }
 
-func TestPrepareExtra(t *testing.T) {
-	validatorN := 4
-	buf := make([]byte, 0)
-	buf = append(buf, make([]byte, types.IstanbulExtraVanity)...)
-	buf = append(buf, byte(validatorN))
-	buf = append(buf, make([]byte, validatorN*common.AddressLength)...)
-	buf = append(buf, make([]byte, types.IstanbulExtraSeal)...)
-
-	parentHeader := &types.Header{}
-	parentHeader.Extra = buf
-
-	header := &types.Header{}
-	header.Extra = common.StringToHash("123").Bytes()
-
-	expectedExtra := parentHeader.Extra
-	copy(expectedExtra[0:types.IstanbulExtraVanity], header.Extra)
-
-	b, _, _ := newSimpleBackend()
-	extra := b.prepareExtra(header, parentHeader)
-	if bytes.Compare(extra, expectedExtra) != 0 {
-		t.Errorf("expected: %v, got: %v", expectedExtra, extra)
-	}
-
-	// append useless information
-	buf = append(buf, make([]byte, 15)...)
-	header.Extra = buf
-
-	extra = b.prepareExtra(header, parentHeader)
-	if bytes.Compare(extra, expectedExtra) != 0 {
-		t.Errorf("expected: %v, got: %v", expectedExtra, extra)
-	}
-}
-
 func TestSignaturePosition(t *testing.T) {
 	validatorN := 2
 	buf := make([]byte, 0)

@@ -59,7 +59,7 @@ func (ap *testerAccountPool) sign(header *types.Header, validator string) {
 	// Sign the header and embed the signature in extra data
 	hashData := crypto.Keccak256([]byte(sigHash(header).Bytes()))
 	sig, _ := crypto.Sign(hashData, ap.accounts[validator])
-	copy(header.Extra[len(header.Extra)-extraSeal:], sig)
+	copy(header.Extra[len(header.Extra)-types.IstanbulExtraSeal:], sig)
 }
 
 func (ap *testerAccountPool) address(account string) common.Address {
@@ -331,12 +331,12 @@ func TestVoting(t *testing.T) {
 		// Create the genesis block with the initial set of validators
 		genesis := &core.Genesis{
 			Difficulty: defaultDifficulty,
-			ExtraData:  make([]byte, extraVanity+extraValidatorSize+common.AddressLength*len(validators)+extraSeal),
+			ExtraData:  make([]byte, types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+common.AddressLength*len(validators)+types.IstanbulExtraSeal),
 		}
 		// set validator size
-		genesis.ExtraData[extraVanity] = byte(len(validators))
+		genesis.ExtraData[types.IstanbulExtraVanity] = byte(len(validators))
 		for j, validator := range validators {
-			copy(genesis.ExtraData[extraVanity+extraValidatorSize+j*common.AddressLength:], validator[:])
+			copy(genesis.ExtraData[types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+j*common.AddressLength:], validator[:])
 		}
 		// Create a pristine blockchain with the genesis injected
 		db, _ := ethdb.NewMemDatabase()
@@ -357,7 +357,7 @@ func TestVoting(t *testing.T) {
 				Number:     big.NewInt(int64(j) + 1),
 				Time:       big.NewInt(int64(j) * int64(config.BlockPauseTime)),
 				Coinbase:   accounts.address(vote.voted),
-				Extra:      make([]byte, extraVanity+extraValidatorSize+common.AddressLength*len(validators)+extraSeal),
+				Extra:      make([]byte, types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+common.AddressLength*len(validators)+types.IstanbulExtraSeal),
 				Difficulty: defaultDifficulty,
 			}
 			if j > 0 {
