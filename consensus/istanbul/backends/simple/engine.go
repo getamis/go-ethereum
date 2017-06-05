@@ -83,6 +83,7 @@ var (
 var (
 	defaultDifficulty = big.NewInt(1)
 	nilUncleHash      = types.CalcUncleHash(nil) // Always Keccak256(RLP([])) as uncles are meaningless outside of PoW.
+	emptyNonce        = types.BlockNonce{}
 	now               = time.Now
 
 	nonceAuthVote = hexutil.MustDecode("0xffffffffffffffff") // Magic nonce number to vote on adding a new signer
@@ -131,11 +132,11 @@ func (sb *simpleBackend) verifyHeader(chain consensus.ChainReader, header *types
 		if header.Coinbase != (common.Address{}) {
 			return errInvalidCoinbase
 		}
-		if header.Nonce != (types.BlockNonce{}) {
+		if header.Nonce != (emptyNonce) {
 			return errInvalidNonce
 		}
 	} else {
-		if header.Nonce != (types.BlockNonce{}) && !bytes.Equal(header.Nonce[:], nonceAuthVote) && !bytes.Equal(header.Nonce[:], nonceDropVote) {
+		if header.Nonce != (emptyNonce) && !bytes.Equal(header.Nonce[:], nonceAuthVote) && !bytes.Equal(header.Nonce[:], nonceDropVote) {
 			return errInvalidNonce
 		}
 	}
@@ -261,7 +262,7 @@ func (sb *simpleBackend) VerifySeal(chain consensus.ChainReader, header *types.H
 func (sb *simpleBackend) Prepare(chain consensus.ChainReader, header *types.Header) error {
 	// unused fields, force to set to empty
 	header.Coinbase = common.Address{}
-	header.Nonce = types.BlockNonce{}
+	header.Nonce = emptyNonce
 	header.MixDigest = common.Hash{}
 
 	// copy the parent extra data as the header extra data
@@ -532,7 +533,7 @@ func validatorLength(header *types.Header) int {
 }
 
 // snapshot retrieves the authorization snapshot at a given point in time.
-func (sb *simpleBackend) snapshot(chain consensus.ChainReader, number uint64, hash common.Hash, parent *types.Header) (*Snapshot, error) {
+func (sb *simpleBackend) snapshot(chain consensus.ChainReader, number uint64, hash common.Hash, parents []*types.Header) (*Snapshot, error) {
 	// Search for a snapshot in memory or on disk for checkpoints
 	var (
 		headers []*types.Header
@@ -558,8 +559,8 @@ func (sb *simpleBackend) snapshot(chain consensus.ChainReader, number uint64, ha
 			if err := sb.VerifyHeader(chain, genesis, false); err != nil {
 				return nil, err
 			}
-			signers := validator.ExtractValidators(sb.getValidatorBytes(genesis))
-			snap = newSnapshot(sb.config.Epoch, 0, genesis.Hash(), validator.NewSet(signers, sb.config.ProposerPolicy))
+			validators := validator.ExtractValidators(sb.getValidatorBytes(genesis))
+			snap = newSnapshot(sb.config.Epoch, 0, genesis.Hash(), validators)
 			if err := snap.store(sb.db); err != nil {
 				return nil, err
 			}
@@ -568,13 +569,13 @@ func (sb *simpleBackend) snapshot(chain consensus.ChainReader, number uint64, ha
 		}
 		// No snapshot for this header, gather the header and move backward
 		var header *types.Header
-		if parent != nil {
+		if len(parents) > 0 {
 			// If we have explicit parents, pick from there (enforced)
-			header = parent
+			header = parents[len(parents)-1]
 			if header.Hash() != hash || header.Number.Uint64() != number {
 				return nil, consensus.ErrUnknownAncestor
 			}
-			parent = nil
+			parents = parents[:len(parents)-1]
 		} else {
 			// No explicit parents (or no more left), reach out to the database
 			header = chain.GetHeader(hash, number)

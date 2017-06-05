@@ -65,7 +65,7 @@ func TestCheckSignature(t *testing.T) {
 }
 
 func TestCheckValidatorSignature(t *testing.T) {
-	b, keys, vset := newSimpleBackend()
+	_, keys, vset := newSimpleBackend()
 
 	// 1. Positive test: sign with validator's key should succeed
 	data := []byte("dummy data")
@@ -77,7 +77,7 @@ func TestCheckValidatorSignature(t *testing.T) {
 			t.Errorf("Unable to sign data")
 		}
 		// CheckValidatorSignature should succeed
-		addr, err := b.CheckValidatorSignature(data, sig)
+		addr, err := istanbul.CheckValidatorSignature(vset, data, sig)
 		if err != nil {
 			t.Errorf("CheckValidatorSignature should succeed")
 		}
@@ -99,7 +99,7 @@ func TestCheckValidatorSignature(t *testing.T) {
 	}
 
 	// CheckValidatorSignature should return ErrUnauthorizedAddress
-	addr, err := b.CheckValidatorSignature(data, sig)
+	addr, err := istanbul.CheckValidatorSignature(vset, data, sig)
 	if err != istanbul.ErrUnauthorizedAddress {
 		t.Errorf("Expected error istanbul.ErrUnauthorizedAddress, but got: %v", err)
 	}
@@ -162,7 +162,6 @@ func newSimpleBackend() (backend *simpleBackend, validatorKeys Keys, validatorSe
 	backend = &simpleBackend{
 		privateKey: key,
 		logger:     log.New("backend", "simple"),
-		valSet:     validatorSet,
 	}
 	return
 }

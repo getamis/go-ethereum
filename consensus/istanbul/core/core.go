@@ -236,17 +236,5 @@ func (c *core) newRoundChangeTimer() {
 }
 
 func (c *core) checkValidatorSignature(data []byte, sig []byte) (common.Address, error) {
-	// 1. Get signature address
-	signer, err := istanbul.GetSignatureAddress(data, sig)
-	if err != nil {
-		log.Error("Failed to get signer address", "err", err)
-		return common.Address{}, err
-	}
-
-	// 2. Check validator
-	if _, val := c.valSet.GetByAddress(signer); val != nil {
-		return val.Address(), nil
-	}
-
-	return common.Address{}, istanbul.ErrUnauthorizedAddress
+	return istanbul.CheckValidatorSignature(c.valSet, data, sig)
 }
