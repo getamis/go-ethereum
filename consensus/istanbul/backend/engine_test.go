@@ -232,7 +232,7 @@ func TestSealCommittedOtherHash(t *testing.T) {
 			if !ok {
 				t.Errorf("unexpected event comes, got: %v, expected: istanbul.RequestEvent", reflect.TypeOf(ev.Data))
 			}
-			engine.Commit(otherBlock)
+			engine.Commit(otherBlock, []byte{})
 		}
 		eventSub.Unsubscribe()
 	}

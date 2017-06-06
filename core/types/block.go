@@ -378,6 +378,11 @@ func (b *Block) WithBody(transactions []*Transaction, uncles []*Header) *Block {
 	return block
 }
 
+// UpdateIstanbulHeaderExtra updates header committed seals that store consensus proof
+func (b *Block) UpdateIstanbulHeaderExtra(signatures []byte) error {
+	return updateIstanbulCommittedSeal(b.header, signatures)
+}
+
 // Hash returns the keccak256 hash of b's header.
 // The hash is computed on the first call and cached thereafter.
 func (b *Block) Hash() common.Hash {

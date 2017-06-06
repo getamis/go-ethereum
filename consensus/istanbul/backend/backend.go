@@ -46,11 +46,16 @@ func New(config *istanbul.Config, eventMux *event.TypeMux, privateKey *ecdsa.Pri
 		address:          crypto.PubkeyToAddress(privateKey.PublicKey),
 		logger:           log.New("backend", "simple"),
 		db:               db,
-		commitCh:         make(chan common.Hash, 1),
+		commitCh:         make(chan committedResult, 1),
 		recents:          recents,
 		candidates:       make(map[common.Address]bool),
 	}
 	return backend
+}
+
+type committedResult struct {
+	Hash       common.Hash
+	Signatures []byte
 }
 
 // ----------------------------------------------------------------------------
@@ -70,7 +75,7 @@ type simpleBackend struct {
 	inserter         func(block *types.Block) error
 
 	// the channels for istanbul engine notifications
-	commitCh          chan common.Hash
+	commitCh          chan committedResult
 	proposedBlockHash common.Hash
 	sealMu            sync.Mutex
 
@@ -123,7 +128,7 @@ func (sb *simpleBackend) Broadcast(valSet istanbul.ValidatorSet, payload []byte)
 }
 
 // Commit implements istanbul.Backend.Commit
-func (sb *simpleBackend) Commit(proposal istanbul.Proposal) error {
+func (sb *simpleBackend) Commit(proposal istanbul.Proposal, signatures []byte) error {
 	// Check if the proposal is a valid block
 	block := &types.Block{}
 	block, ok := proposal.(*types.Block)
@@ -141,9 +146,14 @@ func (sb *simpleBackend) Commit(proposal istanbul.Proposal) error {
 	// -- otherwise, a error will be returned and a round change event will be fired.
 	if sb.proposedBlockHash == block.Hash() {
 		// feed block hash to Seal() and wait the Seal() result
-		sb.commitCh <- block.Hash()
+		sb.commitCh <- committedResult{Hash: block.Hash(), Signatures: signatures}
 		// TODO: how do we check the block is inserted correctly?
 		return nil
+	}
+
+	err := block.UpdateIstanbulHeaderExtra(signatures)
+	if err != nil {
+		return err
 	}
 	return sb.inserter(block)
 }

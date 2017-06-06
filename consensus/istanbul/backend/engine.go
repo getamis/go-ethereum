@@ -114,6 +114,7 @@ func (sb *simpleBackend) verifyHeader(chain consensus.ChainReader, header *types
 		return consensus.ErrFutureBlock
 	}
 
+	// TODO: Validate istanbul committed message here
 	// Ensure that the extra data format is satisfied
 	if err := types.ValidateIstanbulSeal(header); err != nil {
 		return errInvalidExtraDataFormat
@@ -124,7 +125,7 @@ func (sb *simpleBackend) verifyHeader(chain consensus.ChainReader, header *types
 		return errInvalidNonce
 	}
 	// Ensure that the mix digest is zero as we don't have fork protection currently
-	if header.MixDigest != (common.Hash{}) {
+	if header.MixDigest != types.IstanbulDigest {
 		return errInvalidMixDigest
 	}
 	// Ensure that the block doesn't contain any uncles which are meaningless in Istanbul
@@ -257,7 +258,7 @@ func (sb *simpleBackend) Prepare(chain consensus.ChainReader, header *types.Head
 	// unused fields, force to set to empty
 	header.Coinbase = common.Address{}
 	header.Nonce = emptyNonce
-	header.MixDigest = common.Hash{}
+	header.MixDigest = types.IstanbulDigest
 
 	// copy the parent extra data as the header extra data
 	number := header.Number.Uint64()
@@ -375,10 +376,14 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 
 	for {
 		select {
-		case hash := <-sb.commitCh:
+		case result := <-sb.commitCh:
 			// if the block hash and the hash from channel are the same,
 			// return the block. Otherwise, keep waiting the next hash.
-			if block.Hash() == hash {
+			if block.Hash() == result.Hash {
+				err := block.UpdateIstanbulHeaderExtra(result.Signatures)
+				if err != nil {
+					return nil, err
+				}
 				return block, nil
 			}
 		case <-stop:
@@ -575,6 +580,7 @@ func (sb *simpleBackend) snapshot(chain consensus.ChainReader, number uint64, ha
 func sigHash(header *types.Header) (hash common.Hash) {
 	hasher := sha3.NewKeccak256()
 
+	index := types.ExtractToIstanbulIndex(header)
 	rlp.Encode(hasher, []interface{}{
 		header.ParentHash,
 		header.UncleHash,
@@ -588,7 +594,7 @@ func sigHash(header *types.Header) (hash common.Hash) {
 		header.GasLimit,
 		header.GasUsed,
 		header.Time,
-		header.Extra[:len(header.Extra)-types.IstanbulExtraSeal], // Yes, this will panic if extra is too short
+		header.Extra[:index.Seal], // Yes, this will panic if extra is too short
 		header.MixDigest,
 		header.Nonce,
 	})

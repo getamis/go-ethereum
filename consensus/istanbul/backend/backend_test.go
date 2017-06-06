@@ -17,14 +17,17 @@
 package backend
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 	"github.com/ethereum/go-ethereum/consensus/istanbul/validator"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -109,6 +112,61 @@ func TestCheckValidatorSignature(t *testing.T) {
 	}
 }
 
+func TestCommit(t *testing.T) {
+	backend, _, _ := newSimpleBackend()
+
+	// Case: it's a proposer, so the backend.commit will receive channel result from backend.Commit function
+	testCases := []struct {
+		expectedErr       error
+		expectedSignature []byte
+		expectedBlock     func() *types.Block
+	}{
+		{
+			// normal case
+			nil,
+			append([]byte{1}, bytes.Repeat([]byte{0x00}, types.IstanbulExtraCommittedSeal-1)...),
+			func() *types.Block {
+				chain, engine := newBlockChain(1)
+				return makeBlockWithoutSeal(chain, engine, chain.Genesis())
+			},
+		},
+		{
+			// invalid signature
+			types.ErrInvalidIstanbulCommittedSeal,
+			nil,
+			func() *types.Block {
+				chain, engine := newBlockChain(1)
+				return makeBlockWithoutSeal(chain, engine, chain.Genesis())
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		expBlock := test.expectedBlock()
+
+		go func() {
+			for {
+				select {
+				case result := <-backend.commitCh:
+					if result.Hash != expBlock.Hash() {
+						t.Errorf("expected: %v, but got: %v", expBlock.Hash().Hex(), result.Hash.Hex())
+					}
+					return
+				case <-time.After(time.Second):
+					t.Error("unexpected error, timeout")
+				}
+			}
+		}()
+
+		backend.proposedBlockHash = expBlock.Hash()
+		if err := backend.Commit(expBlock, test.expectedSignature); err != nil {
+			if err != test.expectedErr {
+				t.Errorf("expected: %v, but got: %v", test.expectedErr, err)
+			}
+		}
+	}
+}
+
 /**
  * SimpleBackend
  * Private key: bb047e5940b6d83354d9432db7c449ac8fca2248008aaa7271369880f9f11cc1
@@ -162,6 +220,7 @@ func newSimpleBackend() (backend *simpleBackend, validatorKeys Keys, validatorSe
 	backend = &simpleBackend{
 		privateKey: key,
 		logger:     log.New("backend", "simple"),
+		commitCh:   make(chan committedResult, 1),
 	}
 	return
 }

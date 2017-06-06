@@ -176,7 +176,12 @@ func (c *core) commit() {
 
 	proposal := c.current.Proposal()
 	if proposal != nil {
-		if err := c.backend.Commit(proposal); err != nil {
+		var signatures []byte
+		for _, v := range c.current.Commits.Values() {
+			signatures = append(signatures, v.Signature...)
+		}
+
+		if err := c.backend.Commit(proposal, signatures); err != nil {
 			c.sendRoundChange()
 			return
 		}
