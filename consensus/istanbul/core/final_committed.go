@@ -25,38 +25,10 @@ import (
 
 func (c *core) handleFinalCommitted(proposal istanbul.Proposal, proposer common.Address) error {
 	logger := c.logger.New("state", c.state, "number", proposal.Number(), "hash", proposal.Hash())
+	logger.Trace("Received a final committed proposal")
 
-	// this proposal comes from consensus
-	sub := c.current.Subject()
-	if sub != nil &&
-		proposal.Hash() == sub.Digest &&
-		c.state == StateCommitted {
-		logger.Trace("New proposal from consensus")
-
-		// broadcast the checkpoint
-		c.sendCheckpoint(&istanbul.Subject{
-			View: &istanbul.View{
-				Sequence: new(big.Int).Set(proposal.Number()),
-				Round:    new(big.Int).Set(c.current.Round()),
-			},
-			Digest: proposal.Hash(),
-		})
-
-		// store snapshot
-		c.snapshotsMu.Lock()
-		c.snapshots = append(c.snapshots, c.current)
-		c.snapshotsMu.Unlock()
-	} else { // this proposal comes from synchronization
-		logger.Trace("New proposal from synchronization")
-	}
-
-	// We're late, catch up the sequence number
+	// Catch up the sequence number
 	if proposal.Number().Cmp(c.current.Sequence()) >= 0 {
-		// We build a stable checkpoint every 'CheckPointPeriod' proposal
-		if new(big.Int).Mod(c.current.Sequence(), big.NewInt(int64(c.config.CheckPointPeriod))).Int64() == 0 {
-			go c.sendEvent(buildCheckpointEvent{})
-		}
-
 		// Remember to store the proposer since we've accpeted the proposal
 		c.lastProposer = proposer
 		c.startNewRound(&istanbul.View{

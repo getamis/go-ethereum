@@ -48,7 +48,6 @@ func New(backend istanbul.Backend, config *istanbul.Config) Engine {
 		backend:           backend,
 		backlogs:          make(map[istanbul.Validator]*prque.Prque),
 		backlogsMu:        new(sync.Mutex),
-		snapshotsMu:       new(sync.RWMutex),
 		roundChangeSet:    newRoundChangeSet(backend.Validators()),
 		pendingRequests:   prque.New(),
 		pendingRequestsMu: new(sync.Mutex),
@@ -74,9 +73,7 @@ type core struct {
 	backlogs   map[istanbul.Validator]*prque.Prque
 	backlogsMu *sync.Mutex
 
-	current     *snapshot
-	snapshots   []*snapshot
-	snapshotsMu *sync.RWMutex
+	current *snapshot
 
 	roundChangeSet   *roundChangeSet
 	roundChangeTimer *time.Timer
