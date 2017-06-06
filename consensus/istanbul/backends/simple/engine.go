@@ -292,7 +292,6 @@ func (sb *simpleBackend) Prepare(chain consensus.ChainReader, header *types.Head
 	// use the same difficulty for all blocks
 	header.Difficulty = defaultDifficulty
 
-	sb.logger.Info("Prepare", "number", number, "sb.config.Epoch", sb.config.Epoch)
 	if number%sb.config.Epoch != 0 {
 		sb.candidatesLock.RLock()
 		if len(sb.candidates) > 0 {
@@ -439,7 +438,7 @@ func (sb *simpleBackend) APIs(chain consensus.ChainReader) []rpc.API {
 	return []rpc.API{{
 		Namespace: "istanbul",
 		Version:   "1.0",
-		Service:   &API{chain: chain, pbft: sb},
+		Service:   &API{chain: chain, istanbul: sb},
 		Public:    true,
 	}}
 }

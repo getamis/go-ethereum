@@ -180,6 +180,7 @@ func NewTestSystemWithBackend(n, f uint64) *testSystem {
 			Sequence: big.NewInt(1),
 		}, vset)
 		core.logger = testLogger
+		core.validateFn = backend.CheckValidatorSignature
 
 		backend.engine = core
 	}

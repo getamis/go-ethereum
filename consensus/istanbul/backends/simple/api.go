@@ -29,13 +29,13 @@ import (
 
 // API is a user facing RPC API to dump Istanbul state
 type API struct {
-	chain consensus.ChainReader
-	pbft  *simpleBackend
+	chain    consensus.ChainReader
+	istanbul *simpleBackend
 }
 
 // RoundState returns current state and proposer
 func (api *API) RoundState() {
-	state, roundState := api.pbft.core.RoundState()
+	state, roundState := api.istanbul.core.RoundState()
 	log.Info("RoundState", "sequence", roundState.Sequence, "round", roundState.Round,
 		"state", state, "hash", roundState.Preprepare.Proposal.Hash(),
 		"prepares", roundState.Prepares, "commits", roundState.Commits,
@@ -44,7 +44,7 @@ func (api *API) RoundState() {
 
 // Backlog returns backlogs
 func (api *API) Backlog() {
-	backlog := api.pbft.core.Backlog()
+	backlog := api.istanbul.core.Backlog()
 	logs := make([]string, 0, len(backlog))
 	for validator, q := range backlog {
 		logs = append(logs, fmt.Sprintf("{%v, %v}", validator, q.Size()))
@@ -65,7 +65,7 @@ func (api *API) GetSnapshot(number *rpc.BlockNumber) (*Snapshot, error) {
 	if header == nil {
 		return nil, errUnknownBlock
 	}
-	return api.pbft.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	return api.istanbul.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
 }
 
 // GetSnapshotAtHash retrieves the state snapshot at a given block.
@@ -74,7 +74,7 @@ func (api *API) GetSnapshotAtHash(hash common.Hash) (*Snapshot, error) {
 	if header == nil {
 		return nil, errUnknownBlock
 	}
-	return api.pbft.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	return api.istanbul.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
 }
 
 // GetValidators retrieves the list of authorized validators at the specified block.
@@ -90,7 +90,7 @@ func (api *API) GetValidators(number *rpc.BlockNumber) ([]common.Address, error)
 	if header == nil {
 		return nil, errUnknownBlock
 	}
-	snap, err := api.pbft.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	snap, err := api.istanbul.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func (api *API) GetValidatorsAtHash(hash common.Hash) ([]common.Address, error) 
 	if header == nil {
 		return nil, errUnknownBlock
 	}
-	snap, err := api.pbft.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	snap, err := api.istanbul.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -112,11 +112,11 @@ func (api *API) GetValidatorsAtHash(hash common.Hash) ([]common.Address, error) 
 
 // Candidates returns the current candidates the node tries to uphold and vote on.
 func (api *API) Candidates() map[common.Address]bool {
-	api.pbft.candidatesLock.RLock()
-	defer api.pbft.candidatesLock.RUnlock()
+	api.istanbul.candidatesLock.RLock()
+	defer api.istanbul.candidatesLock.RUnlock()
 
 	proposals := make(map[common.Address]bool)
-	for address, auth := range api.pbft.candidates {
+	for address, auth := range api.istanbul.candidates {
 		proposals[address] = auth
 	}
 	return proposals
@@ -125,17 +125,17 @@ func (api *API) Candidates() map[common.Address]bool {
 // Propose injects a new authorization candidate that the validator will attempt to
 // push through.
 func (api *API) Propose(address common.Address, auth bool) {
-	api.pbft.candidatesLock.Lock()
-	defer api.pbft.candidatesLock.Unlock()
+	api.istanbul.candidatesLock.Lock()
+	defer api.istanbul.candidatesLock.Unlock()
 
-	api.pbft.candidates[address] = auth
+	api.istanbul.candidates[address] = auth
 }
 
 // Discard drops a currently running candidate, stopping the validator from casting
 // further votes (either for or against).
 func (api *API) Discard(address common.Address) {
-	api.pbft.candidatesLock.Lock()
-	defer api.pbft.candidatesLock.Unlock()
+	api.istanbul.candidatesLock.Lock()
+	defer api.istanbul.candidatesLock.Unlock()
 
-	delete(api.pbft.candidates, address)
+	delete(api.istanbul.candidates, address)
 }

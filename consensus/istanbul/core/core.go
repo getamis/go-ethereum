@@ -34,7 +34,7 @@ const (
 )
 
 func New(backend istanbul.Backend, config *istanbul.Config) Engine {
-	return &core{
+	c := &core{
 		config:            config,
 		address:           backend.Address(),
 		state:             StateAcceptRequest,
@@ -45,6 +45,8 @@ func New(backend istanbul.Backend, config *istanbul.Config) Engine {
 		pendingRequests:   prque.New(),
 		pendingRequestsMu: new(sync.Mutex),
 	}
+	c.validateFn = c.checkValidatorSignature
+	return c
 }
 
 // ----------------------------------------------------------------------------
@@ -64,6 +66,7 @@ type core struct {
 	lastProposal          istanbul.Proposal
 	valSet                istanbul.ValidatorSet
 	waitingForRoundChange bool
+	validateFn            func([]byte, []byte) (common.Address, error)
 
 	backlogs   map[istanbul.Validator]*prque.Prque
 	backlogsMu *sync.Mutex

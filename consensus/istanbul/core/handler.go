@@ -102,7 +102,7 @@ func (c *core) handleMsg(payload []byte) error {
 
 	// Decode message and check its signature
 	msg := new(message)
-	if err := msg.FromPayload(payload, c.checkValidatorSignature); err != nil {
+	if err := msg.FromPayload(payload, c.validateFn); err != nil {
 		logger.Error("Failed to decode message from payload", "err", err)
 		return err
 	}
