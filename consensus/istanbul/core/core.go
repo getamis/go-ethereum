@@ -246,7 +246,7 @@ func (c *core) newRoundChangeTimer() {
 		c.roundChangeTimer.Stop()
 	}
 
-	timeout := time.Duration(c.config.RequestTimeoutMsec) * time.Millisecond
+	timeout := time.Duration(c.config.RequestTimeout) * time.Millisecond
 	c.roundChangeTimer = time.AfterFunc(timeout, func() {
 		c.sendRoundChange()
 	})

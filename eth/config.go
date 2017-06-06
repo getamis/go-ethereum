@@ -51,7 +51,7 @@ var DefaultConfig = Config{
 		Percentile: 50,
 	},
 
-	Istanbul: istanbul.DefaultConfig,
+	Istanbul: *istanbul.DefaultConfig,
 }
 
 func init() {
@@ -113,7 +113,7 @@ type Config struct {
 	EnablePreimageRecording bool
 
 	// Istanbul options
-	Istanbul *istanbul.Config
+	Istanbul istanbul.Config
 
 	// Miscellaneous options
 	DocRoot   string `toml:"-"`
