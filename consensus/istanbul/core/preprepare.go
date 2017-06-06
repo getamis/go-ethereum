@@ -45,11 +45,6 @@ func (c *core) handlePreprepare(msg *message, src istanbul.Validator) error {
 	logger := c.logger.New("from", src, "state", c.state)
 	logger.Trace("handlePreprepare")
 
-	if c.waitingForRoundChange {
-		logger.Warn("Waiting for a RoundChange, ignore", "msg", msg)
-		return errIgnored
-	}
-
 	// Decode preprepare
 	var preprepare *istanbul.Preprepare
 	err := msg.Decode(&preprepare)

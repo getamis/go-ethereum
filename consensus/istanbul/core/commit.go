@@ -42,11 +42,6 @@ func (c *core) handleCommit(msg *message, src istanbul.Validator) error {
 	logger := c.logger.New("from", src, "state", c.state)
 	logger.Trace("handleCommit")
 
-	if c.waitingForRoundChange {
-		logger.Warn("Waiting for a round change, ignore", "msg", msg)
-		return errIgnored
-	}
-
 	// Decode commit message
 	var commit *istanbul.Subject
 	err := msg.Decode(&commit)

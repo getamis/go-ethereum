@@ -48,6 +48,10 @@ func (c *core) checkMessage(msgCode uint64, view *istanbul.View) error {
 		return errOldMessage
 	}
 
+	if c.waitingForRoundChange {
+		return errFutureMessage
+	}
+
 	// StateAcceptRequest only accepts msgPreprepare
 	// other messages are future messages
 	if c.state == StateAcceptRequest {
