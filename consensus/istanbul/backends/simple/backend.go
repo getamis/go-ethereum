@@ -109,10 +109,10 @@ func (sb *simpleBackend) Broadcast(valSet istanbul.ValidatorSet, payload []byte)
 	for _, val := range valSet.List() {
 		if val.Address() == sb.Address() {
 			// send to self
-			pbftMsg := istanbul.MessageEvent{
+			msg := istanbul.MessageEvent{
 				Payload: payload,
 			}
-			go sb.istanbulEventMux.Post(pbftMsg)
+			go sb.istanbulEventMux.Post(msg)
 
 		} else {
 			// send to other peers

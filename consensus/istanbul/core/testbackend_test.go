@@ -73,7 +73,7 @@ func (self *testSystemBackend) Send(message []byte, target common.Address) error
 	return nil
 }
 
-func (self *testSystemBackend) Broadcast(message []byte) error {
+func (self *testSystemBackend) Broadcast(valSet istanbul.ValidatorSet, message []byte) error {
 	testLogger.Info("enqueuing a message...", "address", self.Address())
 	self.sentMsgs = append(self.sentMsgs, message)
 	self.sys.queuedMessage <- istanbul.MessageEvent{
@@ -204,6 +204,7 @@ func NewTestSystemWithBackend(n, f uint64) *testSystem {
 			Sequence: big.NewInt(1),
 		}, vset)
 		core.logger = testLogger
+		core.validateFn = backend.CheckValidatorSignature
 
 		backend.engine = core
 	}

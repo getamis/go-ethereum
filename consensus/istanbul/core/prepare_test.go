@@ -156,7 +156,7 @@ OUTER:
 			c := v.engine.(*core)
 			validator := c.valSet.GetByIndex(uint64(i))
 			c.current = newTestSnapshot(
-				&pbft.View{
+				&istanbul.View{
 					Round:    big.NewInt(0),
 					Sequence: c.current.Sequence(),
 				},
