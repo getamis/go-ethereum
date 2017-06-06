@@ -23,45 +23,47 @@ import (
 // in this test, we can set n to 1, and it means we can process Istanbul and commit a
 // block by one node. Otherwise, if n is larger than 1, we have to generate
 // other fake events to process Istanbul.
-func newBlockChain(n int) (*core.BlockChain, *simpleBackend) {
+func newBlockChain(n int) []*simpleBackend {
 	genesis, nodeKeys := getGenesisAndKeys(n)
-	eventMux := new(event.TypeMux)
-	memDB, _ := ethdb.NewMemDatabase()
+	var backends []*simpleBackend
 	config := istanbul.DefaultConfig
 	// Use the first key as private key
-	backend := New(config, eventMux, nodeKeys[0], memDB)
-	genesis.MustCommit(memDB)
-	blockchain, err := core.NewBlockChain(memDB, genesis.Config, backend, eventMux, vm.Config{})
+	for i := 0; i < n; i++ {
+		eventMux := new(event.TypeMux)
+		memDB, _ := ethdb.NewMemDatabase()
+		backend := New(config, eventMux, nodeKeys[i], memDB)
+		genesis.MustCommit(memDB)
+		blockchain, err := core.NewBlockChain(memDB, genesis.Config, backend, eventMux, vm.Config{})
+		if err != nil {
+			panic(err)
+		}
+		commitBlock := func(block *types.Block) error {
+			_, err := blockchain.InsertChain([]*types.Block{block})
+			return err
+		}
+		backend.Start(blockchain, commitBlock)
+
+		b, _ := backend.(*simpleBackend)
+		backends = append(backends, b)
+	}
+
+	snap, err := backends[0].snapshot(backends[0].chain, 0, common.Hash{}, nil)
 	if err != nil {
 		panic(err)
-	}
-	commitBlock := func(block *types.Block) error {
-		_, err := blockchain.InsertChain([]*types.Block{block})
-		return err
-	}
-	backend.Start(blockchain, commitBlock)
-
-	b, _ := backend.(*simpleBackend)
-
-	snap, err := b.snapshot(blockchain, 0, common.Hash{}, nil)
-	if err != nil {
-		panic(err)
-	}
-	if snap == nil {
-		panic("nil snap")
 	}
 	proposerAddr := snap.ValSet.GetProposer().Address()
-
-	// find proposer key
-	for _, key := range nodeKeys {
+	// find proposer key, and make backends[0] as the first proposer
+	for i, key := range nodeKeys {
 		addr := crypto.PubkeyToAddress(key.PublicKey)
 		if addr.String() == proposerAddr.String() {
-			b.privateKey = key
-			b.address = addr
+			if i != 0 {
+				backends[0], backends[i] = backends[i], backends[0]
+			}
+			break
 		}
 	}
 
-	return blockchain, b
+	return backends
 }
 
 func getGenesisAndKeys(n int) (*core.Genesis, []*ecdsa.PrivateKey) {
@@ -129,7 +131,8 @@ func makeBlockWithoutSeal(chain *core.BlockChain, engine *simpleBackend, parent 
 }
 
 func TestPrepare(t *testing.T) {
-	chain, engine := newBlockChain(1)
+	engine := newBlockChain(1)[0]
+	chain := engine.chain.(*core.BlockChain)
 	header := makeHeader(chain.Genesis(), engine.config)
 	err := engine.Prepare(chain, header)
 	if err != nil {
@@ -143,7 +146,8 @@ func TestPrepare(t *testing.T) {
 }
 
 func TestSealStopChannel(t *testing.T) {
-	chain, engine := newBlockChain(4)
+	engine := newBlockChain(4)[0]
+	chain := engine.chain.(*core.BlockChain)
 	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	stop := make(chan struct{}, 1)
 	eventSub := engine.EventMux().Subscribe(istanbul.RequestEvent{})
@@ -169,7 +173,8 @@ func TestSealStopChannel(t *testing.T) {
 }
 
 func TestSealRoundChange(t *testing.T) {
-	chain, engine := newBlockChain(4)
+	engine := newBlockChain(4)[0]
+	chain := engine.chain.(*core.BlockChain)
 	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	eventSub := engine.EventMux().Subscribe(istanbul.RequestEvent{})
 	eventLoop := func() {
@@ -200,7 +205,8 @@ func TestSealRoundChange(t *testing.T) {
 }
 
 func TestSealCommittedOtherHash(t *testing.T) {
-	chain, engine := newBlockChain(4)
+	engine := newBlockChain(4)[0]
+	chain := engine.chain.(*core.BlockChain)
 	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	otherBlock := makeBlockWithoutSeal(chain, engine, block)
 	eventSub := engine.EventMux().Subscribe(istanbul.RequestEvent{})
@@ -231,7 +237,8 @@ func TestSealCommittedOtherHash(t *testing.T) {
 }
 
 func TestSealCommitted(t *testing.T) {
-	chain, engine := newBlockChain(1)
+	engine := newBlockChain(1)[0]
+	chain := engine.chain.(*core.BlockChain)
 	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	expectedBlock, _ := engine.updateBlock(engine.chain.GetHeader(block.ParentHash(), block.NumberU64()-1), block)
 
@@ -245,8 +252,8 @@ func TestSealCommitted(t *testing.T) {
 }
 
 func TestVerifyHeader(t *testing.T) {
-	chain, engine := newBlockChain(1)
-
+	engine := newBlockChain(1)[0]
+	chain := engine.chain.(*core.BlockChain)
 	// correct case
 	block := makeBlock(chain, engine, chain.Genesis())
 	err := engine.VerifyHeader(chain, block.Header(), false)
@@ -312,21 +319,11 @@ func TestVerifyHeader(t *testing.T) {
 	if err != consensus.ErrFutureBlock {
 		t.Errorf("unexpected error comes, got: %v, expected: consensus.ErrFutureBlock", err)
 	}
-
-	// check point block
-	// non zero coinbase
-	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
-	header = block.Header()
-	header.Coinbase = common.StringToAddress("123456789")
-	header.Number = big.NewInt(int64(engine.config.Epoch))
-	err = engine.VerifyHeader(chain, header, false)
-	if err != errInvalidCoinbase {
-		t.Errorf("unexpected error comes, got: %v, expected: errInvalidCoinbase", err)
-	}
 }
 
 func TestVerifySeal(t *testing.T) {
-	chain, engine := newBlockChain(1)
+	engine := newBlockChain(1)[0]
+	chain := engine.chain.(*core.BlockChain)
 	genesis := chain.Genesis()
 	// cannot verify genesis
 	err := engine.VerifySeal(chain, genesis.Header())
@@ -353,7 +350,8 @@ func TestVerifySeal(t *testing.T) {
 }
 
 func TestVerifyHeaders(t *testing.T) {
-	chain, engine := newBlockChain(1)
+	engine := newBlockChain(1)[0]
+	chain := engine.chain.(*core.BlockChain)
 	genesis := chain.Genesis()
 
 	// success case
@@ -554,4 +552,80 @@ func TestValidExtra(t *testing.T) {
 			t.Errorf("expected: %v, but: %v", test.expectedValid, valid)
 		}
 	}
+}
+
+func TestSnapshot(t *testing.T) {
+	size := 2
+	engines := newBlockChain(size)
+	chains := make([]*core.BlockChain, size)
+	for i := 0; i < size; i++ {
+		chains[i] = engines[i].chain.(*core.BlockChain)
+	}
+
+	block := chains[1].Genesis()
+	for i := 0; i < 10000; i++ {
+		// _, err := engines[1].snapshot(chains[1], block.NumberU64(), block.Hash(), nil)
+		// if err != nil {
+		// 	t.Errorf("%v: error should be nil, but got: %v", i, err)
+		// }
+
+		// generate blocks
+		switch i % 1 {
+		case 0:
+			// if len(snap.validators()) != 2 {
+			// 	t.Errorf("expected validator size: 2, but: %v", len(snap.validators()))
+			// }
+			block = makeBlockWithoutSeal(chains[1], engines[1], block)
+			header := block.Header()
+			header.Coinbase = common.StringToAddress("A")
+			copy(header.Nonce[:], nonceAuthVote)
+			block = block.WithSeal(header)
+			block, _ = engines[1].updateBlock(engines[1].chain.GetHeader(block.ParentHash(), block.NumberU64()-1), block)
+		case 1:
+			// if len(snap.validators()) != 2 {
+			// 	t.Errorf("expected validator size: 2, but: %v", len(snap.validators()))
+			// }
+			block = makeBlockWithoutSeal(chains[0], engines[0], block)
+			header := block.Header()
+			header.Coinbase = common.StringToAddress("A")
+			copy(header.Nonce[:], nonceAuthVote)
+			block = block.WithSeal(header)
+			block, _ = engines[0].updateBlock(engines[0].chain.GetHeader(block.ParentHash(), block.NumberU64()-1), block)
+		case 2:
+			// if len(snap.validators()) != 3 {
+			// 	t.Errorf("expected validator size: 3, but: %v", len(snap.validators()))
+			// }
+			block = makeBlockWithoutSeal(chains[1], engines[1], block)
+			header := block.Header()
+			header.Coinbase = common.StringToAddress("A")
+			copy(header.Nonce[:], nonceDropVote)
+			block = block.WithSeal(header)
+			block, _ = engines[1].updateBlock(engines[1].chain.GetHeader(block.ParentHash(), block.NumberU64()-1), block)
+		case 3:
+			// if len(snap.validators()) != 3 {
+			// 	t.Errorf("expected validator size: 3, but: %v", len(snap.validators()))
+			// }
+			block = makeBlockWithoutSeal(chains[0], engines[0], block)
+			header := block.Header()
+			header.Coinbase = common.StringToAddress("A")
+			copy(header.Nonce[:], nonceDropVote)
+			block = block.WithSeal(header)
+			block, _ = engines[0].updateBlock(engines[0].chain.GetHeader(block.ParentHash(), block.NumberU64()-1), block)
+		}
+
+		// insert block into chain
+		// for j := 0; j < len(engines); j++ {
+		err := engines[1].inserter(block)
+		if err != nil {
+			t.Errorf("%vth engine: insert error should be nil, but got: %v", 1, err)
+		}
+		h := engines[1].chain.GetHeader(block.Hash(), block.NumberU64())
+		if h == nil {
+			t.Errorf("Header should not be nil")
+		}
+
+		// 	fmt.Printf("%v engine, block = (%v, %v)\n", j, block.NumberU64(), block.Hash().Hex())
+		// }
+	}
+
 }
