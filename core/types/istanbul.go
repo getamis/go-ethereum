@@ -38,8 +38,7 @@ var (
 	ErrInvalidIstanbulCommittedSeal = fmt.Errorf("Invalid istanbul committed seal")
 )
 
-// FIXME: I don't like this name :(
-type Istanbul struct {
+type IstanbulExtra struct {
 	Vanity        []byte
 	Validators    []common.Address
 	Seal          []byte
@@ -55,7 +54,7 @@ type IstanbulIndex struct {
 	CommittedSealLength int
 }
 
-func ExtractToIstanbul(h *Header) *Istanbul {
+func ExtractToIstanbul(h *Header) *IstanbulExtra {
 	index := ExtractToIstanbulIndex(h)
 
 	validators := make([]common.Address, (index.Seal-index.ValidatorLength)/common.AddressLength)
@@ -69,7 +68,7 @@ func ExtractToIstanbul(h *Header) *Istanbul {
 		copy(cmttedSeals[i][:], h.Extra[index.CommittedSealLength+i*IstanbulExtraSeal:])
 	}
 
-	return &Istanbul{
+	return &IstanbulExtra{
 		Vanity:        h.Extra[index.Vanity:index.ValidatorSize],
 		Validators:    validators,
 		Seal:          h.Extra[index.Seal : index.Seal+IstanbulExtraSeal],
@@ -186,15 +185,15 @@ func ensureValidIstanbulExtra(h *Header) *Header {
 	return newHeader
 }
 
-// updateIstanbulCommittedSeal updates header signatures that store consensus proof
-func updateIstanbulCommittedSeal(h *Header, committedSeal []byte) error {
+// UpdateIstanbulCommittedSeal updates header signatures that store consensus proof
+func UpdateIstanbulCommittedSealExtra(b *Block, committedSeal []byte) error {
 	// sanity check
 	if len(committedSeal)%IstanbulExtraCommittedSeal != 0 {
 		return ErrInvalidIstanbulCommittedSeal
 	}
 	size := len(committedSeal) / IstanbulExtraCommittedSeal
-	h.Extra = append(h.Extra, byte(size))
-	h.Extra = append(h.Extra, committedSeal...)
+	b.header.Extra = append(b.header.Extra, byte(size))
+	b.header.Extra = append(b.header.Extra, committedSeal...)
 	return nil
 }
 

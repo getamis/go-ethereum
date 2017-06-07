@@ -46,7 +46,7 @@ func TestHeaderHash(t *testing.T) {
 }
 
 func TestExtractToIstanbul(t *testing.T) {
-	expectedIstanbul := &Istanbul{
+	expectedIstanbul := &IstanbulExtra{
 		Vanity: append([]byte{1, 2, 3}, bytes.Repeat([]byte{0x00}, IstanbulExtraVanity-3)...),
 		Validators: []common.Address{
 			common.HexToAddress("0x44add0ec310f115a0e603b2d7db9f067778eaf8a"),

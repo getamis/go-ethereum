@@ -378,13 +378,9 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 		select {
 		case result := <-sb.commitCh:
 			// if the block hash and the hash from channel are the same,
-			// return the block. Otherwise, keep waiting the next hash.
-			if block.Hash() == result.Hash {
-				err := block.UpdateIstanbulHeaderExtra(result.Signatures)
-				if err != nil {
-					return nil, err
-				}
-				return block, nil
+			// return the result. Otherwise, keep waiting the next hash.
+			if block.Hash() == result.Hash() {
+				return result, nil
 			}
 		case <-stop:
 			return nil, nil

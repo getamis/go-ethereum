@@ -148,8 +148,8 @@ func TestCommit(t *testing.T) {
 			for {
 				select {
 				case result := <-backend.commitCh:
-					if result.Hash != expBlock.Hash() {
-						t.Errorf("expected: %v, but got: %v", expBlock.Hash().Hex(), result.Hash.Hex())
+					if result.Hash() != expBlock.Hash() {
+						t.Errorf("expected: %v, but got: %v", expBlock.Hash().Hex(), result.Hash().Hex())
 					}
 					return
 				case <-time.After(time.Second):
@@ -220,7 +220,7 @@ func newSimpleBackend() (backend *simpleBackend, validatorKeys Keys, validatorSe
 	backend = &simpleBackend{
 		privateKey: key,
 		logger:     log.New("backend", "simple"),
-		commitCh:   make(chan committedResult, 1),
+		commitCh:   make(chan *types.Block, 1),
 	}
 	return
 }

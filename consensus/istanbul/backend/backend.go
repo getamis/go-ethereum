@@ -46,16 +46,11 @@ func New(config *istanbul.Config, eventMux *event.TypeMux, privateKey *ecdsa.Pri
 		address:          crypto.PubkeyToAddress(privateKey.PublicKey),
 		logger:           log.New("backend", "simple"),
 		db:               db,
-		commitCh:         make(chan committedResult, 1),
+		commitCh:         make(chan *types.Block, 1),
 		recents:          recents,
 		candidates:       make(map[common.Address]bool),
 	}
 	return backend
-}
-
-type committedResult struct {
-	Hash       common.Hash
-	Signatures []byte
 }
 
 // ----------------------------------------------------------------------------
@@ -75,7 +70,7 @@ type simpleBackend struct {
 	inserter         func(block *types.Block) error
 
 	// the channels for istanbul engine notifications
-	commitCh          chan committedResult
+	commitCh          chan *types.Block
 	proposedBlockHash common.Hash
 	sealMu            sync.Mutex
 
@@ -137,6 +132,12 @@ func (sb *simpleBackend) Commit(proposal istanbul.Proposal, signatures []byte) e
 		return errInvalidProposal
 	}
 
+	// Append signatures into extra-data
+	err := types.UpdateIstanbulCommittedSealExtra(block, signatures)
+	if err != nil {
+		return err
+	}
+
 	sb.logger.Info("Committed", "address", sb.Address(), "hash", proposal.Hash(), "number", proposal.Number().Uint64())
 	// - if the proposed and committed blocks are the same, send the proposed hash
 	//   to commit channel, which is being watched inside the engine.Seal() function.
@@ -146,15 +147,11 @@ func (sb *simpleBackend) Commit(proposal istanbul.Proposal, signatures []byte) e
 	// -- otherwise, a error will be returned and a round change event will be fired.
 	if sb.proposedBlockHash == block.Hash() {
 		// feed block hash to Seal() and wait the Seal() result
-		sb.commitCh <- committedResult{Hash: block.Hash(), Signatures: signatures}
+		sb.commitCh <- block
 		// TODO: how do we check the block is inserted correctly?
 		return nil
 	}
 
-	err := block.UpdateIstanbulHeaderExtra(signatures)
-	if err != nil {
-		return err
-	}
 	return sb.inserter(block)
 }
 
