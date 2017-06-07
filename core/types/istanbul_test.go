@@ -136,7 +136,7 @@ func TestPrepareIstanbulExtra(t *testing.T) {
 	buf.Write(make([]byte, validatorN*common.AddressLength))
 	buf.Write(make([]byte, IstanbulExtraSeal))
 	buf.Write([]byte{byte(cmttedN)})
-	buf.Write(make([]byte, cmttedN*IstanbulExtraCommittedSeal))
+	buf.Write(make([]byte, cmttedN*IstanbulExtraSeal))
 
 	// test with block 1
 	parentHeader := &Header{Number: new(big.Int).Set(common.Big0)}
@@ -226,7 +226,7 @@ func TestIstanbulExtraFilter(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		newHeader := IstanbulExtraFilter(&Header{Extra: test.testExtra})
+		newHeader := IstanbulHashFilter(&Header{Extra: test.testExtra})
 
 		if !reflect.DeepEqual(newHeader.Extra, test.expectedExtra) {
 			t.Errorf("expected: %v, but got: %v", test.expectedExtra, newHeader.Extra)

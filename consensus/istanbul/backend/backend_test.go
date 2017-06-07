@@ -124,7 +124,7 @@ func TestCommit(t *testing.T) {
 		{
 			// normal case
 			nil,
-			append([]byte{1}, bytes.Repeat([]byte{0x00}, types.IstanbulExtraCommittedSeal-1)...),
+			append([]byte{1}, bytes.Repeat([]byte{0x00}, types.IstanbulExtraSeal-1)...),
 			func() *types.Block {
 				chain, engine := newBlockChain(1)
 				return makeBlockWithoutSeal(chain, engine, chain.Genesis())

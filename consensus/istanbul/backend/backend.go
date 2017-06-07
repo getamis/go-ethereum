@@ -133,7 +133,7 @@ func (sb *simpleBackend) Commit(proposal istanbul.Proposal, signatures []byte) e
 	}
 
 	// Append signatures into extra-data
-	err := types.UpdateIstanbulCommittedSealExtra(block, signatures)
+	err := types.AppendIstanbulCommittedSealExtra(block, signatures)
 	if err != nil {
 		return err
 	}

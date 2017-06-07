@@ -119,7 +119,7 @@ func appendValidators(genesis *core.Genesis, addrs []common.Address) {
 
 	// committed seal
 	genesis.ExtraData = append(genesis.ExtraData, byte(0x01))
-	genesis.ExtraData = append(genesis.ExtraData, make([]byte, types.IstanbulExtraCommittedSeal)...)
+	genesis.ExtraData = append(genesis.ExtraData, make([]byte, types.IstanbulExtraSeal)...)
 }
 
 func makeHeader(parent *types.Block, config *istanbul.Config) *types.Header {

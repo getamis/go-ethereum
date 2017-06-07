@@ -28,11 +28,10 @@ var (
 	// The IstanbulDigest represents a constant of "Istanbul practical byzantine fault tolerance".
 	IstanbulDigest = common.HexToHash("0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365")
 
-	IstanbulExtraVanity        = int(params.MaximumExtraDataSize) // Fixed number of extra-data prefix bytes reserved for signer vanity
-	IstanbulExtraValidatorSize = 1                                // Fixed number of extra-data infix bytes reserved for validator size
-	IstanbulExtraSeal          = 65                               // Fixed number of extra-data suffix bytes reserved for signer seal
-	IstanbulExtraCommittedSize = 1                                // Fixed number of extra-data infix bytes reserved for committed size
-	IstanbulExtraCommittedSeal = 65                               // Fixed number of extra-data suffix bytes reserved for committed seal
+	IstanbulExtraVanity        = int(params.MaximumExtraDataSize) // Fixed number of extra-data bytes reserved for signer vanity
+	IstanbulExtraValidatorSize = 1                                // Fixed number of extra-data bytes reserved for validator size
+	IstanbulExtraSeal          = 65                               // Fixed number of extra-data bytes reserved for signer seal
+	IstanbulExtraCommittedSize = 1                                // Fixed number of extra-data bytes reserved for committed size
 
 	ErrInvalidIstanbulHeaderExtra   = fmt.Errorf("Invalid istanbul header extra-data")
 	ErrInvalidIstanbulCommittedSeal = fmt.Errorf("Invalid istanbul committed seal")
@@ -64,7 +63,7 @@ func ExtractToIstanbul(h *Header) *IstanbulExtra {
 
 	cmttedSeals := make([][]byte, (len(h.Extra)-index.CommittedSealLength)/IstanbulExtraSeal)
 	for i := 0; i < len(cmttedSeals); i++ {
-		cmttedSeals[i] = make([]byte, IstanbulExtraCommittedSeal)
+		cmttedSeals[i] = make([]byte, IstanbulExtraSeal)
 		copy(cmttedSeals[i][:], h.Extra[index.CommittedSealLength+i*IstanbulExtraSeal:])
 	}
 
@@ -111,11 +110,16 @@ func ValidateIstanbulSeal(header *Header) error {
 	return nil
 }
 
-// PrepareIstanbulExtra returns a istanbul extra-data that use the given header, parent
-// we copy vanity from header and validator, seal from parent
+// PrepareIstanbulExtra returns a istanbul extra-data that use the given header, parent to
+// ensure it conforms to Istanbul rules, but committed seals is not included. The rules is
+// like following.
+// ┌────────────────────────┬─────────────────────────────┬───────────────────────────────────────┬─────────────────────┐
+// │ header vanity(32 bytes)│ parent validator#N (1 bytes)│ parent validator address(N * 20 bytes)│ empty seal(65 bytes)│
+// └────────────────────────┴─────────────────────────────┴───────────────────────────────────────┴─────────────────────┘
 func PrepareIstanbulExtra(header, parent *Header) []byte {
 	var buf bytes.Buffer
 
+	// 1. compensate the lack bytes if header.Extra is not enough IstanbulExtraVanity bytes.
 	if len(header.Extra) < IstanbulExtraVanity {
 		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, IstanbulExtraVanity-len(header.Extra))...)
 	}
@@ -123,19 +127,20 @@ func PrepareIstanbulExtra(header, parent *Header) []byte {
 
 	index := ExtractToIstanbulIndex(parent)
 
+	// 2. copy validators from parent.
 	buf.Write(parent.Extra[index.ValidatorSize:index.Seal])
+	// 3. append the IstanbulExtraSeal bytes for block signature.
 	buf.Write(make([]byte, IstanbulExtraSeal))
 
 	return buf.Bytes()
 }
 
-// IstanbulExtraFilter is used to filter out the useless information.
-//
-// We just keep the following data in header.Extra.
+// IstanbulHashFilter is used to filter out the useless information(like committed seals) to
+// ensure it conforms to following rules.
 // ┌─────────────────┬──────────────────────┬────────────────────────────────┬───────────────┐
 // │ vanity(32 bytes)│ validator#N (1 bytes)│ validator address(N * 20 bytes)│ seal(65 bytes)│
 // └─────────────────┴──────────────────────┴────────────────────────────────┴───────────────┘
-func IstanbulExtraFilter(h *Header) *Header {
+func IstanbulHashFilter(h *Header) *Header {
 	newHeader := ensureValidIstanbulExtra(h)
 	valLength := getValidatorLength(newHeader)
 	newHeader.Extra = newHeader.Extra[0 : IstanbulExtraVanity+IstanbulExtraValidatorSize+valLength+IstanbulExtraSeal]
@@ -174,7 +179,7 @@ func ensureValidIstanbulExtra(h *Header) *Header {
 		newHeader.Extra = append(newHeader.Extra, bytes.Repeat([]byte{0x00}, defaultLength+IstanbulExtraCommittedSize-len(newHeader.Extra))...)
 	}
 
-	cmttedLength := int(newHeader.Extra[defaultLength : defaultLength+IstanbulExtraCommittedSize][0]) * IstanbulExtraCommittedSeal
+	cmttedLength := int(newHeader.Extra[defaultLength : defaultLength+IstanbulExtraCommittedSize][0]) * IstanbulExtraSeal
 	defaultLength += IstanbulExtraCommittedSize + cmttedLength
 	if len(newHeader.Extra) < defaultLength {
 		newHeader.Extra = append(newHeader.Extra, bytes.Repeat([]byte{0x00}, defaultLength-len(newHeader.Extra))...)
@@ -185,22 +190,23 @@ func ensureValidIstanbulExtra(h *Header) *Header {
 	return newHeader
 }
 
-// UpdateIstanbulCommittedSeal updates header signatures that store consensus proof
-func UpdateIstanbulCommittedSealExtra(b *Block, committedSeal []byte) error {
+// AppendIstanbulCommittedSealExtra updates header signatures that store consensus proof
+func AppendIstanbulCommittedSealExtra(b *Block, committedSeal []byte) error {
 	// sanity check
-	if len(committedSeal)%IstanbulExtraCommittedSeal != 0 {
+	if len(committedSeal)%IstanbulExtraSeal != 0 {
 		return ErrInvalidIstanbulCommittedSeal
 	}
-	size := len(committedSeal) / IstanbulExtraCommittedSeal
+	size := len(committedSeal) / IstanbulExtraSeal
 	b.header.Extra = append(b.header.Extra, byte(size))
 	b.header.Extra = append(b.header.Extra, committedSeal...)
 	return nil
 }
 
-// getValidatorLength returns a validator total length for a given header
+// getValidatorLength returns a validator total length for a given header. It returns 0 if there are no
+// more extra-data.
 func getValidatorLength(h *Header) int {
 	if len(h.Extra) < IstanbulExtraVanity+IstanbulExtraValidatorSize {
-		return -1
+		return 0
 	}
 	return int(h.Extra[IstanbulExtraVanity : IstanbulExtraVanity+IstanbulExtraValidatorSize][0]) * common.AddressLength
 }
