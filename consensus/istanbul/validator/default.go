@@ -19,6 +19,7 @@ package validator
 import (
 	"reflect"
 	"sort"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
@@ -39,8 +40,9 @@ func (val *defaultValidator) String() string {
 // ----------------------------------------------------------------------------
 
 type defaultSet struct {
-	validators istanbul.Validators
-	proposer   istanbul.Validator
+	validators  istanbul.Validators
+	proposer    istanbul.Validator
+	validatorMu sync.Mutex
 
 	selector istanbul.ProposalSelector
 }
@@ -135,4 +137,43 @@ func stickyProposer(valSet istanbul.ValidatorSet, proposer common.Address, round
 	}
 	pick := seed % uint64(valSet.Size())
 	return valSet.GetByIndex(pick)
+}
+
+func (valSet *defaultSet) AddValidator(address common.Address) bool {
+	valSet.validatorMu.Lock()
+	defer valSet.validatorMu.Unlock()
+	for _, v := range valSet.validators {
+		if v.Address() == address {
+			return false
+		}
+	}
+	valSet.validators = append(valSet.validators, New(address))
+	// TODO: we may not need to re-sort it again
+	// sort validator
+	sort.Sort(valSet.validators)
+	return true
+}
+
+func (valSet *defaultSet) RemoveValidator(address common.Address) bool {
+	valSet.validatorMu.Lock()
+	defer valSet.validatorMu.Unlock()
+
+	for i, v := range valSet.validators {
+		if v.Address() == address {
+			valSet.validators = append(valSet.validators[:i], valSet.validators[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+func (valSet *defaultSet) Copy() istanbul.ValidatorSet {
+	valSet.validatorMu.Lock()
+	defer valSet.validatorMu.Unlock()
+
+	addresses := make([]common.Address, 0, valSet.Size())
+	for _, v := range valSet.validators {
+		addresses = append(addresses, v.Address())
+	}
+	return newDefaultSet(addresses, valSet.selector)
 }

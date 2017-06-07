@@ -22,7 +22,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
 // API is a user facing RPC API to dump Istanbul state
@@ -34,10 +36,8 @@ type API struct {
 // RoundState returns current state and proposer
 func (api *API) RoundState() {
 	state, roundState := api.pbft.core.RoundState()
-	p := api.pbft.valSet.GetProposer().Address()
 	log.Info("RoundState", "sequence", roundState.Sequence, "round", roundState.Round,
-		"state", state, "proposer", p,
-		"hash", roundState.Preprepare.Proposal.Hash(),
+		"state", state, "hash", roundState.Preprepare.Proposal.Hash(),
 		"prepares", roundState.Prepares, "commits", roundState.Commits,
 		"checkpoint", roundState.Checkpoints)
 }
@@ -50,6 +50,64 @@ func (api *API) Backlog() {
 		logs = append(logs, fmt.Sprintf("{%v, %v}", validator, q.Size()))
 	}
 	log.Info("Backlog", "logs", fmt.Sprintf("[%v]", strings.Join(logs, ", ")))
+}
+
+// GetSnapshot retrieves the state snapshot at a given block.
+func (api *API) GetSnapshot(number *rpc.BlockNumber) (*Snapshot, error) {
+	// Retrieve the requested block number (or current if none requested)
+	var header *types.Header
+	if number == nil || *number == rpc.LatestBlockNumber {
+		header = api.chain.CurrentHeader()
+	} else {
+		header = api.chain.GetHeaderByNumber(uint64(number.Int64()))
+	}
+	// Ensure we have an actually valid block and return its snapshot
+	if header == nil {
+		return nil, errUnknownBlock
+	}
+	return api.pbft.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+}
+
+// GetSnapshotAtHash retrieves the state snapshot at a given block.
+func (api *API) GetSnapshotAtHash(hash common.Hash) (*Snapshot, error) {
+	header := api.chain.GetHeaderByHash(hash)
+	if header == nil {
+		return nil, errUnknownBlock
+	}
+	return api.pbft.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+}
+
+// GetSigners retrieves the list of authorized signers at the specified block.
+func (api *API) GetSigners(number *rpc.BlockNumber) ([]common.Address, error) {
+	// Retrieve the requested block number (or current if none requested)
+	var header *types.Header
+	if number == nil || *number == rpc.LatestBlockNumber {
+		header = api.chain.CurrentHeader()
+	} else {
+		header = api.chain.GetHeaderByNumber(uint64(number.Int64()))
+	}
+	// Ensure we have an actually valid block and return the signers from its snapshot
+	if header == nil {
+		return nil, errUnknownBlock
+	}
+	snap, err := api.pbft.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return snap.signers(), nil
+}
+
+// GetSignersAtHash retrieves the state snapshot at a given block.
+func (api *API) GetSignersAtHash(hash common.Hash) ([]common.Address, error) {
+	header := api.chain.GetHeaderByHash(hash)
+	if header == nil {
+		return nil, errUnknownBlock
+	}
+	snap, err := api.pbft.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return snap.signers(), nil
 }
 
 // Candidates returns the current candidates the node tries to uphold and vote on.

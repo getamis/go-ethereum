@@ -21,6 +21,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"math/big"
+	"math/rand"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -64,6 +65,8 @@ var (
 	errInvalidMixDigest = errors.New("non-zero mix digest")
 	// errInvalidCoinbase is returned if a block's coinbase is non zero.
 	errInvalidCoinbase = errors.New("non-zero coinbase")
+	// errInvalidNonce is returned if a block's nonce is invalid
+	errInvalidNonce = errors.New("invalid nonce")
 	// errInvalidUncleHash is returned if a block contains an non-empty uncle list.
 	errInvalidUncleHash = errors.New("non empty uncle hash")
 	// errInconsistentValidatorSet is returned if the validator set is inconsistent
@@ -109,6 +112,7 @@ func (sb *simpleBackend) verifyHeader(chain consensus.ChainReader, header *types
 	if header.Number == nil {
 		return errUnknownBlock
 	}
+	number := header.Number.Uint64()
 
 	// Don't waste time checking blocks from the future
 	if header.Time.Cmp(big.NewInt(now().Unix())) > 0 {
@@ -120,9 +124,20 @@ func (sb *simpleBackend) verifyHeader(chain consensus.ChainReader, header *types
 		return errInvalidExtraDataFormat
 	}
 
+	// Checkpoint blocks need to enforce zero beneficiary
+	checkpoint := (number % sb.config.Epoch) == 0
 	// Ensure that the coinbase is zero
-	if header.Coinbase != (common.Address{}) {
-		return errInvalidCoinbase
+	if checkpoint {
+		if header.Coinbase != (common.Address{}) {
+			return errInvalidCoinbase
+		}
+		if header.Nonce != (types.BlockNonce{}) {
+			return errInvalidNonce
+		}
+	} else {
+		if header.Nonce != (types.BlockNonce{}) && !bytes.Equal(header.Nonce[:], nonceAuthVote) && !bytes.Equal(header.Nonce[:], nonceDropVote) {
+			return errInvalidNonce
+		}
 	}
 	// Ensure that the mix digest is zero as we don't have fork protection currently
 	if header.MixDigest != (common.Hash{}) {
@@ -157,10 +172,10 @@ func (sb *simpleBackend) verifyCascadingFields(chain consensus.ChainReader, head
 	if parent.Time.Uint64()+sb.config.BlockPeriod > header.Time.Uint64() {
 		return errInvalidTimestamp
 	}
-	// Fixed validator set
-	if bytes.Compare(sb.getValidatorBytes(header), sb.getValidatorBytes(parent)) != 0 {
-		return errInconsistentValidatorSet
-	}
+	// // Fixed validator set
+	// if bytes.Compare(sb.getValidatorBytes(header), sb.getValidatorBytes(parent)) != 0 {
+	// 	return errInconsistentValidatorSet
+	// }
 	return sb.verifySigner(chain, header, parent)
 }
 
@@ -258,10 +273,30 @@ func (sb *simpleBackend) Prepare(chain consensus.ChainReader, header *types.Head
 	if !sb.validExtraFormat(parent) {
 		return errInvalidExtraDataFormat
 	}
+	// TODO: we may only insert validator list in epoch block
 	// Ensure the extra data has all it's components
 	header.Extra = sb.prepareExtra(header, parent)
 	// use the same difficulty for all blocks
 	header.Difficulty = defaultDifficulty
+
+	sb.logger.Info("Prepare", "number", number, "sb.config.Epoch", sb.config.Epoch)
+	if number%sb.config.Epoch != 0 {
+		sb.candidatesLock.RLock()
+		if len(sb.candidates) > 0 {
+			addresses := make([]common.Address, 0, len(sb.candidates))
+			for address := range sb.candidates {
+				addresses = append(addresses, address)
+			}
+			header.Coinbase = addresses[rand.Intn(len(addresses))]
+			if sb.candidates[header.Coinbase] {
+				copy(header.Nonce[:], nonceAuthVote)
+			} else {
+				copy(header.Nonce[:], nonceDropVote)
+			}
+			sb.logger.Info("Vote", "coinbase", header.Coinbase, "nonce", header.Nonce, "candidates", sb.candidates)
+		}
+		sb.candidatesLock.RUnlock()
+	}
 	return nil
 }
 
@@ -286,11 +321,21 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 	// update the block header timestamp and signature and propose the block to core engine
 	header := block.Header()
 	number := header.Number.Uint64()
+
+	// Bail out if we're unauthorized to sign a block
+	snap, err := sb.snapshot(chain, number-1, header.ParentHash, nil)
+	if err != nil {
+		return nil, err
+	}
+	if _, v := snap.ValSet.GetByAddress(sb.address); v == nil {
+		return nil, errUnauthorized
+	}
+
 	parent := chain.GetHeader(header.ParentHash, number-1)
 	if parent == nil {
 		return nil, consensus.ErrUnknownAncestor
 	}
-	block, err := sb.updateBlock(parent, block)
+	block, err = sb.updateBlock(parent, block)
 	if err != nil {
 		return nil, err
 	}
@@ -373,9 +418,17 @@ func (sb *simpleBackend) APIs(chain consensus.ChainReader) []rpc.API {
 // HandleMsg implements consensus.Istanbul.HandleMsg
 func (sb *simpleBackend) HandleMsg(pubKey *ecdsa.PublicKey, data []byte) error {
 	addr := crypto.PubkeyToAddress(*pubKey)
-	if _, val := sb.valSet.GetByAddress(addr); val == nil {
-		sb.logger.Error("Not in validator set", "addr", addr)
-		return istanbul.ErrUnauthorizedAddress
+	// get the latest snapshot
+	curHeader := sb.chain.CurrentHeader()
+	snap, err := sb.snapshot(sb.chain, curHeader.Number.Uint64(), curHeader.Hash(), nil)
+	if err != nil {
+		sb.logger.Error("Cannot get latest snapshot", "err", err)
+		return err
+	}
+
+	if _, val := snap.ValSet.GetByAddress(addr); val == nil {
+		sb.logger.Error("Not in validator set", "peerAddr", addr)
+		return errInvalidPeer
 	}
 
 	go sb.istanbulEventMux.Post(istanbul.MessageEvent{
@@ -399,12 +452,6 @@ func (sb *simpleBackend) NewChainHead(block *types.Block) {
 
 // Start implements consensus.Istanbul.Start
 func (sb *simpleBackend) Start(chain consensus.ChainReader, inserter func(block *types.Block) error) error {
-	if err := sb.initValidatorSet(chain); err != nil {
-		return err
-	}
-	if _, v := sb.valSet.GetByAddress(sb.address); v == nil {
-		return istanbul.ErrUnauthorizedAddress
-	}
 	sb.chain = chain
 	sb.inserter = inserter
 	sb.core = istanbulCore.New(sb, sb.config)
@@ -420,7 +467,8 @@ func (sb *simpleBackend) Start(chain consensus.ChainReader, inserter func(block 
 		}
 		lastProposer = p
 	}
-	return sb.core.Start(lastSequence, lastProposer)
+	block := chain.GetBlock(curHeader.Hash(), lastSequence.Uint64())
+	return sb.core.Start(lastSequence, lastProposer, block)
 }
 
 // Stop implements consensus.Istanbul.Stop
@@ -428,18 +476,6 @@ func (sb *simpleBackend) Stop() error {
 	if sb.core != nil {
 		return sb.core.Stop()
 	}
-	return nil
-}
-
-func (sb *simpleBackend) initValidatorSet(chain consensus.ChainReader) error {
-	header := chain.CurrentHeader()
-	// get the validator byte array and feed into validator set
-	validatorAddresses := validator.ExtractValidators(sb.getValidatorBytes(header))
-	valSet := validator.NewSet(validatorAddresses, sb.config.ProposerPolicy)
-	if valSet == nil {
-		return errInvalidExtraDataFormat
-	}
-	sb.valSet = valSet
 	return nil
 }
 
@@ -496,7 +532,7 @@ func validatorLength(header *types.Header) int {
 }
 
 // snapshot retrieves the authorization snapshot at a given point in time.
-func (sb *simpleBackend) snapshot(chain consensus.ChainReader, number uint64, hash common.Hash, parents []*types.Header) (*Snapshot, error) {
+func (sb *simpleBackend) snapshot(chain consensus.ChainReader, number uint64, hash common.Hash, parent *types.Header) (*Snapshot, error) {
 	// Search for a snapshot in memory or on disk for checkpoints
 	var (
 		headers []*types.Header
@@ -523,7 +559,7 @@ func (sb *simpleBackend) snapshot(chain consensus.ChainReader, number uint64, ha
 				return nil, err
 			}
 			signers := validator.ExtractValidators(sb.getValidatorBytes(genesis))
-			snap = newSnapshot(sb.config.Epoch, 0, genesis.Hash(), signers)
+			snap = newSnapshot(sb.config.Epoch, 0, genesis.Hash(), validator.NewSet(signers, sb.config.ProposerPolicy))
 			if err := snap.store(sb.db); err != nil {
 				return nil, err
 			}
@@ -532,13 +568,13 @@ func (sb *simpleBackend) snapshot(chain consensus.ChainReader, number uint64, ha
 		}
 		// No snapshot for this header, gather the header and move backward
 		var header *types.Header
-		if len(parents) > 0 {
+		if parent != nil {
 			// If we have explicit parents, pick from there (enforced)
-			header = parents[len(parents)-1]
+			header = parent
 			if header.Hash() != hash || header.Number.Uint64() != number {
 				return nil, consensus.ErrUnknownAncestor
 			}
-			parents = parents[:len(parents)-1]
+			parent = nil
 		} else {
 			// No explicit parents (or no more left), reach out to the database
 			header = chain.GetHeader(hash, number)
@@ -609,5 +645,5 @@ func ecrecover(header *types.Header) (common.Address, error) {
 	}
 	start, end := signaturePosition(header)
 	signature := header.Extra[start:end]
-	return getSignatureAddress(sigHash(header).Bytes(), signature)
+	return istanbul.GetSignatureAddress(sigHash(header).Bytes(), signature)
 }

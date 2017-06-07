@@ -703,13 +703,35 @@ web3._extend({
 			params: 0
 		}),
 		new web3._extend.Method({
+			name: 'getSnapshot',
+			call: 'istanbul_getSnapshot',
+			params: 1,
+      		inputFormatter: [null]
+		}),
+		new web3._extend.Method({
+			name: 'getSnapshotAtHash',
+			call: 'istanbul_getSnapshotAtHash',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'getSigners',
+			call: 'istanbul_getSigners',
+			params: 1,
+			inputFormatter: [null]
+		}),
+		new web3._extend.Method({
+			name: 'getSignersAtHash',
+			call: 'istanbul_getSignersAtHash',
+			params: 1
+		}),
+		new web3._extend.Method({
 			name: 'propose',
-			call: 'pbft_propose',
+			call: 'istanbul_propose',
 			params: 2
 		}),
 		new web3._extend.Method({
 			name: 'discard',
-			call: 'pbft_discard',
+			call: 'istanbul_discard',
 			params: 1
 		})
   	],
@@ -717,7 +739,7 @@ web3._extend({
 	[
 		new web3._extend.Property({
 			name: 'candidates',
-			getter: 'pbft_candidates'
+			getter: 'istanbul_candidates'
 		}),
 	]
 });

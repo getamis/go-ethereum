@@ -27,7 +27,7 @@ type Backend interface {
 	Address() common.Address
 
 	// Validators returns the validator set
-	Validators() ValidatorSet
+	Validators(proposal Proposal) ValidatorSet
 
 	// EventMux returns the event mux in backend
 	EventMux() *event.TypeMux
@@ -36,7 +36,7 @@ type Backend interface {
 	Send(payload []byte, target common.Address) error
 
 	// Broadcast sends a message to all peers
-	Broadcast(payload []byte) error
+	Broadcast(valSet ValidatorSet, payload []byte) error
 
 	// Commit delivers a approved proposal to backend.
 	// The delivered proposal will be put into blockchain.
@@ -53,9 +53,4 @@ type Backend interface {
 
 	// CheckSignature verifies the signature by checking if it's signed by given peer
 	CheckSignature(data []byte, addr common.Address, sig []byte) error
-
-	// CheckValidatorSignature verifies if the data is signed by one of the validators
-	// If the verification succeeds, the signer's address is returned, otherwise
-	// an empty address and an error are returned.
-	CheckValidatorSignature(data []byte, sig []byte) (common.Address, error)
 }

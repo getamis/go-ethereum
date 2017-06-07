@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus/pbft"
+	"github.com/ethereum/go-ethereum/consensus/istanbul"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -341,7 +341,7 @@ func TestVoting(t *testing.T) {
 		genesis.Commit(db)
 
 		eventMux := new(event.TypeMux)
-		config := pbft.DefaultConfig
+		config := istanbul.DefaultConfig
 		if tt.epoch != 0 {
 			config.Epoch = tt.epoch
 		}

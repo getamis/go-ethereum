@@ -51,7 +51,7 @@ func TestHandleMsg(t *testing.T) {
 		Signature: []byte{},
 	}
 
-	_, val := v0.Validators().GetByAddress(v0.Address())
+	_, val := v0.Validators(nil).GetByAddress(v0.Address())
 	if err := r0.handleCheckedMsg(msg, val); err != errFailedDecodePreprepare {
 		t.Error("message should decode failed")
 	}
@@ -71,7 +71,7 @@ func TestHandleMsg(t *testing.T) {
 		Signature: []byte{},
 	}
 
-	_, val = v0.Validators().GetByAddress(v0.Address())
+	_, val = v0.Validators(nil).GetByAddress(v0.Address())
 	if err := r0.handleCheckedMsg(msg, val); err != errFailedDecodePrepare {
 		t.Error("message should decode failed")
 	}
@@ -91,7 +91,7 @@ func TestHandleMsg(t *testing.T) {
 		Signature: []byte{},
 	}
 
-	_, val = v0.Validators().GetByAddress(v0.Address())
+	_, val = v0.Validators(nil).GetByAddress(v0.Address())
 	if err := r0.handleCheckedMsg(msg, val); err != errFailedDecodeCommit {
 		t.Error("message should decode failed")
 	}
@@ -111,7 +111,7 @@ func TestHandleMsg(t *testing.T) {
 		Signature: []byte{},
 	}
 
-	_, val = v0.Validators().GetByAddress(v0.Address())
+	_, val = v0.Validators(nil).GetByAddress(v0.Address())
 	if err := r0.handleCheckedMsg(msg, val); err == nil {
 		t.Error("error is supposed to be returned")
 	}

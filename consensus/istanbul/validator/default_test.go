@@ -36,6 +36,7 @@ func TestValidatorSet(t *testing.T) {
 	testNormalValSet(t)
 	testEmptyValSet(t)
 	testStickyProposer(t)
+	testAddAndRemoveValidator(t)
 }
 
 func testNewValidatorSet(t *testing.T) {
@@ -128,8 +129,48 @@ func testNormalValSet(t *testing.T) {
 
 func testEmptyValSet(t *testing.T) {
 	valSet := NewSet(ExtractValidators([]byte{}), istanbul.RoundRobin)
-	if valSet != nil {
-		t.Errorf("validator set should be nil")
+	if valSet == nil {
+		t.Errorf("validator set should not be nil")
+	}
+}
+
+func testAddAndRemoveValidator(t *testing.T) {
+	valSet := NewSet(ExtractValidators([]byte{}))
+	if !valSet.AddValidator(common.StringToAddress(string(2))) {
+		t.Error("validator should be added")
+	}
+	if valSet.AddValidator(common.StringToAddress(string(2))) {
+		t.Error("existing validator should not be added again")
+	}
+	valSet.AddValidator(common.StringToAddress(string(1)))
+	valSet.AddValidator(common.StringToAddress(string(0)))
+	if len(valSet.List()) != 3 {
+		t.Error("validator size should be 3")
+	}
+
+	for i, v := range valSet.List() {
+		expected := common.StringToAddress(string(i))
+		if v.Address() != expected {
+			t.Errorf("the order of validators is wrong, expected: %v, got: %v", expected.Hex(), v.Address().Hex())
+		}
+	}
+
+	if !valSet.RemoveValidator(common.StringToAddress(string(2))) {
+		t.Error("validator should be removed")
+	}
+	if valSet.RemoveValidator(common.StringToAddress(string(2))) {
+		t.Error("non-existing validator should not be removed")
+	}
+	if len(valSet.List()) != 2 {
+		t.Error("validator size should be 2")
+	}
+	valSet.RemoveValidator(common.StringToAddress(string(1)))
+	if len(valSet.List()) != 1 {
+		t.Error("validator size should be 1")
+	}
+	valSet.RemoveValidator(common.StringToAddress(string(0)))
+	if len(valSet.List()) != 0 {
+		t.Error("validator size should be 0")
 	}
 }
 

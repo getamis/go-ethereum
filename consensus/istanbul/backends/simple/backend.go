@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 	istanbulCore "github.com/ethereum/go-ethereum/consensus/istanbul/core"
+	"github.com/ethereum/go-ethereum/consensus/istanbul/validator"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -47,6 +48,7 @@ func New(config *istanbul.Config, eventMux *event.TypeMux, privateKey *ecdsa.Pri
 		db:               db,
 		commitCh:         make(chan common.Hash, 1),
 		recents:          recents,
+		candidates:       make(map[common.Address]bool),
 	}
 	return backend
 }
@@ -55,7 +57,6 @@ func New(config *istanbul.Config, eventMux *event.TypeMux, privateKey *ecdsa.Pri
 
 type simpleBackend struct {
 	config           *istanbul.Config
-	valSet           istanbul.ValidatorSet
 	eventMux         *event.TypeMux
 	istanbulEventMux *event.TypeMux
 	privateKey       *ecdsa.PrivateKey
@@ -87,8 +88,12 @@ func (sb *simpleBackend) Address() common.Address {
 }
 
 // Validators implements istanbul.Backend.Validators
-func (sb *simpleBackend) Validators() istanbul.ValidatorSet {
-	return sb.valSet
+func (sb *simpleBackend) Validators(proposal istanbul.Proposal) istanbul.ValidatorSet {
+	snap, err := sb.snapshot(sb.chain, proposal.Number().Uint64(), proposal.Hash(), nil)
+	if err != nil {
+		return validator.NewSet(nil, sb.config.ProposerPolicy)
+	}
+	return snap.ValSet
 }
 
 func (sb *simpleBackend) Send(payload []byte, target common.Address) error {
@@ -100,8 +105,8 @@ func (sb *simpleBackend) Send(payload []byte, target common.Address) error {
 }
 
 // Broadcast implements istanbul.Backend.Send
-func (sb *simpleBackend) Broadcast(payload []byte) error {
-	for _, val := range sb.valSet.List() {
+func (sb *simpleBackend) Broadcast(valSet istanbul.ValidatorSet, payload []byte) error {
+	for _, val := range valSet.List() {
 		if val.Address() == sb.Address() {
 			// send to self
 			pbftMsg := istanbul.MessageEvent{
@@ -177,7 +182,7 @@ func (sb *simpleBackend) Sign(data []byte) ([]byte, error) {
 
 // CheckSignature implements istanbul.Backend.CheckSignature
 func (sb *simpleBackend) CheckSignature(data []byte, address common.Address, sig []byte) error {
-	signer, err := getSignatureAddress(data, sig)
+	signer, err := istanbul.GetSignatureAddress(data, sig)
 	if err != nil {
 		log.Error("Failed to get signer address", "err", err)
 		return err
@@ -187,33 +192,4 @@ func (sb *simpleBackend) CheckSignature(data []byte, address common.Address, sig
 		return errInvalidSignature
 	}
 	return nil
-}
-
-// CheckValidatorSignature implements istanbul.Backend.CheckValidatorSignature
-func (sb *simpleBackend) CheckValidatorSignature(data []byte, sig []byte) (common.Address, error) {
-	// 1. Get signature address
-	signer, err := getSignatureAddress(data, sig)
-	if err != nil {
-		log.Error("Failed to get signer address", "err", err)
-		return common.Address{}, err
-	}
-
-	// 2. Check validator
-	if _, val := sb.valSet.GetByAddress(signer); val != nil {
-		return val.Address(), nil
-	}
-
-	return common.Address{}, istanbul.ErrUnauthorizedAddress
-}
-
-// get the signer address from the signature
-func getSignatureAddress(data []byte, sig []byte) (common.Address, error) {
-	// 1. Keccak data
-	hashData := crypto.Keccak256([]byte(data))
-	// 2. Recover public key
-	pubkey, err := crypto.SigToPub(hashData, sig)
-	if err != nil {
-		return common.Address{}, err
-	}
-	return crypto.PubkeyToAddress(*pubkey), nil
 }

@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 )
 
@@ -38,8 +39,7 @@ func TestHandlePreprepare(t *testing.T) {
 	testCases := []struct {
 		system          *testSystem
 		expectedRequest istanbul.Proposal
-
-		expectedErr error
+		expectedErr     error
 	}{
 		{
 			// normal case
@@ -48,7 +48,7 @@ func TestHandlePreprepare(t *testing.T) {
 
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
-
+					c.Start(big.NewInt(0), common.Address{}, nil)
 					if i != 0 {
 						c.state = StateAcceptRequest
 					}
@@ -67,18 +67,10 @@ func TestHandlePreprepare(t *testing.T) {
 					c := backend.engine.(*core)
 
 					if i != 0 {
+						c.Start(big.NewInt(0), common.Address{}, nil)
 						c.state = StateAcceptRequest
-						// hack: force set subject that future message can be simulated
-						c.current = newTestRoundState(
-							&istanbul.View{
-								Round:    big.NewInt(0),
-								Sequence: big.NewInt(0),
-							},
-							backend.Validators(),
-						)
-
 					} else {
-						c.current.SetSequence(big.NewInt(10))
+						c.Start(big.NewInt(10), common.Address{}, nil)
 					}
 				}
 				return sys
@@ -98,6 +90,7 @@ func TestHandlePreprepare(t *testing.T) {
 					c := backend.engine.(*core)
 
 					if i != 0 {
+						c.Start(big.NewInt(0), common.Address{}, nil)
 						// replica 0 is primary
 						c.state = StatePreprepared
 					}
@@ -116,6 +109,7 @@ func TestHandlePreprepare(t *testing.T) {
 					c := backend.engine.(*core)
 
 					if i != 0 {
+						c.Start(big.NewInt(10), common.Address{}, nil)
 						c.state = StatePreprepared
 						c.current.SetSequence(big.NewInt(10))
 						c.current.SetRound(big.NewInt(10))
@@ -151,7 +145,7 @@ OUTER:
 			c := v.engine.(*core)
 
 			m, _ := Encode(preprepare)
-			_, val := v0.Validators().GetByAddress(v0.Address())
+			_, val := c.valSet.GetByAddress(v0.Address())
 			// run each backends and verify handlePreprepare function.
 			if err := c.handlePreprepare(&message{
 				Code:    msgPreprepare,
