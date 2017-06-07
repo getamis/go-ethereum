@@ -63,8 +63,6 @@ var (
 	errInvalidExtraDataFormat = errors.New("invalid extra data format")
 	// errInvalidMixDigest is returned if a block's mix digest is non zero.
 	errInvalidMixDigest = errors.New("non-zero mix digest")
-	// errInvalidCoinbase is returned if a block's coinbase is non zero.
-	errInvalidCoinbase = errors.New("non-zero coinbase")
 	// errInvalidNonce is returned if a block's nonce is invalid
 	errInvalidNonce = errors.New("invalid nonce")
 	// errInvalidUncleHash is returned if a block contains an non-empty uncle list.
@@ -113,7 +111,6 @@ func (sb *simpleBackend) verifyHeader(chain consensus.ChainReader, header *types
 	if header.Number == nil {
 		return errUnknownBlock
 	}
-	number := header.Number.Uint64()
 
 	// Don't waste time checking blocks from the future
 	if header.Time.Cmp(big.NewInt(now().Unix())) > 0 {
@@ -125,20 +122,9 @@ func (sb *simpleBackend) verifyHeader(chain consensus.ChainReader, header *types
 		return errInvalidExtraDataFormat
 	}
 
-	// Checkpoint blocks need to enforce zero beneficiary
-	checkpoint := (number % sb.config.Epoch) == 0
 	// Ensure that the coinbase is zero
-	if checkpoint {
-		if header.Coinbase != (common.Address{}) {
-			return errInvalidCoinbase
-		}
-		if header.Nonce != (emptyNonce) {
-			return errInvalidNonce
-		}
-	} else {
-		if header.Nonce != (emptyNonce) && !bytes.Equal(header.Nonce[:], nonceAuthVote) && !bytes.Equal(header.Nonce[:], nonceDropVote) {
-			return errInvalidNonce
-		}
+	if header.Nonce != (emptyNonce) && !bytes.Equal(header.Nonce[:], nonceAuthVote) && !bytes.Equal(header.Nonce[:], nonceDropVote) {
+		return errInvalidNonce
 	}
 	// Ensure that the mix digest is zero as we don't have fork protection currently
 	if header.MixDigest != (common.Hash{}) {
@@ -292,25 +278,22 @@ func (sb *simpleBackend) Prepare(chain consensus.ChainReader, header *types.Head
 	// use the same difficulty for all blocks
 	header.Difficulty = defaultDifficulty
 
-	if number%sb.config.Epoch != 0 {
-		sb.candidatesLock.RLock()
-		if len(sb.candidates) > 0 {
-			addresses := make([]common.Address, 0, len(sb.candidates))
-			for address := range sb.candidates {
-				addresses = append(addresses, address)
-			}
-			header.Coinbase = addresses[rand.Intn(len(addresses))]
-			if sb.candidates[header.Coinbase] {
-				copy(header.Nonce[:], nonceAuthVote)
-			} else {
-				copy(header.Nonce[:], nonceDropVote)
-			}
-			sb.logger.Info("Vote", "coinbase", header.Coinbase, "nonce", header.Nonce, "candidates", sb.candidates)
+	// choose one candidate
+	sb.candidatesLock.RLock()
+	if len(sb.candidates) > 0 {
+		addresses := make([]common.Address, 0, len(sb.candidates))
+		for address := range sb.candidates {
+			addresses = append(addresses, address)
 		}
-		sb.candidatesLock.RUnlock()
+		header.Coinbase = addresses[rand.Intn(len(addresses))]
+		if sb.candidates[header.Coinbase] {
+			copy(header.Nonce[:], nonceAuthVote)
+		} else {
+			copy(header.Nonce[:], nonceDropVote)
+		}
 	}
+	sb.candidatesLock.RUnlock()
 
-	// TODO: we may only insert validator list in epoch block
 	// Ensure the extra data has all it's components
 	snap, err := sb.snapshot(chain, number-1, header.ParentHash, nil)
 	if err != nil {
@@ -322,8 +305,8 @@ func (sb *simpleBackend) Prepare(chain consensus.ChainReader, header *types.Head
 		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, expectedSize-len(header.Extra))...)
 	}
 	header.Extra[types.IstanbulExtraVanity] = byte(snap.ValSet.Size())
-	for i, validator := range snap.ValSet.List() {
-		copy(header.Extra[types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+i*common.AddressLength:], validator.Address().Bytes())
+	for i, validator := range snap.validators() {
+		copy(header.Extra[types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+i*common.AddressLength:], validator.Bytes())
 	}
 	return nil
 }

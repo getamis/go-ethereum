@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 	"github.com/ethereum/go-ethereum/core"
@@ -313,14 +314,13 @@ func TestVerifyHeader(t *testing.T) {
 		t.Errorf("unexpected error comes, got: %v, expected: consensus.ErrFutureBlock", err)
 	}
 
-	// check point block
-	// non zero coinbase
+	// invalid nonce
 	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	header = block.Header()
-	header.Coinbase = common.StringToAddress("123456789")
+	copy(header.Nonce[:], hexutil.MustDecode("0x111111111111"))
 	header.Number = big.NewInt(int64(engine.config.Epoch))
 	err = engine.VerifyHeader(chain, header, false)
-	if err != errInvalidCoinbase {
+	if err != errInvalidNonce {
 		t.Errorf("unexpected error comes, got: %v, expected: errInvalidCoinbase", err)
 	}
 }
