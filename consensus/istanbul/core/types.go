@@ -43,7 +43,6 @@ const (
 	StatePreprepared
 	StatePrepared
 	StateCommitted
-	StateCheckpointReady
 )
 
 func (s State) String() string {
@@ -78,7 +77,6 @@ const (
 	msgPreprepare uint64 = iota
 	msgPrepare
 	msgCommit
-	msgCheckpoint
 	msgRoundChange
 	msgAll
 )

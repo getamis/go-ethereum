@@ -59,7 +59,6 @@ func (c *core) subscribeEvents() {
 		istanbul.FinalCommittedEvent{},
 		// internal events
 		backlogEvent{},
-		buildCheckpointEvent{},
 	)
 }
 
@@ -87,8 +86,6 @@ func (c *core) handleEvents() {
 		case backlogEvent:
 			// No need to check signature for internal messages
 			c.handleCheckedMsg(ev.msg, ev.src)
-		case buildCheckpointEvent:
-			go c.buildStableCheckpoint()
 		}
 	}
 }
@@ -138,8 +135,6 @@ func (c *core) handleCheckedMsg(msg *message, src istanbul.Validator) error {
 		return testBacklog(c.handlePrepare(msg, src))
 	case msgCommit:
 		return testBacklog(c.handleCommit(msg, src))
-	case msgCheckpoint:
-		return c.handleCheckpoint(msg, src)
 	case msgRoundChange:
 		return c.handleRoundChange(msg, src)
 	default:

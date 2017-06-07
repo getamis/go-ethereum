@@ -24,6 +24,3 @@ type backlogEvent struct {
 	src istanbul.Validator
 	msg *message
 }
-
-type buildCheckpointEvent struct {
-}
