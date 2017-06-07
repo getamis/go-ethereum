@@ -69,7 +69,7 @@ func TestHandlePreprepare(t *testing.T) {
 					if i != 0 {
 						c.state = StateAcceptRequest
 						// hack: force set subject that future message can be simulated
-						c.current = newTestSnapshot(
+						c.current = newTestRoundState(
 							&istanbul.View{
 								Round:    big.NewInt(0),
 								Sequence: big.NewInt(0),

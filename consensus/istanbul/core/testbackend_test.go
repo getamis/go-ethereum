@@ -199,7 +199,7 @@ func NewTestSystemWithBackend(n, f uint64) *testSystem {
 
 		core := New(backend, config).(*core)
 		core.state = StateAcceptRequest
-		core.current = newSnapshot(&istanbul.View{
+		core.current = newRoundState(&istanbul.View{
 			Round:    big.NewInt(0),
 			Sequence: big.NewInt(1),
 		}, vset)

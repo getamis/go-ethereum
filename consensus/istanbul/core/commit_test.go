@@ -51,7 +51,7 @@ func TestHandleCommit(t *testing.T) {
 
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
-					c.current = newTestSnapshot(
+					c.current = newTestRoundState(
 						&istanbul.View{
 							Round:    big.NewInt(0),
 							Sequence: big.NewInt(1),
@@ -78,13 +78,13 @@ func TestHandleCommit(t *testing.T) {
 
 					if i == 0 {
 						// replica 0 is primary
-						c.current = newTestSnapshot(
+						c.current = newTestRoundState(
 							expectedSubject.View,
 							backend.Validators(),
 						)
 						c.state = StatePreprepared
 					} else {
-						c.current = newTestSnapshot(
+						c.current = newTestRoundState(
 							&istanbul.View{
 								Round:    big.NewInt(2),
 								Sequence: big.NewInt(3),
@@ -107,13 +107,13 @@ func TestHandleCommit(t *testing.T) {
 
 					if i == 0 {
 						// replica 0 is primary
-						c.current = newTestSnapshot(
+						c.current = newTestRoundState(
 							expectedSubject.View,
 							backend.Validators(),
 						)
 						c.state = StatePreprepared
 					} else {
-						c.current = newTestSnapshot(
+						c.current = newTestRoundState(
 							&istanbul.View{
 								Round:    big.NewInt(0),
 								Sequence: big.NewInt(0),
@@ -136,7 +136,7 @@ func TestHandleCommit(t *testing.T) {
 
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
-					c.current = newTestSnapshot(
+					c.current = newTestRoundState(
 						expectedSubject.View,
 						backend.Validators(),
 					)
@@ -157,7 +157,7 @@ func TestHandleCommit(t *testing.T) {
 
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
-					c.current = newTestSnapshot(
+					c.current = newTestRoundState(
 						&istanbul.View{
 							Round:    big.NewInt(0),
 							Sequence: proposal.Number(),
@@ -234,8 +234,8 @@ func TestVerifyCommit(t *testing.T) {
 	testCases := []struct {
 		expected error
 
-		commit   *istanbul.Subject
-		snapshot *snapshot
+		commit     *istanbul.Subject
+		roundState *roundState
 	}{
 		{
 			// normal case
@@ -244,7 +244,7 @@ func TestVerifyCommit(t *testing.T) {
 				View:   &istanbul.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
 				Digest: newTestProposal().Hash(),
 			},
-			snapshot: newTestSnapshot(
+			roundState: newTestRoundState(
 				&istanbul.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
 				valSet,
 			),
@@ -256,7 +256,7 @@ func TestVerifyCommit(t *testing.T) {
 				View:   &istanbul.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
 				Digest: newTestProposal().Hash(),
 			},
-			snapshot: newTestSnapshot(
+			roundState: newTestRoundState(
 				&istanbul.View{Round: big.NewInt(1), Sequence: big.NewInt(1)},
 				valSet,
 			),
@@ -268,7 +268,7 @@ func TestVerifyCommit(t *testing.T) {
 				View:   &istanbul.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
 				Digest: common.StringToHash("1234567890"),
 			},
-			snapshot: newTestSnapshot(
+			roundState: newTestRoundState(
 				&istanbul.View{Round: big.NewInt(1), Sequence: big.NewInt(1)},
 				valSet,
 			),
@@ -280,7 +280,7 @@ func TestVerifyCommit(t *testing.T) {
 				View:   &istanbul.View{Round: big.NewInt(0), Sequence: nil},
 				Digest: newTestProposal().Hash(),
 			},
-			snapshot: newTestSnapshot(
+			roundState: newTestRoundState(
 				&istanbul.View{Round: big.NewInt(1), Sequence: big.NewInt(1)},
 				valSet,
 			),
@@ -292,7 +292,7 @@ func TestVerifyCommit(t *testing.T) {
 				View:   &istanbul.View{Round: big.NewInt(1), Sequence: big.NewInt(0)},
 				Digest: newTestProposal().Hash(),
 			},
-			snapshot: newTestSnapshot(
+			roundState: newTestRoundState(
 				&istanbul.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
 				valSet,
 			),
@@ -304,7 +304,7 @@ func TestVerifyCommit(t *testing.T) {
 				View:   &istanbul.View{Round: big.NewInt(0), Sequence: big.NewInt(1)},
 				Digest: newTestProposal().Hash(),
 			},
-			snapshot: newTestSnapshot(
+			roundState: newTestRoundState(
 				&istanbul.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
 				valSet,
 			),
@@ -312,7 +312,7 @@ func TestVerifyCommit(t *testing.T) {
 	}
 	for i, test := range testCases {
 		c := sys.backends[0].engine.(*core)
-		c.current = test.snapshot
+		c.current = test.roundState
 
 		if err := c.verifyCommit(test.commit, peer); err != nil {
 			if err != test.expected {

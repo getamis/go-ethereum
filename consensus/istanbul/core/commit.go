@@ -86,7 +86,7 @@ func (c *core) verifyCommit(commit *istanbul.Subject, src istanbul.Validator) er
 func (c *core) acceptCommit(msg *message, src istanbul.Validator) error {
 	logger := c.logger.New("from", src, "state", c.state)
 
-	// Add the commit message to current snapshot
+	// Add the commit message to current round state
 	if err := c.current.Commits.Add(msg); err != nil {
 		logger.Error("Failed to record commit message", "msg", msg, "err", err)
 		return err

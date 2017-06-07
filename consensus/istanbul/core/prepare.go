@@ -85,9 +85,9 @@ func (c *core) verifyPrepare(prepare *istanbul.Subject, src istanbul.Validator) 
 func (c *core) acceptPrepare(msg *message, src istanbul.Validator) error {
 	logger := c.logger.New("from", src, "state", c.state)
 
-	// Add the prepare message to current snapshot
+	// Add the prepare message to current round state
 	if err := c.current.Prepares.Add(msg); err != nil {
-		logger.Error("Failed to add prepare message to snapshot", "msg", msg, "err", err)
+		logger.Error("Failed to add prepare message to round state", "msg", msg, "err", err)
 		return err
 	}
 

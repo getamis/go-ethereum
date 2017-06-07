@@ -34,7 +34,7 @@ import (
 func TestCheckMessage(t *testing.T) {
 	c := &core{
 		state: StateAcceptRequest,
-		current: newSnapshot(&istanbul.View{
+		current: newRoundState(&istanbul.View{
 			Sequence: big.NewInt(1),
 			Round:    big.NewInt(0),
 		}, newTestValidatorSet(4)),
@@ -203,7 +203,7 @@ func TestProcessFutureBacklog(t *testing.T) {
 		backlogs:   make(map[istanbul.Validator]*prque.Prque),
 		backlogsMu: new(sync.Mutex),
 		backend:    backend,
-		current: newSnapshot(&istanbul.View{
+		current: newRoundState(&istanbul.View{
 			Sequence: big.NewInt(1),
 			Round:    big.NewInt(0),
 		}, newTestValidatorSet(4)),
@@ -289,7 +289,7 @@ func testProcessBacklog(t *testing.T, msg *message) {
 		backlogsMu: new(sync.Mutex),
 		backend:    backend,
 		state:      State(msg.Code),
-		current: newSnapshot(&istanbul.View{
+		current: newRoundState(&istanbul.View{
 			Sequence: big.NewInt(1),
 			Round:    big.NewInt(0),
 		}, newTestValidatorSet(4)),
