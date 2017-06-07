@@ -25,8 +25,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-func newSnapshot(view *istanbul.View, validatorSet istanbul.ValidatorSet) *snapshot {
-	return &snapshot{
+func newRoundState(view *istanbul.View, validatorSet istanbul.ValidatorSet) *roundState {
+	return &roundState{
 		round:       view.Round,
 		sequence:    view.Sequence,
 		Preprepare:  nil,
@@ -37,8 +37,8 @@ func newSnapshot(view *istanbul.View, validatorSet istanbul.ValidatorSet) *snaps
 	}
 }
 
-// snapshot stores the consensus state
-type snapshot struct {
+// roundState stores the consensus state
+type roundState struct {
 	round       *big.Int
 	sequence    *big.Int
 	Preprepare  *istanbul.Preprepare
@@ -49,7 +49,7 @@ type snapshot struct {
 	mu *sync.RWMutex
 }
 
-func (s *snapshot) Subject() *istanbul.Subject {
+func (s *roundState) Subject() *istanbul.Subject {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -66,14 +66,14 @@ func (s *snapshot) Subject() *istanbul.Subject {
 	}
 }
 
-func (s *snapshot) SetPreprepare(preprepare *istanbul.Preprepare) {
+func (s *roundState) SetPreprepare(preprepare *istanbul.Preprepare) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.Preprepare = preprepare
 }
 
-func (s *snapshot) Proposal() istanbul.Proposal {
+func (s *roundState) Proposal() istanbul.Proposal {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -84,28 +84,28 @@ func (s *snapshot) Proposal() istanbul.Proposal {
 	return nil
 }
 
-func (s *snapshot) SetRound(r *big.Int) {
+func (s *roundState) SetRound(r *big.Int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.round = new(big.Int).Set(r)
 }
 
-func (s *snapshot) Round() *big.Int {
+func (s *roundState) Round() *big.Int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.round
 }
 
-func (s *snapshot) SetSequence(seq *big.Int) {
+func (s *roundState) SetSequence(seq *big.Int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.sequence = seq
 }
 
-func (s *snapshot) Sequence() *big.Int {
+func (s *roundState) Sequence() *big.Int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -115,7 +115,7 @@ func (s *snapshot) Sequence() *big.Int {
 // The DecodeRLP method should read one value from the given
 // Stream. It is not forbidden to read less or more, but it might
 // be confusing.
-func (s *snapshot) DecodeRLP(stream *rlp.Stream) error {
+func (s *roundState) DecodeRLP(stream *rlp.Stream) error {
 	var ss struct {
 		Round       *big.Int
 		Sequence    *big.Int
@@ -147,7 +147,7 @@ func (s *snapshot) DecodeRLP(stream *rlp.Stream) error {
 // not verified at the moment, but a future version might. It is
 // recommended to write only a single value but writing multiple
 // values or no value at all is also permitted.
-func (s *snapshot) EncodeRLP(w io.Writer) error {
+func (s *roundState) EncodeRLP(w io.Writer) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

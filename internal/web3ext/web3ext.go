@@ -30,7 +30,7 @@ var Modules = map[string]string{
 	"shh":        Shh_JS,
 	"swarmfs":    SWARMFS_JS,
 	"txpool":     TxPool_JS,
-	"istanbul":       Istanbul_JS,
+	"istanbul":   Istanbul_JS,
 }
 
 const Chequebook_JS = `
@@ -693,8 +693,8 @@ web3._extend({
   	methods:
   	[
 		new web3._extend.Method({
-			name: 'snapshot',
-			call: 'istanbul_snapshot',
+			name: 'roundstate',
+			call: 'istanbul_roundstate',
 			params: 0
 		}),
 		new web3._extend.Method({

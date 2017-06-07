@@ -30,8 +30,8 @@ import (
 type Engine interface {
 	Start(lastSequence *big.Int, lastProposer common.Address) error
 	Stop() error
-	// get current state and snapshot
-	Snapshot() (State, *snapshot)
+	// get current state and round state
+	RoundState() (State, *roundState)
 	// get back log
 	Backlog() map[istanbul.Validator]*prque.Prque
 }

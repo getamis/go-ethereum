@@ -73,7 +73,7 @@ type core struct {
 	backlogs   map[istanbul.Validator]*prque.Prque
 	backlogsMu *sync.Mutex
 
-	current *snapshot
+	current *roundState
 
 	roundChangeSet   *roundChangeSet
 	roundChangeTimer *time.Timer
@@ -181,8 +181,8 @@ func (c *core) startNewRound(newView *istanbul.View, roundChange bool) {
 
 	// Clear invalid RoundChange messages
 	c.roundChangeSet.Clear(newView)
-	// New snapshot for new round
-	c.current = newSnapshot(newView, c.backend.Validators())
+	// New round state for new round
+	c.current = newRoundState(newView, c.backend.Validators())
 	// Calculate new proposer
 	c.backend.Validators().CalcProposer(c.proposerSeed())
 	c.waitingForRoundChange = false
@@ -198,7 +198,7 @@ func (c *core) startNewRound(newView *istanbul.View, roundChange bool) {
 func (c *core) catchUpRound(view *istanbul.View) {
 	logger := c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence(), "old_proposer", c.backend.Validators().GetProposer())
 	c.waitingForRoundChange = true
-	c.current = newSnapshot(view, c.backend.Validators())
+	c.current = newRoundState(view, c.backend.Validators())
 	c.newRoundChangeTimer()
 
 	logger.Trace("Catch up round", "new_round", view.Round, "new_seq", view.Sequence, "new_proposer", c.backend.Validators().GetProposer())
@@ -230,7 +230,7 @@ func (c *core) Address() common.Address {
 	return c.address
 }
 
-func (c *core) Snapshot() (State, *snapshot) {
+func (c *core) RoundState() (State, *roundState) {
 	return c.state, c.current
 }
 

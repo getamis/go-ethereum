@@ -22,8 +22,8 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 )
 
-func newTestSnapshot(view *istanbul.View, validatorSet istanbul.ValidatorSet) *snapshot {
-	return &snapshot{
+func newTestRoundState(view *istanbul.View, validatorSet istanbul.ValidatorSet) *roundState {
+	return &roundState{
 		round:       view.Round,
 		sequence:    view.Sequence,
 		Preprepare:  newTestPreprepare(view),

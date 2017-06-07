@@ -30,15 +30,15 @@ type API struct {
 	backend *simpleBackend
 }
 
-// Snapshot returns current state and proposer
-func (api *API) Snapshot() {
-	state, snapshot := api.backend.core.Snapshot()
+// RoundState returns current state and proposer
+func (api *API) RoundState() {
+	state, roundState := api.backend.core.RoundState()
 	p := api.backend.valSet.GetProposer().Address()
-	log.Info("Snapshot", "sequence", snapshot.Sequence, "Round", snapshot.Round,
+	log.Info("RoundState", "sequence", roundState.Sequence, "Round", roundState.Round,
 		"state", state, "proposer", p,
-		"hash", snapshot.Preprepare.Proposal.Hash(),
-		"prepares", snapshot.Prepares, "commits", snapshot.Commits,
-		"checkpoint", snapshot.Checkpoints)
+		"hash", roundState.Preprepare.Proposal.Hash(),
+		"prepares", roundState.Prepares, "commits", roundState.Commits,
+		"checkpoint", roundState.Checkpoints)
 }
 
 // Backlog returns backlogs

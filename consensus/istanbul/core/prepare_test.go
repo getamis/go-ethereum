@@ -51,7 +51,7 @@ func TestHandlePrepare(t *testing.T) {
 
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
-					c.current = newTestSnapshot(
+					c.current = newTestRoundState(
 						&istanbul.View{
 							Round:    big.NewInt(0),
 							Sequence: big.NewInt(1),
@@ -78,13 +78,13 @@ func TestHandlePrepare(t *testing.T) {
 
 					if i == 0 {
 						// replica 0 is primary
-						c.current = newTestSnapshot(
+						c.current = newTestRoundState(
 							expectedSubject.View,
 							backend.Validators(),
 						)
 						c.state = StatePreprepared
 					} else {
-						c.current = newTestSnapshot(
+						c.current = newTestRoundState(
 							&istanbul.View{
 								Round:    big.NewInt(2),
 								Sequence: big.NewInt(3),
@@ -107,13 +107,13 @@ func TestHandlePrepare(t *testing.T) {
 
 					if i == 0 {
 						// replica 0 is primary
-						c.current = newTestSnapshot(
+						c.current = newTestRoundState(
 							expectedSubject.View,
 							backend.Validators(),
 						)
 						c.state = StatePreprepared
 					} else {
-						c.current = newTestSnapshot(
+						c.current = newTestRoundState(
 							&istanbul.View{
 								Round:    big.NewInt(0),
 								Sequence: big.NewInt(0),
@@ -136,13 +136,13 @@ func TestHandlePrepare(t *testing.T) {
 
 					if i == 0 {
 						// replica 0 is primary
-						c.current = newTestSnapshot(
+						c.current = newTestRoundState(
 							expectedSubject.View,
 							backend.Validators(),
 						)
 						c.state = StatePreprepared
 					} else {
-						c.current = newTestSnapshot(
+						c.current = newTestRoundState(
 							&istanbul.View{
 								Round:    big.NewInt(0),
 								Sequence: big.NewInt(1)},
@@ -164,7 +164,7 @@ func TestHandlePrepare(t *testing.T) {
 
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
-					c.current = newTestSnapshot(
+					c.current = newTestRoundState(
 						expectedSubject.View,
 						backend.Validators(),
 					)
@@ -259,8 +259,8 @@ func TestVerifyPrepare(t *testing.T) {
 	testCases := []struct {
 		expected error
 
-		prepare  *istanbul.Subject
-		snapshot *snapshot
+		prepare    *istanbul.Subject
+		roundState *roundState
 	}{
 		{
 			// normal case
@@ -269,7 +269,7 @@ func TestVerifyPrepare(t *testing.T) {
 				View:   &istanbul.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
 				Digest: newTestProposal().Hash(),
 			},
-			snapshot: newTestSnapshot(
+			roundState: newTestRoundState(
 				&istanbul.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
 				valSet,
 			),
@@ -281,7 +281,7 @@ func TestVerifyPrepare(t *testing.T) {
 				View:   &istanbul.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
 				Digest: newTestProposal().Hash(),
 			},
-			snapshot: newTestSnapshot(
+			roundState: newTestRoundState(
 				&istanbul.View{Round: big.NewInt(1), Sequence: big.NewInt(1)},
 				valSet,
 			),
@@ -293,7 +293,7 @@ func TestVerifyPrepare(t *testing.T) {
 				View:   &istanbul.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
 				Digest: common.StringToHash("1234567890"),
 			},
-			snapshot: newTestSnapshot(
+			roundState: newTestRoundState(
 				&istanbul.View{Round: big.NewInt(1), Sequence: big.NewInt(1)},
 				valSet,
 			),
@@ -305,7 +305,7 @@ func TestVerifyPrepare(t *testing.T) {
 				View:   &istanbul.View{Round: big.NewInt(0), Sequence: nil},
 				Digest: newTestProposal().Hash(),
 			},
-			snapshot: newTestSnapshot(
+			roundState: newTestRoundState(
 				&istanbul.View{Round: big.NewInt(1), Sequence: big.NewInt(1)},
 				valSet,
 			),
@@ -317,7 +317,7 @@ func TestVerifyPrepare(t *testing.T) {
 				View:   &istanbul.View{Round: big.NewInt(1), Sequence: big.NewInt(0)},
 				Digest: newTestProposal().Hash(),
 			},
-			snapshot: newTestSnapshot(
+			roundState: newTestRoundState(
 				&istanbul.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
 				valSet,
 			),
@@ -329,7 +329,7 @@ func TestVerifyPrepare(t *testing.T) {
 				View:   &istanbul.View{Round: big.NewInt(0), Sequence: big.NewInt(1)},
 				Digest: newTestProposal().Hash(),
 			},
-			snapshot: newTestSnapshot(
+			roundState: newTestRoundState(
 				&istanbul.View{Round: big.NewInt(0), Sequence: big.NewInt(0)},
 				valSet,
 			),
@@ -337,7 +337,7 @@ func TestVerifyPrepare(t *testing.T) {
 	}
 	for i, test := range testCases {
 		c := sys.backends[0].engine.(*core)
-		c.current = test.snapshot
+		c.current = test.roundState
 
 		if err := c.verifyPrepare(test.prepare, peer); err != nil {
 			if err != test.expected {

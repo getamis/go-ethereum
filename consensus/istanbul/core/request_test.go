@@ -31,7 +31,7 @@ import (
 func TestCheckRequestMsg(t *testing.T) {
 	c := &core{
 		state: StateAcceptRequest,
-		current: newSnapshot(&istanbul.View{
+		current: newRoundState(&istanbul.View{
 			Sequence: big.NewInt(1),
 			Round:    big.NewInt(0),
 		}, newTestValidatorSet(4)),
@@ -86,7 +86,7 @@ func TestStoreRequestMsg(t *testing.T) {
 		logger:  log.New("backend", "test", "id", 0),
 		backend: backend,
 		state:   StateAcceptRequest,
-		current: newSnapshot(&istanbul.View{
+		current: newRoundState(&istanbul.View{
 			Sequence: big.NewInt(0),
 			Round:    big.NewInt(0),
 		}, newTestValidatorSet(4)),
