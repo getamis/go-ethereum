@@ -17,6 +17,7 @@
 package core
 
 import (
+	"bytes"
 	"math"
 	"math/big"
 	"sync"
@@ -103,7 +104,8 @@ func (c *core) finalizeMessage(msg *message) ([]byte, error) {
 	msg.ProposalSeal = []byte{}
 	// A sanity check
 	if c.current.Proposal() != nil {
-		msg.ProposalSeal, err = c.backend.Sign(c.current.Proposal().Hash().Bytes())
+		seal := prepareProposalSeal(c.current.Proposal().Hash(), msg.Code)
+		msg.ProposalSeal, err = c.backend.Sign(seal)
 		if err != nil {
 			return nil, err
 		}
@@ -274,4 +276,17 @@ func (c *core) newRoundChangeTimer() {
 
 func (c *core) checkValidatorSignature(data []byte, sig []byte) (common.Address, error) {
 	return istanbul.CheckValidatorSignature(c.valSet, data, sig)
+}
+
+// prepareProposalSeal returns a slice from the given hash, and msgCode. Replaces msgCode
+// with msgPreprepare if msgCode is lager than uint8.
+func prepareProposalSeal(hash common.Hash, msgCode uint64) []byte {
+	// a sanity check
+	if msgCode > math.MaxUint8 {
+		msgCode = msgPreprepare
+	}
+	var buf bytes.Buffer
+	buf.Write(hash.Bytes())
+	buf.Write([]byte{byte(msgCode)})
+	return buf.Bytes()
 }
