@@ -184,7 +184,7 @@ func (c *core) startNewRound(newView *istanbul.View, roundChange bool) {
 	// New round state for new round
 	c.current = newRoundState(newView, c.backend.Validators())
 	// Calculate new proposer
-	c.backend.Validators().CalcProposer(c.proposerSeed())
+	c.backend.Validators().CalcProposer(c.lastProposer, newView.Round.Uint64())
 	c.waitingForRoundChange = false
 	c.setState(StateAcceptRequest)
 	if roundChange && c.isPrimary() {
@@ -202,18 +202,6 @@ func (c *core) catchUpRound(view *istanbul.View) {
 	c.newRoundChangeTimer()
 
 	logger.Trace("Catch up round", "new_round", view.Round, "new_seq", view.Sequence, "new_proposer", c.backend.Validators().GetProposer())
-}
-
-func (c *core) proposerSeed() uint64 {
-	emptyAddr := common.Address{}
-	if c.lastProposer == emptyAddr {
-		return c.current.Round().Uint64()
-	}
-	offset := 0
-	if idx, val := c.backend.Validators().GetByAddress(c.lastProposer); val != nil {
-		offset = idx
-	}
-	return uint64(offset) + c.current.Round().Uint64() + 1
 }
 
 func (c *core) setState(state State) {
