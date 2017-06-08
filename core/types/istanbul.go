@@ -28,9 +28,9 @@ var (
 	// The IstanbulDigest represents a constant of "Istanbul practical byzantine fault tolerance".
 	IstanbulDigest = common.HexToHash("0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365")
 
-	IstanbulExtraVanity        = int(params.MaximumExtraDataSize) // Fixed number of extra-data bytes reserved for signer vanity
+	IstanbulExtraVanity        = int(params.MaximumExtraDataSize) // Fixed number of extra-data bytes reserved for validator vanity
 	IstanbulExtraValidatorSize = 1                                // Fixed number of extra-data bytes reserved for validator size
-	IstanbulExtraSeal          = 65                               // Fixed number of extra-data bytes reserved for signer seal
+	IstanbulExtraSeal          = 65                               // Fixed number of extra-data bytes reserved for validator seal
 	IstanbulExtraCommittedSize = 1                                // Fixed number of extra-data bytes reserved for committed size
 
 	ErrInvalidIstanbulHeaderExtra   = fmt.Errorf("Invalid istanbul header extra-data")
@@ -193,15 +193,15 @@ func ensureValidIstanbulExtra(h *Header) *Header {
 	return newHeader
 }
 
-// AppendIstanbulCommittedSealExtra updates header signatures that store consensus proof
-func AppendIstanbulCommittedSealExtra(b *Block, committedSeal []byte) error {
+// AppendIstanbulCommittedSealExtra append committed seals that store consensus proof
+func AppendIstanbulCommittedSealExtra(b *Block, seals []byte) error {
 	// sanity check
-	if len(committedSeal)%IstanbulExtraSeal != 0 {
+	if len(seals)%IstanbulExtraSeal != 0 {
 		return ErrInvalidIstanbulCommittedSeal
 	}
-	size := len(committedSeal) / IstanbulExtraSeal
+	size := len(seals) / IstanbulExtraSeal
 	b.header.Extra = append(b.header.Extra, byte(size))
-	b.header.Extra = append(b.header.Extra, committedSeal...)
+	b.header.Extra = append(b.header.Extra, seals...)
 	return nil
 }
 

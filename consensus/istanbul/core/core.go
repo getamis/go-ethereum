@@ -95,8 +95,19 @@ type core struct {
 }
 
 func (c *core) finalizeMessage(msg *message) ([]byte, error) {
+	var err error
 	// Add sender address
 	msg.Address = c.Address()
+
+	// Add proof of consensus
+	msg.ProposalSeal = []byte{}
+	// A sanity check
+	if c.current.Proposal() != nil {
+		msg.ProposalSeal, err = c.backend.Sign(c.current.Proposal().Hash().Bytes())
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// Sign message
 	data, err := msg.PayloadNoSig()
@@ -178,7 +189,7 @@ func (c *core) commit() {
 	if proposal != nil {
 		var signatures []byte
 		for _, v := range c.current.Commits.Values() {
-			signatures = append(signatures, v.Signature...)
+			signatures = append(signatures, v.ProposalSeal...)
 		}
 
 		if err := c.backend.Commit(proposal, signatures); err != nil {
