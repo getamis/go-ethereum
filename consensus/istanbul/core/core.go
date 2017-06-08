@@ -26,6 +26,8 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	metrics "github.com/ethereum/go-ethereum/metrics"
+	goMetrics "github.com/rcrowley/go-metrics"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
@@ -35,15 +37,19 @@ const (
 
 func New(backend istanbul.Backend, config *istanbul.Config) Engine {
 	c := &core{
-		config:            config,
-		address:           backend.Address(),
-		state:             StateAcceptRequest,
-		logger:            log.New("address", backend.Address()),
-		backend:           backend,
-		backlogs:          make(map[istanbul.Validator]*prque.Prque),
-		backlogsMu:        new(sync.Mutex),
-		pendingRequests:   prque.New(),
-		pendingRequestsMu: new(sync.Mutex),
+		config:             config,
+		address:            backend.Address(),
+		state:              StateAcceptRequest,
+		logger:             log.New("address", backend.Address()),
+		backend:            backend,
+		backlogs:           make(map[istanbul.Validator]*prque.Prque),
+		backlogsMu:         new(sync.Mutex),
+		pendingRequests:    prque.New(),
+		pendingRequestsMu:  new(sync.Mutex),
+		consensusTimestamp: time.Time{},
+		roundMeter:         metrics.NewMeter("consensus/istanbul/core/round"),
+		sequenceMeter:      metrics.NewMeter("consensus/istanbul/core/sequence"),
+		consensusTimer:     metrics.NewTimer("consensus/istanbul/core/consensus"),
 	}
 	c.validateFn = c.checkValidatorSignature
 	return c
@@ -78,6 +84,14 @@ type core struct {
 
 	pendingRequests   *prque.Prque
 	pendingRequestsMu *sync.Mutex
+
+	consensusTimestamp time.Time
+	// the meter to record the round change rate
+	roundMeter goMetrics.Meter
+	// the meter to record the sequence update rate
+	sequenceMeter goMetrics.Meter
+	// the timer to record consensus duration (from accepting a preprepare to final committed stage)
+	consensusTimer goMetrics.Timer
 }
 
 func (c *core) finalizeMessage(msg *message) ([]byte, error) {
@@ -198,6 +212,10 @@ func (c *core) startNewRound(newView *istanbul.View, roundChange bool) {
 
 func (c *core) catchUpRound(view *istanbul.View) {
 	logger := c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence(), "old_proposer", c.valSet.GetProposer())
+
+	if view.Round.Cmp(c.current.Round()) > 0 {
+		c.roundMeter.Mark(new(big.Int).Sub(view.Round, c.current.Round()).Int64())
+	}
 	c.waitingForRoundChange = true
 	c.current = newRoundState(view, c.valSet)
 	c.newRoundChangeTimer()

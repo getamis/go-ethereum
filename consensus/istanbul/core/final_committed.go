@@ -18,6 +18,7 @@ package core
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
@@ -29,7 +30,15 @@ func (c *core) handleFinalCommitted(proposal istanbul.Proposal, proposer common.
 
 	// Catch up the sequence number
 	if proposal.Number().Cmp(c.current.Sequence()) >= 0 {
-		// Remember to store the proposer since we've accpeted the proposal
+		// Remember to store the proposer since we've accpetted the proposal
+		diff := new(big.Int).Sub(proposal.Number(), c.current.Sequence())
+		c.sequenceMeter.Mark(new(big.Int).Add(diff, common.Big1).Int64())
+
+		if !c.consensusTimestamp.IsZero() {
+			c.consensusTimer.UpdateSince(c.consensusTimestamp)
+			c.consensusTimestamp = time.Time{}
+		}
+
 		c.lastProposer = proposer
 		c.lastProposal = proposal
 		c.startNewRound(&istanbul.View{
