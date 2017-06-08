@@ -99,15 +99,14 @@ func (sb *simpleBackend) Author(header *types.Header) (common.Address, error) {
 // given engine. Verifying the seal may be done optionally here, or explicitly
 // via the VerifySeal method.
 func (sb *simpleBackend) VerifyHeader(chain consensus.ChainReader, header *types.Header, seal bool) error {
-	number := header.Number.Uint64()
-	return sb.verifyHeader(chain, header, chain.GetHeader(header.ParentHash, number-1))
+	return sb.verifyHeader(chain, header, nil)
 }
 
 // verifyHeader checks whether a header conforms to the consensus rules.The
 // caller may optionally pass in a batch of parents (ascending order) to avoid
 // looking those up from the database. This is useful for concurrently verifying
 // a batch of new headers.
-func (sb *simpleBackend) verifyHeader(chain consensus.ChainReader, header *types.Header, parent *types.Header) error {
+func (sb *simpleBackend) verifyHeader(chain consensus.ChainReader, header *types.Header, parents []*types.Header) error {
 	if header.Number == nil {
 		return errUnknownBlock
 	}
@@ -122,7 +121,7 @@ func (sb *simpleBackend) verifyHeader(chain consensus.ChainReader, header *types
 		return errInvalidExtraDataFormat
 	}
 
-	// Ensure that the coinbase is zero
+	// Ensure that the coinbase is valid
 	if header.Nonce != (emptyNonce) && !bytes.Equal(header.Nonce[:], nonceAuthVote) && !bytes.Equal(header.Nonce[:], nonceDropVote) {
 		return errInvalidNonce
 	}
@@ -139,28 +138,34 @@ func (sb *simpleBackend) verifyHeader(chain consensus.ChainReader, header *types
 		return errInvalidDifficulty
 	}
 
-	return sb.verifyCascadingFields(chain, header, parent)
+	return sb.verifyCascadingFields(chain, header, parents)
 }
 
 // verifyCascadingFields verifies all the header fields that are not standalone,
 // rather depend on a batch of previous headers. The caller may optionally pass
 // in a batch of parents (ascending order) to avoid looking those up from the
 // database. This is useful for concurrently verifying a batch of new headers.
-func (sb *simpleBackend) verifyCascadingFields(chain consensus.ChainReader, header *types.Header, parent *types.Header) error {
+func (sb *simpleBackend) verifyCascadingFields(chain consensus.ChainReader, header *types.Header, parents []*types.Header) error {
 	// The genesis block is the always valid dead-end
 	number := header.Number.Uint64()
 	if number == 0 {
 		return nil
 	}
 	// Ensure that the block's timestamp isn't too close to it's parent
+	var parent *types.Header
+	if len(parents) > 0 {
+		parent = parents[len(parents)-1]
+	} else {
+		parent = chain.GetHeader(header.ParentHash, number-1)
+	}
 	if parent == nil || parent.Number.Uint64() != number-1 || parent.Hash() != header.ParentHash {
 		return consensus.ErrUnknownAncestor
 	}
 	if parent.Time.Uint64()+sb.config.BlockPeriod > header.Time.Uint64() {
 		return errInvalidTimestamp
 	}
-	// Retrieve the snapshot needed to verify this header and cache it
-	snap, err := sb.snapshot(chain, number-1, header.ParentHash, []*types.Header{parent})
+	// Verify validators in extraData. Validators in snapshot and extraData should be the same.
+	snap, err := sb.snapshot(chain, number-1, header.ParentHash, parents)
 	if err != nil {
 		return err
 	}
@@ -172,7 +177,7 @@ func (sb *simpleBackend) verifyCascadingFields(chain consensus.ChainReader, head
 	if !bytes.Equal(header.Extra[types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize:extraSuffix], validators) {
 		return errInvalidExtraDataFormat
 	}
-	return sb.verifySigner(chain, header, parent)
+	return sb.verifySigner(chain, header, parents)
 }
 
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers
@@ -184,13 +189,7 @@ func (sb *simpleBackend) VerifyHeaders(chain consensus.ChainReader, headers []*t
 	results := make(chan error, len(headers))
 	go func() {
 		for i, header := range headers {
-			var err error
-			if i == 0 {
-				err = sb.VerifyHeader(chain, header, false)
-			} else {
-				// The headers are ordered, and the parent header is the previous one.
-				err = sb.verifyHeader(chain, header, headers[i-1])
-			}
+			err := sb.verifyHeader(chain, header, headers[:i])
 
 			select {
 			case <-abort:
@@ -212,7 +211,7 @@ func (sb *simpleBackend) VerifyUncles(chain consensus.ChainReader, block *types.
 }
 
 // verifySigner checks whether the signer is in parent's validator set
-func (sb *simpleBackend) verifySigner(chain consensus.ChainReader, header *types.Header, parent *types.Header) error {
+func (sb *simpleBackend) verifySigner(chain consensus.ChainReader, header *types.Header, parents []*types.Header) error {
 	// Verifying the genesis block is not supported
 	number := header.Number.Uint64()
 	if number == 0 {
@@ -220,7 +219,7 @@ func (sb *simpleBackend) verifySigner(chain consensus.ChainReader, header *types
 	}
 
 	// Retrieve the snapshot needed to verify this header and cache it
-	snap, err := sb.snapshot(chain, number-1, header.ParentHash, []*types.Header{parent})
+	snap, err := sb.snapshot(chain, number-1, header.ParentHash, parents)
 	if err != nil {
 		return err
 	}
@@ -231,6 +230,7 @@ func (sb *simpleBackend) verifySigner(chain consensus.ChainReader, header *types
 		return err
 	}
 
+	// Signer should be in the validator set of previous block's extraData.
 	if _, v := snap.ValSet.GetByAddress(signer); v == nil {
 		return errUnauthorized
 	}
@@ -250,12 +250,7 @@ func (sb *simpleBackend) VerifySeal(chain consensus.ChainReader, header *types.H
 	if header.Difficulty.Cmp(defaultDifficulty) != 0 {
 		return errInvalidDifficulty
 	}
-
-	parent := chain.GetHeader(header.ParentHash, number-1)
-	if parent == nil {
-		return consensus.ErrUnknownAncestor
-	}
-	return sb.verifySigner(chain, header, parent)
+	return sb.verifySigner(chain, header, nil)
 }
 
 // Prepare initializes the consensus fields of a block header according to the
@@ -296,9 +291,10 @@ func (sb *simpleBackend) Prepare(chain consensus.ChainReader, header *types.Head
 	}
 	sb.candidatesLock.RUnlock()
 
-	// choose one candidate
+	// pick one of the candidates randomly
 	if len(addresses) > 0 {
 		index := rand.Intn(len(addresses))
+		// add validator voting in coinbase
 		header.Coinbase = addresses[index]
 		if authorizes[index] {
 			copy(header.Nonce[:], nonceAuthVote)
@@ -307,7 +303,7 @@ func (sb *simpleBackend) Prepare(chain consensus.ChainReader, header *types.Head
 		}
 	}
 
-	// Ensure the extra data has all it's components
+	// add validators in snapshot to extraData's validators section
 	size := snap.ValSet.Size()
 	expectedSize := types.IstanbulExtraVanity + types.IstanbulExtraValidatorSize + size*common.AddressLength + types.IstanbulExtraSeal
 	if len(header.Extra) < expectedSize {

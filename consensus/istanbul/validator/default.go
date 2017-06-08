@@ -42,7 +42,7 @@ func (val *defaultValidator) String() string {
 type defaultSet struct {
 	validators  istanbul.Validators
 	proposer    istanbul.Validator
-	validatorMu sync.Mutex
+	validatorMu sync.RWMutex
 
 	selector istanbul.ProposalSelector
 }
@@ -67,10 +67,21 @@ func newDefaultSet(addrs []common.Address, selector istanbul.ProposalSelector) *
 	return valSet
 }
 
-func (valSet *defaultSet) Size() int                  { return len(valSet.validators) }
-func (valSet *defaultSet) List() []istanbul.Validator { return valSet.validators }
+func (valSet *defaultSet) Size() int {
+	valSet.validatorMu.RLock()
+	defer valSet.validatorMu.RUnlock()
+	return len(valSet.validators)
+}
+
+func (valSet *defaultSet) List() []istanbul.Validator {
+	valSet.validatorMu.RLock()
+	defer valSet.validatorMu.RUnlock()
+	return valSet.validators
+}
 
 func (valSet *defaultSet) GetByIndex(i uint64) istanbul.Validator {
+	valSet.validatorMu.RLock()
+	defer valSet.validatorMu.RUnlock()
 	if i < uint64(valSet.Size()) {
 		return valSet.validators[i]
 	}
@@ -96,6 +107,8 @@ func (valSet *defaultSet) IsProposer(address common.Address) bool {
 }
 
 func (valSet *defaultSet) CalcProposer(lastProposer common.Address, round uint64) {
+	valSet.validatorMu.RLock()
+	defer valSet.validatorMu.RUnlock()
 	valSet.proposer = valSet.selector(valSet, lastProposer, round)
 }
 
