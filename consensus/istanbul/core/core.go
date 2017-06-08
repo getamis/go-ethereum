@@ -290,3 +290,8 @@ func prepareProposalSeal(hash common.Hash, msgCode uint64) []byte {
 	buf.Write([]byte{byte(msgCode)})
 	return buf.Bytes()
 }
+
+// PrepareCommittedSeal returns a slice from the given hash.
+func PrepareCommittedSeal(hash common.Hash) []byte {
+	return prepareProposalSeal(hash, msgCommit)
+}

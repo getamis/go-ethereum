@@ -178,7 +178,13 @@ func (sb *simpleBackend) Verify(proposal istanbul.Proposal) error {
 		return errInvalidProposal
 	}
 	// verify the header of proposed block
-	return sb.VerifyHeader(sb.chain, block.Header(), false)
+	if err := sb.VerifyHeader(sb.chain, block.Header(), false); err != nil {
+		if err == errEmptyCommittedSeals {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 // Sign implements istanbul.Backend.Sign

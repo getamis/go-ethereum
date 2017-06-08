@@ -21,6 +21,8 @@ import (
 	"sort"
 	"sync"
 
+	"math"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 )
@@ -190,3 +192,5 @@ func (valSet *defaultSet) Copy() istanbul.ValidatorSet {
 	}
 	return newDefaultSet(addresses, valSet.selector)
 }
+
+func (valSet *defaultSet) F() int { return int(math.Ceil(float64(valSet.Size())/3)) - 1 }
