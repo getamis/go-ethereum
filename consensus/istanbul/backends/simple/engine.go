@@ -278,27 +278,36 @@ func (sb *simpleBackend) Prepare(chain consensus.ChainReader, header *types.Head
 	// use the same difficulty for all blocks
 	header.Difficulty = defaultDifficulty
 
-	// choose one candidate
+	// Assemble the voting snapshot
+	snap, err := sb.snapshot(chain, number-1, header.ParentHash, nil)
+	if err != nil {
+		return err
+	}
+
+	// get valid candidate list
 	sb.candidatesLock.RLock()
-	if len(sb.candidates) > 0 {
-		addresses := make([]common.Address, 0, len(sb.candidates))
-		for address := range sb.candidates {
+	var addresses []common.Address
+	var authorizes []bool
+	for address, authorize := range sb.candidates {
+		if snap.checkVote(address, authorize) {
 			addresses = append(addresses, address)
+			authorizes = append(authorizes, authorize)
 		}
-		header.Coinbase = addresses[rand.Intn(len(addresses))]
-		if sb.candidates[header.Coinbase] {
+	}
+	sb.candidatesLock.RUnlock()
+
+	// choose one candidate
+	if len(addresses) > 0 {
+		index := rand.Intn(len(addresses))
+		header.Coinbase = addresses[index]
+		if authorizes[index] {
 			copy(header.Nonce[:], nonceAuthVote)
 		} else {
 			copy(header.Nonce[:], nonceDropVote)
 		}
 	}
-	sb.candidatesLock.RUnlock()
 
 	// Ensure the extra data has all it's components
-	snap, err := sb.snapshot(chain, number-1, header.ParentHash, nil)
-	if err != nil {
-		return err
-	}
 	size := snap.ValSet.Size()
 	expectedSize := types.IstanbulExtraVanity + types.IstanbulExtraValidatorSize + size*common.AddressLength + types.IstanbulExtraSeal
 	if len(header.Extra) < expectedSize {

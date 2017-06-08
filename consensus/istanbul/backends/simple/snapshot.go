@@ -114,11 +114,16 @@ func (s *Snapshot) copy() *Snapshot {
 	return cpy
 }
 
+// checkVote return whether it's a valid vote
+func (s *Snapshot) checkVote(address common.Address, authorize bool) bool {
+	_, validator := s.ValSet.GetByAddress(address)
+	return (validator != nil && !authorize) || (validator == nil && authorize)
+}
+
 // cast adds a new vote into the tally.
 func (s *Snapshot) cast(address common.Address, authorize bool) bool {
 	// Ensure the vote is meaningful
-	_, validator := s.ValSet.GetByAddress(address)
-	if (validator != nil && authorize) || (validator == nil && !authorize) {
+	if !s.checkVote(address, authorize) {
 		return false
 	}
 	// Cast the vote into an existing or new tally
