@@ -162,10 +162,11 @@ OUTER:
 			)
 			m, _ := Encode(c.current.Subject())
 			if err := r0.handleCommit(&message{
-				Code:      msgPrepare,
-				Msg:       m,
-				Address:   validator.Address(),
-				Signature: validator.Address().Bytes(), // small hack
+				Code:         msgPrepare,
+				Msg:          m,
+				Address:      validator.Address(),
+				Signature:    []byte{},
+				ProposalSeal: validator.Address().Bytes(), // small hack
 			}, validator); err != nil {
 				if err != test.expectedErr {
 					t.Error("unexpected error: ", err)
@@ -194,9 +195,9 @@ OUTER:
 
 		// check signatures large than 2F+1
 		signedCount := int64(0)
-		signers := make([]common.Address, len(v0.commitSigs[0])/common.AddressLength)
+		signers := make([]common.Address, len(v0.committedSeals[0])/common.AddressLength)
 		for i := 0; i < len(signers); i++ {
-			copy(signers[i][:], v0.commitSigs[0][i*common.AddressLength:])
+			copy(signers[i][:], v0.committedSeals[0][i*common.AddressLength:])
 		}
 		for _, validator := range r0.valSet.List() {
 			for _, signer := range signers {
