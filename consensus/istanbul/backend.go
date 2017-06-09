@@ -58,14 +58,4 @@ type Backend interface {
 	// If the verification succeeds, the signer's address is returned, otherwise
 	// an empty address and an error are returned.
 	CheckValidatorSignature(data []byte, sig []byte) (common.Address, error)
-
-	Persistence
-}
-
-// Persistence provides persistence data storage for Istanbul core
-type Persistence interface {
-	// Save an object into database
-	Save(key string, val interface{}) error
-	// Restore an object to val from database
-	Restore(key string, val interface{}) error
 }

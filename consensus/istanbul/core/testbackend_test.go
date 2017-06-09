@@ -27,7 +27,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	elog "github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 var testLogger = elog.New()
@@ -123,28 +122,6 @@ func (self *testSystemBackend) NewRequest(request istanbul.Proposal) {
 	go self.events.Post(istanbul.RequestEvent{
 		Proposal: request,
 	})
-}
-
-// ==============================================
-//
-// define the struct that need to be provided for DB manager.
-
-// Save an object into db
-func (self *testSystemBackend) Save(key string, val interface{}) error {
-	blob, err := rlp.EncodeToBytes(val)
-	if err != nil {
-		return err
-	}
-	return self.db.Put([]byte(key), blob)
-}
-
-// Restore an object to val from db
-func (self *testSystemBackend) Restore(key string, val interface{}) error {
-	blob, err := self.db.Get([]byte(key))
-	if err != nil {
-		return err
-	}
-	return rlp.DecodeBytes(blob, val)
 }
 
 // ==============================================
