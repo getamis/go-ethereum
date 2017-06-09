@@ -30,7 +30,8 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
-	istanbul "github.com/ethereum/go-ethereum/consensus/istanbul/backends/simple"
+	"github.com/ethereum/go-ethereum/consensus/istanbul"
+	istanbulBackend "github.com/ethereum/go-ethereum/consensus/istanbul/backends/simple"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -224,7 +225,8 @@ func CreateConsensusEngine(ctx *node.ServiceContext, config *Config, chainConfig
 		if chainConfig.Istanbul.Epoch != 0 {
 			config.Istanbul.Epoch = chainConfig.Istanbul.Epoch
 		}
-		return istanbul.New(&config.Istanbul, ctx.EventMux, ctx.NodeKey(), db)
+		config.Istanbul.ProposerPolicy = istanbul.ProposerPolicy(chainConfig.Istanbul.ProposerPolicy)
+		return istanbulBackend.New(&config.Istanbul, ctx.EventMux, ctx.NodeKey(), db)
 	}
 
 	// Otherwise assume proof-of-work
