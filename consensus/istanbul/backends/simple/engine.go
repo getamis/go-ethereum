@@ -57,8 +57,6 @@ var (
 	errUnauthorized = errors.New("unauthorized")
 	// errInvalidDifficulty is returned if the difficulty of a block is not 1
 	errInvalidDifficulty = errors.New("invalid difficulty")
-	// errInvalidPeer is returned when a message from invalid peer comes
-	errInvalidPeer = errors.New("invalid peer")
 	// errInvalidExtraDataFormat is returned when the extra data format is incorrect
 	errInvalidExtraDataFormat = errors.New("invalid extra data format")
 	// errInvalidMixDigest is returned if a block's mix digest is non zero.
@@ -444,7 +442,7 @@ func (sb *simpleBackend) HandleMsg(pubKey *ecdsa.PublicKey, data []byte) error {
 
 	if _, val := snap.ValSet.GetByAddress(addr); val == nil {
 		sb.logger.Error("Not in validator set", "peerAddr", addr)
-		return errInvalidPeer
+		return istanbul.ErrUnauthorizedAddress
 	}
 
 	go sb.istanbulEventMux.Post(istanbul.MessageEvent{
