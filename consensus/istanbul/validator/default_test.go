@@ -135,7 +135,7 @@ func testEmptyValSet(t *testing.T) {
 }
 
 func testAddAndRemoveValidator(t *testing.T) {
-	valSet := NewSet(ExtractValidators([]byte{}))
+	valSet := NewSet(ExtractValidators([]byte{}), istanbul.RoundRobin)
 	if !valSet.AddValidator(common.StringToAddress(string(2))) {
 		t.Error("validator should be added")
 	}

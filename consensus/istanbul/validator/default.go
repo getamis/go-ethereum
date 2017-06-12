@@ -184,7 +184,7 @@ func (valSet *defaultSet) Copy() istanbul.ValidatorSet {
 	valSet.validatorMu.Lock()
 	defer valSet.validatorMu.Unlock()
 
-	addresses := make([]common.Address, 0, valSet.Size())
+	addresses := make([]common.Address, 0, len(valSet.validators))
 	for _, v := range valSet.validators {
 		addresses = append(addresses, v.Address())
 	}
