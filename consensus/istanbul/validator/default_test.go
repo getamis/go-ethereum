@@ -35,6 +35,7 @@ func TestValidatorSet(t *testing.T) {
 	testNewValidatorSet(t)
 	testNormalValSet(t)
 	testEmptyValSet(t)
+	testStickyProposer(t)
 }
 
 func testNewValidatorSet(t *testing.T) {
@@ -52,7 +53,7 @@ func testNewValidatorSet(t *testing.T) {
 	}
 
 	// Create ValidatorSet
-	valSet := NewSet(ExtractValidators(b))
+	valSet := NewSet(ExtractValidators(b), istanbul.RoundRobin)
 	if valSet == nil {
 		t.Errorf("Cannot parse the validator byte array")
 		t.FailNow()
@@ -76,7 +77,7 @@ func testNormalValSet(t *testing.T) {
 	val1 := New(addr1)
 	val2 := New(addr2)
 
-	valSet := NewSet(ExtractValidators(append(b1, b2...)))
+	valSet := newDefaultSet([]common.Address{addr1, addr2}, roundRobinProposer)
 	if valSet == nil {
 		t.Errorf("invalid validator set format")
 		t.FailNow()
@@ -108,15 +109,59 @@ func testNormalValSet(t *testing.T) {
 		t.Errorf("get wrong proposer, got: %v, expected: %v", val, val1)
 	}
 	// test calculate proposer
-	valSet.CalcProposer(uint64(3))
+	lastProposer := addr1
+	valSet.CalcProposer(lastProposer, uint64(0))
+	if val := valSet.GetProposer(); !reflect.DeepEqual(val, val2) {
+		t.Errorf("get wrong proposer, got: %v, expected: %v", val, val2)
+	}
+	valSet.CalcProposer(lastProposer, uint64(3))
+	if val := valSet.GetProposer(); !reflect.DeepEqual(val, val1) {
+		t.Errorf("get wrong proposer, got: %v, expected: %v", val, val1)
+	}
+	// test empty last proposer
+	lastProposer = common.Address{}
+	valSet.CalcProposer(lastProposer, uint64(3))
 	if val := valSet.GetProposer(); !reflect.DeepEqual(val, val2) {
 		t.Errorf("get wrong proposer, got: %v, expected: %v", val, val2)
 	}
 }
 
 func testEmptyValSet(t *testing.T) {
-	valSet := NewSet(ExtractValidators([]byte{}))
+	valSet := NewSet(ExtractValidators([]byte{}), istanbul.RoundRobin)
 	if valSet != nil {
 		t.Errorf("validator set should be nil")
+	}
+}
+
+func testStickyProposer(t *testing.T) {
+	b1 := common.Hex2Bytes(testAddress)
+	b2 := common.Hex2Bytes(testAddress2)
+	addr1 := common.BytesToAddress(b1)
+	addr2 := common.BytesToAddress(b2)
+	val1 := New(addr1)
+	val2 := New(addr2)
+
+	valSet := newDefaultSet([]common.Address{addr1, addr2}, stickyProposer)
+
+	// test get proposer
+	if val := valSet.GetProposer(); !reflect.DeepEqual(val, val1) {
+		t.Errorf("get wrong proposer, got: %v, expected: %v", val, val1)
+	}
+	// test calculate proposer
+	lastProposer := addr1
+	valSet.CalcProposer(lastProposer, uint64(0))
+	if val := valSet.GetProposer(); !reflect.DeepEqual(val, val1) {
+		t.Errorf("get wrong proposer, got: %v, expected: %v", val, val1)
+	}
+
+	valSet.CalcProposer(lastProposer, uint64(1))
+	if val := valSet.GetProposer(); !reflect.DeepEqual(val, val2) {
+		t.Errorf("get wrong proposer, got: %v, expected: %v", val, val2)
+	}
+	// test empty last proposer
+	lastProposer = common.Address{}
+	valSet.CalcProposer(lastProposer, uint64(3))
+	if val := valSet.GetProposer(); !reflect.DeepEqual(val, val2) {
+		t.Errorf("get wrong proposer, got: %v, expected: %v", val, val2)
 	}
 }

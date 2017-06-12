@@ -19,27 +19,10 @@ package validator
 import (
 	"reflect"
 	"sort"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 )
-
-type Validators []istanbul.Validator
-
-func (slice Validators) Len() int {
-	return len(slice)
-}
-
-func (slice Validators) Less(i, j int) bool {
-	return strings.Compare(slice[i].String(), slice[j].String()) < 0
-}
-
-func (slice Validators) Swap(i, j int) {
-	slice[i], slice[j] = slice[j], slice[i]
-}
-
-// ----------------------------------------------------------------------------
 
 type defaultValidator struct {
 	address common.Address
@@ -56,11 +39,13 @@ func (val *defaultValidator) String() string {
 // ----------------------------------------------------------------------------
 
 type defaultSet struct {
-	validators Validators
+	validators istanbul.Validators
 	proposer   istanbul.Validator
+
+	selector istanbul.ProposalSelector
 }
 
-func newDefaultSet(addrs []common.Address) *defaultSet {
+func newDefaultSet(addrs []common.Address, selector istanbul.ProposalSelector) *defaultSet {
 	valSet := &defaultSet{}
 
 	// init validators
@@ -71,12 +56,16 @@ func newDefaultSet(addrs []common.Address) *defaultSet {
 	// sort validator
 	sort.Sort(valSet.validators)
 	// init proposer
-	valSet.CalcProposer(0)
+	if valSet.Size() > 0 {
+		valSet.proposer = valSet.GetByIndex(0)
+	}
+	//set proposal selector
+	valSet.selector = selector
 
 	return valSet
 }
 
-func (valSet *defaultSet) Size() int              { return len(valSet.validators) }
+func (valSet *defaultSet) Size() int                  { return len(valSet.validators) }
 func (valSet *defaultSet) List() []istanbul.Validator { return valSet.validators }
 
 func (valSet *defaultSet) GetByIndex(i uint64) istanbul.Validator {
@@ -104,9 +93,46 @@ func (valSet *defaultSet) IsProposer(address common.Address) bool {
 	return reflect.DeepEqual(valSet.GetProposer(), val)
 }
 
-func (valSet *defaultSet) CalcProposer(seed uint64) {
-	if valSet.Size() != 0 {
-		pick := seed % uint64(valSet.Size())
-		valSet.proposer = valSet.validators[pick]
+func (valSet *defaultSet) CalcProposer(lastProposer common.Address, round uint64) {
+	valSet.proposer = valSet.selector(valSet, lastProposer, round)
+}
+
+func calcSeed(valSet istanbul.ValidatorSet, proposer common.Address, round uint64) uint64 {
+	offset := 0
+	if idx, val := valSet.GetByAddress(proposer); val != nil {
+		offset = idx
 	}
+	return uint64(offset) + round
+}
+
+func emptyAddress(addr common.Address) bool {
+	return addr == common.Address{}
+}
+
+func roundRobinProposer(valSet istanbul.ValidatorSet, proposer common.Address, round uint64) istanbul.Validator {
+	if valSet.Size() == 0 {
+		return nil
+	}
+	seed := uint64(0)
+	if emptyAddress(proposer) {
+		seed = round
+	} else {
+		seed = calcSeed(valSet, proposer, round) + 1
+	}
+	pick := seed % uint64(valSet.Size())
+	return valSet.GetByIndex(pick)
+}
+
+func stickyProposer(valSet istanbul.ValidatorSet, proposer common.Address, round uint64) istanbul.Validator {
+	if valSet.Size() == 0 {
+		return nil
+	}
+	seed := uint64(0)
+	if emptyAddress(proposer) {
+		seed = round
+	} else {
+		seed = calcSeed(valSet, proposer, round)
+	}
+	pick := seed % uint64(valSet.Size())
+	return valSet.GetByIndex(pick)
 }

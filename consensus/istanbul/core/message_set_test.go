@@ -27,7 +27,6 @@ import (
 
 func TestMessageSetWithPreprepare(t *testing.T) {
 	valSet := newTestValidatorSet(4)
-	valSet.CalcProposer(0)
 
 	ms := newMessageSet(valSet)
 
@@ -67,7 +66,6 @@ func TestMessageSetWithPreprepare(t *testing.T) {
 
 func TestMessageSetWithSubject(t *testing.T) {
 	valSet := newTestValidatorSet(4)
-	valSet.CalcProposer(0)
 
 	ms := newMessageSet(valSet)
 

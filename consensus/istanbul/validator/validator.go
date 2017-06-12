@@ -27,11 +27,19 @@ func New(addr common.Address) istanbul.Validator {
 	}
 }
 
-func NewSet(addrs []common.Address) istanbul.ValidatorSet {
+func NewSet(addrs []common.Address, policy istanbul.ProposerPolicy) istanbul.ValidatorSet {
 	if len(addrs) == 0 {
 		return nil
 	}
-	return newDefaultSet(addrs)
+	switch policy {
+	case istanbul.RoundRobin:
+		return newDefaultSet(addrs, roundRobinProposer)
+	case istanbul.Sticky:
+		return newDefaultSet(addrs, stickyProposer)
+	}
+
+	// use round-robin policy as default proposal policy
+	return newDefaultSet(addrs, roundRobinProposer)
 }
 
 func ExtractValidators(extraData []byte) []common.Address {

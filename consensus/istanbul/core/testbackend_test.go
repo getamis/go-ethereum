@@ -145,37 +145,36 @@ func newTestSystem(n uint64) *testSystem {
 	}
 }
 
-func newTestValidatorSet(n int) istanbul.ValidatorSet {
-	// generate validators
-	validators := make([]istanbul.Validator, n)
-	b := []byte{}
+func generateValidators(n int) []common.Address {
+	vals := make([]common.Address, 0)
 	for i := 0; i < n; i++ {
-		// TODO: the private key should be stored if we want to add new feature for sign data
 		privateKey, _ := crypto.GenerateKey()
-		validators[i] = validator.New(crypto.PubkeyToAddress(privateKey.PublicKey))
-		b = append(b, validators[i].Address().Bytes()...)
+		vals = append(vals, crypto.PubkeyToAddress(privateKey.PublicKey))
 	}
+	return vals
+}
 
-	vset := validator.NewSet(validator.ExtractValidators(b))
-
-	return vset
+func newTestValidatorSet(n int) istanbul.ValidatorSet {
+	return validator.NewSet(generateValidators(n), istanbul.RoundRobin)
 }
 
 // FIXME: int64 is needed for N and F
 func NewTestSystemWithBackend(n, f uint64) *testSystem {
 	testLogger.SetHandler(elog.StdoutHandler)
 
-	vset := newTestValidatorSet(int(n))
+	addrs := generateValidators(int(n))
 	sys := newTestSystem(n)
 	config := istanbul.DefaultConfig
 
 	for i := uint64(0); i < n; i++ {
+		vset := validator.NewSet(addrs, istanbul.RoundRobin)
 		backend := sys.NewBackend(i)
 		backend.peers = vset
 		backend.address = vset.GetByIndex(i).Address()
 
 		core := New(backend, config).(*core)
 		core.state = StateAcceptRequest
+		core.lastProposer = common.Address{}
 		core.current = newRoundState(&istanbul.View{
 			Round:    big.NewInt(0),
 			Sequence: big.NewInt(1),

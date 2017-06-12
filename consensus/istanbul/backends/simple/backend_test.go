@@ -130,16 +130,14 @@ func generatePrivateKey() (*ecdsa.PrivateKey, error) {
 
 func newTestValidatorSet(n int) (istanbul.ValidatorSet, []*ecdsa.PrivateKey) {
 	// generate validators
-	validators := make([]istanbul.Validator, n)
 	keys := make(Keys, n)
-	b := []byte{}
+	addrs := make([]common.Address, n)
 	for i := 0; i < n; i++ {
 		privateKey, _ := crypto.GenerateKey()
 		keys[i] = privateKey
-		validators[i] = validator.New(crypto.PubkeyToAddress(privateKey.PublicKey))
-		b = append(b, validators[i].Address().Bytes()...)
+		addrs[i] = crypto.PubkeyToAddress(privateKey.PublicKey)
 	}
-	vset := validator.NewSet(validator.ExtractValidators(b))
+	vset := validator.NewSet(addrs, istanbul.RoundRobin)
 	sort.Sort(keys) //Keys need to be sorted by its public key address
 	return vset, keys
 }

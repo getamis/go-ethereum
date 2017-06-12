@@ -194,7 +194,7 @@ func (sb *simpleBackend) verifySigner(chain consensus.ChainReader, header *types
 
 	validatorAddresses := validator.ExtractValidators(sb.getValidatorBytes(parent))
 	// ensure the signer is in parent's validator set
-	parentValSet := validator.NewSet(validatorAddresses)
+	parentValSet := validator.NewSet(validatorAddresses, sb.config.ProposerPolicy)
 	if parentValSet == nil {
 		return errInvalidExtraDataFormat
 	}
@@ -419,7 +419,7 @@ func (sb *simpleBackend) initValidatorSet(chain consensus.ChainReader) error {
 	header := chain.CurrentHeader()
 	// get the validator byte array and feed into validator set
 	validatorAddresses := validator.ExtractValidators(sb.getValidatorBytes(header))
-	valSet := validator.NewSet(validatorAddresses)
+	valSet := validator.NewSet(validatorAddresses, sb.config.ProposerPolicy)
 	if valSet == nil {
 		return errInvalidExtraDataFormat
 	}
@@ -430,7 +430,7 @@ func (sb *simpleBackend) initValidatorSet(chain consensus.ChainReader) error {
 func (sb *simpleBackend) validExtraFormat(header *types.Header) bool {
 	length := len(header.Extra)
 	// ensure the bytes is enough
-	if length < types.IstanbulExtraVanity +types.IstanbulExtraValidatorSize +types.IstanbulExtraSeal {
+	if length < types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+types.IstanbulExtraSeal {
 		return false
 	}
 
@@ -439,7 +439,7 @@ func (sb *simpleBackend) validExtraFormat(header *types.Header) bool {
 	if vl == 0 {
 		return false
 	}
-	if length != types.IstanbulExtraVanity +types.IstanbulExtraValidatorSize +vl+types.IstanbulExtraSeal {
+	if length != types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+vl+types.IstanbulExtraSeal {
 		return false
 	}
 
@@ -447,7 +447,7 @@ func (sb *simpleBackend) validExtraFormat(header *types.Header) bool {
 }
 
 func (sb *simpleBackend) getValidatorBytes(header *types.Header) []byte {
-	return header.Extra[types.IstanbulExtraVanity +types.IstanbulExtraValidatorSize : types.IstanbulExtraVanity +types.IstanbulExtraValidatorSize +sb.validatorLength(header)]
+	return header.Extra[types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize : types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+sb.validatorLength(header)]
 }
 
 // prepareExtra creates a copy that includes vanity, validators, and a clean seal for the given header
@@ -456,11 +456,11 @@ func (sb *simpleBackend) getValidatorBytes(header *types.Header) []byte {
 func (sb *simpleBackend) prepareExtra(header, parent *types.Header) []byte {
 	buf := make([]byte, 0)
 	if len(header.Extra) < types.IstanbulExtraVanity {
-		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, types.IstanbulExtraVanity -len(header.Extra))...)
+		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, types.IstanbulExtraVanity-len(header.Extra))...)
 	}
 	buf = header.Extra[:types.IstanbulExtraVanity]
 
-	buf = append(buf, parent.Extra[types.IstanbulExtraVanity:types.IstanbulExtraVanity +types.IstanbulExtraValidatorSize +sb.validatorLength(parent)]...)
+	buf = append(buf, parent.Extra[types.IstanbulExtraVanity:types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+sb.validatorLength(parent)]...)
 	buf = append(buf, make([]byte, types.IstanbulExtraSeal)...)
 	return buf
 }
@@ -474,7 +474,7 @@ func (sb *simpleBackend) signaturePosition(header *types.Header) (int, int) {
 
 // validatorLength returns the validator length for the given header
 func (sb *simpleBackend) validatorLength(header *types.Header) int {
-	validatorSize := int(header.Extra[types.IstanbulExtraVanity : types.IstanbulExtraVanity +types.IstanbulExtraValidatorSize][0])
+	validatorSize := int(header.Extra[types.IstanbulExtraVanity : types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize][0])
 	validatorLength := validatorSize * common.AddressLength
 	return int(validatorLength)
 }

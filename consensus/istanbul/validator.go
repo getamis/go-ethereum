@@ -16,7 +16,11 @@
 
 package istanbul
 
-import "github.com/ethereum/go-ethereum/common"
+import (
+	"strings"
+
+	"github.com/ethereum/go-ethereum/common"
+)
 
 type Validator interface {
 	// Address returns address
@@ -26,9 +30,27 @@ type Validator interface {
 	String() string
 }
 
+// ----------------------------------------------------------------------------
+
+type Validators []Validator
+
+func (slice Validators) Len() int {
+	return len(slice)
+}
+
+func (slice Validators) Less(i, j int) bool {
+	return strings.Compare(slice[i].String(), slice[j].String()) < 0
+}
+
+func (slice Validators) Swap(i, j int) {
+	slice[i], slice[j] = slice[j], slice[i]
+}
+
+// ----------------------------------------------------------------------------
+
 type ValidatorSet interface {
 	// Calculate the proposer
-	CalcProposer(seed uint64)
+	CalcProposer(lastProposer common.Address, round uint64)
 	// Return the validator size
 	Size() int
 	// Return the validator array
@@ -42,3 +64,7 @@ type ValidatorSet interface {
 	// Check whether the validator with given address is a proposer
 	IsProposer(address common.Address) bool
 }
+
+// ----------------------------------------------------------------------------
+
+type ProposalSelector func(ValidatorSet, common.Address, uint64) Validator
