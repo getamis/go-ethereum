@@ -18,15 +18,12 @@ package core
 
 import (
 	"fmt"
-	"io"
 	"math/big"
 	"strings"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
-	"github.com/ethereum/go-ethereum/consensus/istanbul/validator"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // Constructs a new messageSet to accumulate messages for given sequence/view number.
@@ -49,13 +46,6 @@ type messageSet struct {
 	valSet     istanbul.ValidatorSet
 	messagesMu *sync.Mutex
 	messages   map[common.Hash]*message
-}
-
-type storageMessageSet struct {
-	View       *istanbul.View
-	Validators []common.Address
-	Keys       []common.Hash
-	Messages   [][]byte
 }
 
 func (ms *messageSet) View() *istanbul.View {
@@ -88,70 +78,6 @@ func (ms *messageSet) Size() int {
 	ms.messagesMu.Lock()
 	defer ms.messagesMu.Unlock()
 	return len(ms.messages)
-}
-
-// The DecodeRLP method should read one value from the given
-// Stream. It is not forbidden to read less or more, but it might
-// be confusing.
-func (ms *messageSet) DecodeRLP(s *rlp.Stream) error {
-	var sms storageMessageSet
-	err := s.Decode(&sms)
-	if err == nil {
-		ms.valSet = validator.NewSet(sms.Validators)
-		ms.view = sms.View
-		ms.messagesMu = new(sync.Mutex)
-		ms.messages = make(map[common.Hash]*message)
-
-		if len(sms.Keys) != len(sms.Messages) {
-			return errFailedDecodeMessageSet
-		}
-
-		for i, k := range sms.Keys {
-			m := new(message)
-			if err := m.FromPayload(sms.Messages[i], nil); err != nil {
-				return err
-			}
-
-			ms.messages[k] = m
-		}
-	}
-	return err
-}
-
-// EncodeRLP should write the RLP encoding of its receiver to w.
-// If the implementation is a pointer method, it may also be
-// called for nil pointers.
-//
-// Implementations should generate valid RLP. The data written is
-// not verified at the moment, but a future version might. It is
-// recommended to write only a single value but writing multiple
-// values or no value at all is also permitted.
-func (ms *messageSet) EncodeRLP(w io.Writer) error {
-	ms.messagesMu.Lock()
-	defer ms.messagesMu.Unlock()
-
-	var addrs []common.Address
-	for _, val := range ms.valSet.List() {
-		addrs = append(addrs, val.Address())
-	}
-
-	var keys []common.Hash
-	var msgs [][]byte
-	for k, v := range ms.messages {
-		keys = append(keys, k)
-		b, err := v.Payload()
-		if err != nil {
-			return err
-		}
-		msgs = append(msgs, b)
-	}
-
-	return rlp.Encode(w, storageMessageSet{
-		View:       ms.view,
-		Validators: addrs,
-		Keys:       keys,
-		Messages:   msgs,
-	})
 }
 
 // ----------------------------------------------------------------------------
