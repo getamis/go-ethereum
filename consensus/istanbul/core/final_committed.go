@@ -31,6 +31,7 @@ func (c *core) handleFinalCommitted(proposal istanbul.Proposal, proposer common.
 	if proposal.Number().Cmp(c.current.Sequence()) >= 0 {
 		// Remember to store the proposer since we've accpeted the proposal
 		c.lastProposer = proposer
+		c.lastProposal = proposal
 		c.startNewRound(&istanbul.View{
 			Sequence: new(big.Int).Add(proposal.Number(), common.Big1),
 			Round:    new(big.Int).Set(common.Big0),

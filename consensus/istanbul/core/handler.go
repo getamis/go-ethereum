@@ -24,9 +24,11 @@ import (
 )
 
 // Start implements core.Engine.Start
-func (c *core) Start(lastSequence *big.Int, lastProposer common.Address) error {
+func (c *core) Start(lastSequence *big.Int, lastProposer common.Address, lastProposal istanbul.Proposal) error {
 	// initial last proposer
 	c.lastProposer = lastProposer
+	c.lastProposal = lastProposal
+	c.valSet = c.backend.Validators(c.lastProposal)
 
 	// Start a new round from last sequence + 1
 	c.startNewRound(&istanbul.View{
@@ -100,13 +102,13 @@ func (c *core) handleMsg(payload []byte) error {
 
 	// Decode message and check its signature
 	msg := new(message)
-	if err := msg.FromPayload(payload, c.backend.CheckValidatorSignature); err != nil {
+	if err := msg.FromPayload(payload, c.validateFn); err != nil {
 		logger.Error("Failed to decode message from payload", "err", err)
 		return err
 	}
 
 	// Only accept message if address is valid
-	_, src := c.backend.Validators().GetByAddress(msg.Address)
+	_, src := c.valSet.GetByAddress(msg.Address)
 	if src == nil {
 		logger.Error("Invalid address in message", "msg", msg)
 		return istanbul.ErrUnauthorizedAddress

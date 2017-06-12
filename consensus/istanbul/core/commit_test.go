@@ -40,8 +40,7 @@ func TestHandleCommit(t *testing.T) {
 	}
 
 	testCases := []struct {
-		system *testSystem
-
+		system      *testSystem
 		expectedErr error
 	}{
 		{
@@ -51,14 +50,7 @@ func TestHandleCommit(t *testing.T) {
 
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
-					c.current = newTestRoundState(
-						&istanbul.View{
-							Round:    big.NewInt(0),
-							Sequence: big.NewInt(1),
-						},
-						backend.Validators(),
-					)
-
+					c.Start(big.NewInt(0), common.Address{}, nil)
 					if i == 0 {
 						// replica 0 is primary
 						c.state = StatePrepared
@@ -77,20 +69,10 @@ func TestHandleCommit(t *testing.T) {
 					c := backend.engine.(*core)
 
 					if i == 0 {
-						// replica 0 is primary
-						c.current = newTestRoundState(
-							expectedSubject.View,
-							backend.Validators(),
-						)
+						c.Start(new(big.Int).Sub(expectedSubject.View.Sequence, common.Big1), common.Address{}, nil)
 						c.state = StatePreprepared
 					} else {
-						c.current = newTestRoundState(
-							&istanbul.View{
-								Round:    big.NewInt(2),
-								Sequence: big.NewInt(3),
-							},
-							backend.Validators(),
-						)
+						c.Start(big.NewInt(2), common.Address{}, nil)
 					}
 				}
 				return sys
@@ -107,19 +89,10 @@ func TestHandleCommit(t *testing.T) {
 
 					if i == 0 {
 						// replica 0 is primary
-						c.current = newTestRoundState(
-							expectedSubject.View,
-							backend.Validators(),
-						)
+						c.Start(new(big.Int).Sub(expectedSubject.View.Sequence, common.Big1), common.Address{}, nil)
 						c.state = StatePreprepared
 					} else {
-						c.current = newTestRoundState(
-							&istanbul.View{
-								Round:    big.NewInt(0),
-								Sequence: big.NewInt(0),
-							},
-							backend.Validators(),
-						)
+						c.Start(big.NewInt(0), common.Address{}, nil)
 					}
 				}
 				return sys
@@ -136,11 +109,7 @@ func TestHandleCommit(t *testing.T) {
 
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
-					c.current = newTestRoundState(
-						expectedSubject.View,
-						backend.Validators(),
-					)
-
+					c.Start(new(big.Int).Sub(expectedSubject.View.Sequence, common.Big1), common.Address{}, nil)
 					if i == 0 {
 						// replica 0 is primary
 						c.state = StatePrepared
@@ -157,13 +126,7 @@ func TestHandleCommit(t *testing.T) {
 
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
-					c.current = newTestRoundState(
-						&istanbul.View{
-							Round:    big.NewInt(0),
-							Sequence: proposal.Number(),
-						},
-						backend.Validators(),
-					)
+					c.Start(new(big.Int).Sub(proposal.Number(), common.Big1), common.Address{}, nil)
 
 					// only replica0 stays at StatePreprepared
 					// other replicas are at StatePrepared
@@ -188,8 +151,16 @@ OUTER:
 		r0 := v0.engine.(*core)
 
 		for i, v := range test.system.backends {
-			validator := v.Validators().GetByIndex(uint64(i))
-			m, _ := Encode(v.engine.(*core).current.Subject())
+			c := v.engine.(*core)
+			validator := c.valSet.GetByIndex(uint64(i))
+			c.current = newTestRoundState(
+				&istanbul.View{
+					Round:    big.NewInt(0),
+					Sequence: c.current.Sequence(),
+				},
+				c.valSet,
+			)
+			m, _ := Encode(c.current.Subject())
 			if err := r0.handleCommit(&message{
 				Code:    msgPrepare,
 				Msg:     m,

@@ -28,7 +28,7 @@ import (
 )
 
 type Engine interface {
-	Start(lastSequence *big.Int, lastProposer common.Address) error
+	Start(lastSequence *big.Int, lastProposer common.Address, lastProposal istanbul.Proposal) error
 	Stop() error
 	// get current state and round state
 	RoundState() (State, *roundState)

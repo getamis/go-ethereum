@@ -20,33 +20,122 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
 // API is a user facing RPC API to dump Istanbul state
 type API struct {
-	chain   consensus.ChainReader
-	backend *simpleBackend
+	chain    consensus.ChainReader
+	istanbul *simpleBackend
 }
 
 // RoundState returns current state and proposer
 func (api *API) RoundState() {
-	state, roundState := api.backend.core.RoundState()
-	p := api.backend.valSet.GetProposer().Address()
-	log.Info("RoundState", "sequence", roundState.Sequence, "Round", roundState.Round,
-		"state", state, "proposer", p,
-		"hash", roundState.Preprepare.Proposal.Hash(),
+	state, roundState := api.istanbul.core.RoundState()
+	log.Info("RoundState", "sequence", roundState.Sequence, "round", roundState.Round,
+		"state", state, "hash", roundState.Preprepare.Proposal.Hash(),
 		"prepares", roundState.Prepares, "commits", roundState.Commits,
 		"checkpoint", roundState.Checkpoints)
 }
 
 // Backlog returns backlogs
 func (api *API) Backlog() {
-	backlog := api.backend.core.Backlog()
+	backlog := api.istanbul.core.Backlog()
 	logs := make([]string, 0, len(backlog))
 	for validator, q := range backlog {
 		logs = append(logs, fmt.Sprintf("{%v, %v}", validator, q.Size()))
 	}
 	log.Info("Backlog", "logs", fmt.Sprintf("[%v]", strings.Join(logs, ", ")))
+}
+
+// GetSnapshot retrieves the state snapshot at a given block.
+func (api *API) GetSnapshot(number *rpc.BlockNumber) (*Snapshot, error) {
+	// Retrieve the requested block number (or current if none requested)
+	var header *types.Header
+	if number == nil || *number == rpc.LatestBlockNumber {
+		header = api.chain.CurrentHeader()
+	} else {
+		header = api.chain.GetHeaderByNumber(uint64(number.Int64()))
+	}
+	// Ensure we have an actually valid block and return its snapshot
+	if header == nil {
+		return nil, errUnknownBlock
+	}
+	return api.istanbul.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+}
+
+// GetSnapshotAtHash retrieves the state snapshot at a given block.
+func (api *API) GetSnapshotAtHash(hash common.Hash) (*Snapshot, error) {
+	header := api.chain.GetHeaderByHash(hash)
+	if header == nil {
+		return nil, errUnknownBlock
+	}
+	return api.istanbul.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+}
+
+// GetValidators retrieves the list of authorized validators at the specified block.
+func (api *API) GetValidators(number *rpc.BlockNumber) ([]common.Address, error) {
+	// Retrieve the requested block number (or current if none requested)
+	var header *types.Header
+	if number == nil || *number == rpc.LatestBlockNumber {
+		header = api.chain.CurrentHeader()
+	} else {
+		header = api.chain.GetHeaderByNumber(uint64(number.Int64()))
+	}
+	// Ensure we have an actually valid block and return the validators from its snapshot
+	if header == nil {
+		return nil, errUnknownBlock
+	}
+	snap, err := api.istanbul.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return snap.validators(), nil
+}
+
+// GetValidatorsAtHash retrieves the state snapshot at a given block.
+func (api *API) GetValidatorsAtHash(hash common.Hash) ([]common.Address, error) {
+	header := api.chain.GetHeaderByHash(hash)
+	if header == nil {
+		return nil, errUnknownBlock
+	}
+	snap, err := api.istanbul.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return snap.validators(), nil
+}
+
+// Candidates returns the current candidates the node tries to uphold and vote on.
+func (api *API) Candidates() map[common.Address]bool {
+	api.istanbul.candidatesLock.RLock()
+	defer api.istanbul.candidatesLock.RUnlock()
+
+	proposals := make(map[common.Address]bool)
+	for address, auth := range api.istanbul.candidates {
+		proposals[address] = auth
+	}
+	return proposals
+}
+
+// Propose injects a new authorization candidate that the validator will attempt to
+// push through.
+func (api *API) Propose(address common.Address, auth bool) {
+	api.istanbul.candidatesLock.Lock()
+	defer api.istanbul.candidatesLock.Unlock()
+
+	api.istanbul.candidates[address] = auth
+}
+
+// Discard drops a currently running candidate, stopping the validator from casting
+// further votes (either for or against).
+func (api *API) Discard(address common.Address) {
+	api.istanbul.candidatesLock.Lock()
+	defer api.istanbul.candidatesLock.Unlock()
+
+	delete(api.istanbul.candidates, address)
 }

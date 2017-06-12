@@ -34,24 +34,19 @@ const (
 )
 
 func New(backend istanbul.Backend, config *istanbul.Config) Engine {
-	// update n and f
-	n := int64(backend.Validators().Size())
-	f := int64(math.Ceil(float64(n)/3) - 1)
-
-	return &core{
+	c := &core{
 		config:            config,
 		address:           backend.Address(),
-		N:                 n,
-		F:                 f,
 		state:             StateAcceptRequest,
 		logger:            log.New("address", backend.Address()),
 		backend:           backend,
 		backlogs:          make(map[istanbul.Validator]*prque.Prque),
 		backlogsMu:        new(sync.Mutex),
-		roundChangeSet:    newRoundChangeSet(backend.Validators()),
 		pendingRequests:   prque.New(),
 		pendingRequestsMu: new(sync.Mutex),
 	}
+	c.validateFn = c.checkValidatorSignature
+	return c
 }
 
 // ----------------------------------------------------------------------------
@@ -68,7 +63,10 @@ type core struct {
 	events  *event.TypeMuxSubscription
 
 	lastProposer          common.Address
+	lastProposal          istanbul.Proposal
+	valSet                istanbul.ValidatorSet
 	waitingForRoundChange bool
+	validateFn            func([]byte, []byte) (common.Address, error)
 
 	backlogs   map[istanbul.Validator]*prque.Prque
 	backlogsMu *sync.Mutex
@@ -131,7 +129,7 @@ func (c *core) broadcast(msg *message) {
 	}
 
 	// Broadcast payload
-	if err = c.backend.Broadcast(payload); err != nil {
+	if err = c.backend.Broadcast(c.valSet, payload); err != nil {
 		logger.Error("Failed to broadcast message", "msg", msg, "err", err)
 		return
 	}
@@ -152,7 +150,7 @@ func (c *core) nextRound() *istanbul.View {
 }
 
 func (c *core) isPrimary() bool {
-	v := c.backend.Validators()
+	v := c.valSet
 	if v == nil {
 		return false
 	}
@@ -174,17 +172,20 @@ func (c *core) commit() {
 func (c *core) startNewRound(newView *istanbul.View, roundChange bool) {
 	var logger log.Logger
 	if c.current == nil {
-		logger = c.logger.New("old_round", -1, "old_seq", 0, "old_proposer", c.backend.Validators().GetProposer())
+		logger = c.logger.New("old_round", -1, "old_seq", 0, "old_proposer", c.valSet.GetProposer())
 	} else {
-		logger = c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence(), "old_proposer", c.backend.Validators().GetProposer())
+		logger = c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence(), "old_proposer", c.valSet.GetProposer())
 	}
 
+	c.valSet = c.backend.Validators(c.lastProposal)
+	c.N = int64(c.valSet.Size())
+	c.F = int64(math.Ceil(float64(c.N)/3) - 1)
 	// Clear invalid RoundChange messages
-	c.roundChangeSet.Clear(newView)
-	// New round state for new round
-	c.current = newRoundState(newView, c.backend.Validators())
+	c.roundChangeSet = newRoundChangeSet(c.valSet)
+	// New snapshot for new round
+	c.current = newRoundState(newView, c.valSet)
 	// Calculate new proposer
-	c.backend.Validators().CalcProposer(c.lastProposer, newView.Round.Uint64())
+	c.valSet.CalcProposer(c.lastProposer, newView.Round.Uint64())
 	c.waitingForRoundChange = false
 	c.setState(StateAcceptRequest)
 	if roundChange && c.isPrimary() {
@@ -192,16 +193,16 @@ func (c *core) startNewRound(newView *istanbul.View, roundChange bool) {
 	}
 	c.newRoundChangeTimer()
 
-	logger.Debug("New round", "new_round", newView.Round, "new_seq", newView.Sequence, "new_proposer", c.backend.Validators().GetProposer())
+	logger.Debug("New round", "new_round", newView.Round, "new_seq", newView.Sequence, "new_proposer", c.valSet.GetProposer(), "valSet", c.valSet.List(), "size", c.valSet.Size())
 }
 
 func (c *core) catchUpRound(view *istanbul.View) {
-	logger := c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence(), "old_proposer", c.backend.Validators().GetProposer())
+	logger := c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence(), "old_proposer", c.valSet.GetProposer())
 	c.waitingForRoundChange = true
-	c.current = newRoundState(view, c.backend.Validators())
+	c.current = newRoundState(view, c.valSet)
 	c.newRoundChangeTimer()
 
-	logger.Trace("Catch up round", "new_round", view.Round, "new_seq", view.Sequence, "new_proposer", c.backend.Validators().GetProposer())
+	logger.Trace("Catch up round", "new_round", view.Round, "new_seq", view.Sequence, "new_proposer", c.valSet)
 }
 
 func (c *core) setState(state State) {
@@ -235,4 +236,8 @@ func (c *core) newRoundChangeTimer() {
 	c.roundChangeTimer = time.AfterFunc(timeout, func() {
 		c.sendRoundChange()
 	})
+}
+
+func (c *core) checkValidatorSignature(data []byte, sig []byte) (common.Address, error) {
+	return istanbul.CheckValidatorSignature(c.valSet, data, sig)
 }

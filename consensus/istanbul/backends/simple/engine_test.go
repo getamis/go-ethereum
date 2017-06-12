@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 	"github.com/ethereum/go-ethereum/core"
@@ -43,7 +44,15 @@ func newBlockChain(n int) (*core.BlockChain, *simpleBackend) {
 
 	b, _ := backend.(*simpleBackend)
 
-	proposerAddr := b.valSet.GetProposer().Address()
+	snap, err := b.snapshot(blockchain, 0, common.Hash{}, nil)
+	if err != nil {
+		panic(err)
+	}
+	if snap == nil {
+		panic("nil snap")
+	}
+	proposerAddr := snap.ValSet.GetProposer().Address()
+
 	// find proposer key
 	for _, key := range nodeKeys {
 		addr := crypto.PubkeyToAddress(key.PublicKey)
@@ -71,6 +80,8 @@ func getGenesisAndKeys(n int) (*core.Genesis, []*ecdsa.PrivateKey) {
 	// force enable Istanbul engine
 	genesis.Config.Istanbul = &params.IstanbulConfig{}
 	genesis.Config.Ethash = nil
+	genesis.Difficulty = defaultDifficulty
+	genesis.Nonce = emptyNonce.Uint64()
 
 	appendValidators(genesis, addrs)
 	return genesis, nodeKeys
@@ -258,15 +269,6 @@ func TestVerifyHeader(t *testing.T) {
 		t.Errorf("unexpected error comes, got: %v, expected: errInvalidExtraDataFormat", err)
 	}
 
-	// non zero coinbase
-	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
-	header = block.Header()
-	header.Coinbase = common.StringToAddress("123456789")
-	err = engine.VerifyHeader(chain, header, false)
-	if err != errInvalidCoinbase {
-		t.Errorf("unexpected error comes, got: %v, expected: errInvalidCoinbase", err)
-	}
-
 	// non zero MixDigest
 	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	header = block.Header()
@@ -310,6 +312,16 @@ func TestVerifyHeader(t *testing.T) {
 	err = engine.VerifyHeader(chain, header, false)
 	if err != consensus.ErrFutureBlock {
 		t.Errorf("unexpected error comes, got: %v, expected: consensus.ErrFutureBlock", err)
+	}
+
+	// invalid nonce
+	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
+	header = block.Header()
+	copy(header.Nonce[:], hexutil.MustDecode("0x111111111111"))
+	header.Number = big.NewInt(int64(engine.config.Epoch))
+	err = engine.VerifyHeader(chain, header, false)
+	if err != errInvalidNonce {
+		t.Errorf("unexpected error comes, got: %v, expected: errInvalidCoinbase", err)
 	}
 }
 
@@ -432,39 +444,6 @@ OUT3:
 	}
 }
 
-func TestPrepareExtra(t *testing.T) {
-	validatorN := 4
-	buf := make([]byte, 0)
-	buf = append(buf, make([]byte, types.IstanbulExtraVanity)...)
-	buf = append(buf, byte(validatorN))
-	buf = append(buf, make([]byte, validatorN*common.AddressLength)...)
-	buf = append(buf, make([]byte, types.IstanbulExtraSeal)...)
-
-	parentHeader := &types.Header{}
-	parentHeader.Extra = buf
-
-	header := &types.Header{}
-	header.Extra = common.StringToHash("123").Bytes()
-
-	expectedExtra := parentHeader.Extra
-	copy(expectedExtra[0:types.IstanbulExtraVanity], header.Extra)
-
-	b, _, _ := newSimpleBackend()
-	extra := b.prepareExtra(header, parentHeader)
-	if bytes.Compare(extra, expectedExtra) != 0 {
-		t.Errorf("expected: %v, got: %v", expectedExtra, extra)
-	}
-
-	// append useless information
-	buf = append(buf, make([]byte, 15)...)
-	header.Extra = buf
-
-	extra = b.prepareExtra(header, parentHeader)
-	if bytes.Compare(extra, expectedExtra) != 0 {
-		t.Errorf("expected: %v, got: %v", expectedExtra, extra)
-	}
-}
-
 func TestSignaturePosition(t *testing.T) {
 	validatorN := 2
 	buf := make([]byte, 0)
@@ -479,8 +458,7 @@ func TestSignaturePosition(t *testing.T) {
 	header := &types.Header{}
 	header.Extra = buf
 
-	b, _, _ := newSimpleBackend()
-	start, end := b.signaturePosition(header)
+	start, end := signaturePosition(header)
 	if expectedStart != start && expectedtEnd != end {
 		t.Errorf("expected start: %v, got: %v, expected end: %v, got: %v", expectedStart, start, expectedtEnd, end)
 	}

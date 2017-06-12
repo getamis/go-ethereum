@@ -28,9 +28,6 @@ func New(addr common.Address) istanbul.Validator {
 }
 
 func NewSet(addrs []common.Address, policy istanbul.ProposerPolicy) istanbul.ValidatorSet {
-	if len(addrs) == 0 {
-		return nil
-	}
 	switch policy {
 	case istanbul.RoundRobin:
 		return newDefaultSet(addrs, roundRobinProposer)
@@ -43,9 +40,6 @@ func NewSet(addrs []common.Address, policy istanbul.ProposerPolicy) istanbul.Val
 }
 
 func ExtractValidators(extraData []byte) []common.Address {
-	if !ValidExtraData(extraData) {
-		return nil
-	}
 	// get the validator addresses
 	addrs := make([]common.Address, (len(extraData) / common.AddressLength))
 	for i := 0; i < len(addrs); i++ {

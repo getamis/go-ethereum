@@ -19,6 +19,7 @@ package validator
 import (
 	"reflect"
 	"sort"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
@@ -39,8 +40,9 @@ func (val *defaultValidator) String() string {
 // ----------------------------------------------------------------------------
 
 type defaultSet struct {
-	validators istanbul.Validators
-	proposer   istanbul.Validator
+	validators  istanbul.Validators
+	proposer    istanbul.Validator
+	validatorMu sync.RWMutex
 
 	selector istanbul.ProposalSelector
 }
@@ -65,10 +67,21 @@ func newDefaultSet(addrs []common.Address, selector istanbul.ProposalSelector) *
 	return valSet
 }
 
-func (valSet *defaultSet) Size() int                  { return len(valSet.validators) }
-func (valSet *defaultSet) List() []istanbul.Validator { return valSet.validators }
+func (valSet *defaultSet) Size() int {
+	valSet.validatorMu.RLock()
+	defer valSet.validatorMu.RUnlock()
+	return len(valSet.validators)
+}
+
+func (valSet *defaultSet) List() []istanbul.Validator {
+	valSet.validatorMu.RLock()
+	defer valSet.validatorMu.RUnlock()
+	return valSet.validators
+}
 
 func (valSet *defaultSet) GetByIndex(i uint64) istanbul.Validator {
+	valSet.validatorMu.RLock()
+	defer valSet.validatorMu.RUnlock()
 	if i < uint64(valSet.Size()) {
 		return valSet.validators[i]
 	}
@@ -94,6 +107,8 @@ func (valSet *defaultSet) IsProposer(address common.Address) bool {
 }
 
 func (valSet *defaultSet) CalcProposer(lastProposer common.Address, round uint64) {
+	valSet.validatorMu.RLock()
+	defer valSet.validatorMu.RUnlock()
 	valSet.proposer = valSet.selector(valSet, lastProposer, round)
 }
 
@@ -135,4 +150,43 @@ func stickyProposer(valSet istanbul.ValidatorSet, proposer common.Address, round
 	}
 	pick := seed % uint64(valSet.Size())
 	return valSet.GetByIndex(pick)
+}
+
+func (valSet *defaultSet) AddValidator(address common.Address) bool {
+	valSet.validatorMu.Lock()
+	defer valSet.validatorMu.Unlock()
+	for _, v := range valSet.validators {
+		if v.Address() == address {
+			return false
+		}
+	}
+	valSet.validators = append(valSet.validators, New(address))
+	// TODO: we may not need to re-sort it again
+	// sort validator
+	sort.Sort(valSet.validators)
+	return true
+}
+
+func (valSet *defaultSet) RemoveValidator(address common.Address) bool {
+	valSet.validatorMu.Lock()
+	defer valSet.validatorMu.Unlock()
+
+	for i, v := range valSet.validators {
+		if v.Address() == address {
+			valSet.validators = append(valSet.validators[:i], valSet.validators[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+func (valSet *defaultSet) Copy() istanbul.ValidatorSet {
+	valSet.validatorMu.Lock()
+	defer valSet.validatorMu.Unlock()
+
+	addresses := make([]common.Address, 0, len(valSet.validators))
+	for _, v := range valSet.validators {
+		addresses = append(addresses, v.Address())
+	}
+	return newDefaultSet(addresses, valSet.selector)
 }
