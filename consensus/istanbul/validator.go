@@ -69,7 +69,7 @@ type ValidatorSet interface {
 	RemoveValidator(address common.Address) bool
 	// Copy validator set
 	Copy() ValidatorSet
-	// Get the maximum number of faulty node
+	// Get the maximum number of faulty nodes
 	F() int
 }
 

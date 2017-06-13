@@ -269,12 +269,12 @@ func TestSealCommitted(t *testing.T) {
 func TestVerifyHeader(t *testing.T) {
 	chain, engine := newBlockChain(1)
 
-	// correct case
+	// errEmptyCommittedSeals case
 	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	block, _ = engine.updateBlock(chain.Genesis().Header(), block)
 	err := engine.VerifyHeader(chain, block.Header(), false)
-	if err != nil {
-		t.Errorf("error should be nil, got: %v", err)
+	if err != errEmptyCommittedSeals {
+		t.Errorf("unexpected error comes, got: %v, expected: errEmptyCommittedSeals", err)
 	}
 
 	// short extra data

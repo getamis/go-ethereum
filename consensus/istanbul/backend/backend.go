@@ -178,10 +178,9 @@ func (sb *simpleBackend) Verify(proposal istanbul.Proposal) error {
 		return errInvalidProposal
 	}
 	// verify the header of proposed block
-	if err := sb.VerifyHeader(sb.chain, block.Header(), false); err != nil {
-		if err == errEmptyCommittedSeals {
-			return nil
-		}
+	err := sb.VerifyHeader(sb.chain, block.Header(), false)
+	// Ignore errEmptyCommittedSeals error because we don't have the committed seals yet
+	if err != nil && err != errEmptyCommittedSeals {
 		return err
 	}
 	return nil

@@ -287,7 +287,7 @@ func prepareProposalSeal(hash common.Hash, msgCode uint64) []byte {
 	return buf.Bytes()
 }
 
-// PrepareCommittedSeal returns a slice from the given hash.
+// PrepareCommittedSeal returns a slice of committed seal for the given hash
 func PrepareCommittedSeal(hash common.Hash) []byte {
 	return prepareProposalSeal(hash, msgCommit)
 }
