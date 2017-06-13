@@ -198,7 +198,7 @@ OUTER:
 		for i := 0; i < len(signers); i++ {
 			copy(signers[i][:], v0.commitSigs[0][i*common.AddressLength:])
 		}
-		for _, validator := range v0.Validators().List() {
+		for _, validator := range r0.valSet.List() {
 			for _, signer := range signers {
 				if validator.Address() == signer {
 					signedCount++
