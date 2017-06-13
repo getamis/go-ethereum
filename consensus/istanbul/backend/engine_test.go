@@ -98,6 +98,7 @@ func getGenesisAndKeys(n int) (*core.Genesis, []*ecdsa.PrivateKey) {
 	genesis.Config.Ethash = nil
 	genesis.Difficulty = defaultDifficulty
 	genesis.Nonce = emptyNonce.Uint64()
+	genesis.Mixhash = types.IstanbulDigest
 
 	appendValidators(genesis, addrs)
 	return genesis, nodeKeys
@@ -269,7 +270,8 @@ func TestVerifyHeader(t *testing.T) {
 	chain, engine := newBlockChain(1)
 
 	// correct case
-	block := makeBlock(chain, engine, chain.Genesis())
+	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
+	block, _ = engine.updateBlock(chain.Genesis().Header(), block)
 	err := engine.VerifyHeader(chain, block.Header(), false)
 	if err != nil {
 		t.Errorf("error should be nil, got: %v", err)
@@ -381,13 +383,15 @@ func TestVerifyHeaders(t *testing.T) {
 	blocks := []*types.Block{}
 	size := 100
 	for i := 0; i < size; i++ {
+		var b *types.Block
 		if i == 0 {
-			blocks = append(blocks, makeBlock(chain, engine, genesis))
+			b = makeBlockWithoutSeal(chain, engine, genesis)
+			b, _ = engine.updateBlock(genesis.Header(), b)
 		} else {
-			b := makeBlockWithoutSeal(chain, engine, blocks[i-1])
+			b = makeBlockWithoutSeal(chain, engine, blocks[i-1])
 			b, _ = engine.updateBlock(blocks[i-1].Header(), b)
-			blocks = append(blocks, b)
 		}
+		blocks = append(blocks, b)
 		headers = append(headers, blocks[i].Header())
 	}
 	now = func() time.Time {

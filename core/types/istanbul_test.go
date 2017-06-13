@@ -133,7 +133,11 @@ func TestPrepareIstanbulExtra(t *testing.T) {
 	var buf bytes.Buffer
 	buf.Write(make([]byte, IstanbulExtraVanity))
 	buf.Write([]byte{byte(validatorN)})
-	buf.Write(make([]byte, validatorN*common.AddressLength))
+	validators := make([]common.Address, validatorN)
+	for i := 0; i < validatorN; i++ {
+		validators[i] = common.StringToAddress(string(i))
+		buf.Write(validators[i].Bytes())
+	}
 	buf.Write(make([]byte, IstanbulExtraSeal))
 	buf.Write([]byte{byte(cmttedN)})
 	buf.Write(make([]byte, cmttedN*IstanbulExtraSeal))
@@ -150,7 +154,7 @@ func TestPrepareIstanbulExtra(t *testing.T) {
 	expectedExtra := parentHeader.Extra[0:index.CommittedSize]
 	copy(expectedExtra[0:IstanbulExtraVanity], header.Extra)
 
-	extra := PrepareIstanbulExtra(header, parentHeader)
+	extra := PrepareIstanbulExtra(header, validators)
 	if bytes.Compare(extra, expectedExtra) != 0 {
 		t.Errorf("expected: %v, got: %v", expectedExtra, extra)
 	}
@@ -159,7 +163,7 @@ func TestPrepareIstanbulExtra(t *testing.T) {
 	buf.Write(make([]byte, 15))
 	header.Extra = buf.Bytes()
 
-	extra = PrepareIstanbulExtra(header, parentHeader)
+	extra = PrepareIstanbulExtra(header, validators)
 	if bytes.Compare(extra, expectedExtra) != 0 {
 		t.Errorf("expected: %v, got: %v", expectedExtra, extra)
 	}

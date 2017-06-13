@@ -331,13 +331,10 @@ func TestVoting(t *testing.T) {
 		// Create the genesis block with the initial set of validators
 		genesis := &core.Genesis{
 			Difficulty: defaultDifficulty,
-			ExtraData:  make([]byte, types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+common.AddressLength*len(validators)+types.IstanbulExtraSeal),
+			Mixhash:    types.IstanbulDigest,
 		}
-		// set validator size
-		genesis.ExtraData[types.IstanbulExtraVanity] = byte(len(validators))
-		for j, validator := range validators {
-			copy(genesis.ExtraData[types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+j*common.AddressLength:], validator[:])
-		}
+		b, _ := genesis.ToBlock()
+		genesis.ExtraData = types.PrepareIstanbulExtra(b.Header(), validators)
 		// Create a pristine blockchain with the genesis injected
 		db, _ := ethdb.NewMemDatabase()
 		genesis.Commit(db)
@@ -357,9 +354,10 @@ func TestVoting(t *testing.T) {
 				Number:     big.NewInt(int64(j) + 1),
 				Time:       big.NewInt(int64(j) * int64(config.BlockPauseTime)),
 				Coinbase:   accounts.address(vote.voted),
-				Extra:      make([]byte, types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+common.AddressLength*len(validators)+types.IstanbulExtraSeal),
 				Difficulty: defaultDifficulty,
+				MixDigest:  types.IstanbulDigest,
 			}
+			headers[j].Extra = types.PrepareIstanbulExtra(headers[j], validators)
 			if j > 0 {
 				headers[j].ParentHash = headers[j-1].Hash()
 			}

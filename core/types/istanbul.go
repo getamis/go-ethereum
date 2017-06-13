@@ -116,7 +116,7 @@ func ValidateIstanbulSeal(header *Header) error {
 // ┌────────────────────────┬─────────────────────────────┬───────────────────────────────────────┬─────────────────────┐
 // │ header vanity(32 bytes)│ parent validator#N (1 bytes)│ parent validator address(N * 20 bytes)│ empty seal(65 bytes)│
 // └────────────────────────┴─────────────────────────────┴───────────────────────────────────────┴─────────────────────┘
-func PrepareIstanbulExtra(header, parent *Header) []byte {
+func PrepareIstanbulExtra(header *Header, vals []common.Address) []byte {
 	var buf bytes.Buffer
 
 	// 1. compensate the lack bytes if header.Extra is not enough IstanbulExtraVanity bytes.
@@ -125,11 +125,14 @@ func PrepareIstanbulExtra(header, parent *Header) []byte {
 	}
 	buf.Write(header.Extra[:IstanbulExtraVanity])
 
-	index := ExtractToIstanbulIndex(parent)
+	// 2. write validator size
+	buf.Write([]byte{byte(len(vals))})
 
-	// 2. copy validators from parent.
-	buf.Write(parent.Extra[index.ValidatorSize:index.Seal])
-	// 3. append the IstanbulExtraSeal bytes for block signature.
+	// 3. copy validators from parent.
+	for _, addr := range vals {
+		buf.Write(addr.Bytes())
+	}
+	// 4. append the IstanbulExtraSeal bytes for block signature.
 	buf.Write(make([]byte, IstanbulExtraSeal))
 
 	return buf.Bytes()

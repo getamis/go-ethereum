@@ -59,8 +59,8 @@ var (
 	errInvalidDifficulty = errors.New("invalid difficulty")
 	// errInvalidExtraDataFormat is returned when the extra data format is incorrect
 	errInvalidExtraDataFormat = errors.New("invalid extra data format")
-	// errInvalidMixDigest is returned if a block's mix digest is non zero.
-	errInvalidMixDigest = errors.New("non-zero mix digest")
+	// errInvalidMixDigest is returned if a block's mix digest is not Istanbul digest.
+	errInvalidMixDigest = errors.New("invalid Istanbul mix digest")
 	// errInvalidNonce is returned if a block's nonce is invalid
 	errInvalidNonce = errors.New("invalid nonce")
 	// errInvalidUncleHash is returned if a block contains an non-empty uncle list.
@@ -300,15 +300,7 @@ func (sb *simpleBackend) Prepare(chain consensus.ChainReader, header *types.Head
 	}
 
 	// add validators in snapshot to extraData's validators section
-	size := snap.ValSet.Size()
-	expectedSize := types.IstanbulExtraVanity + types.IstanbulExtraValidatorSize + size*common.AddressLength + types.IstanbulExtraSeal
-	if len(header.Extra) < expectedSize {
-		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, expectedSize-len(header.Extra))...)
-	}
-	header.Extra[types.IstanbulExtraVanity] = byte(snap.ValSet.Size())
-	for i, validator := range snap.validators() {
-		copy(header.Extra[types.IstanbulExtraVanity+types.IstanbulExtraValidatorSize+i*common.AddressLength:], validator.Bytes())
-	}
+	header.Extra = types.PrepareIstanbulExtra(header, snap.validators())
 	return nil
 }
 
