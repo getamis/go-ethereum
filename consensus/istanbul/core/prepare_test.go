@@ -51,7 +51,15 @@ func TestHandlePrepare(t *testing.T) {
 
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
-					c.Start(big.NewInt(0), common.Address{}, nil)
+					c.valSet = backend.peers
+					c.current = newTestRoundState(
+						&istanbul.View{
+							Round:    big.NewInt(0),
+							Sequence: big.NewInt(1),
+						},
+						c.valSet,
+					)
+
 					if i == 0 {
 						// replica 0 is primary
 						c.state = StatePreprepared
@@ -68,13 +76,22 @@ func TestHandlePrepare(t *testing.T) {
 
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
-
+					c.valSet = backend.peers
 					if i == 0 {
 						// replica 0 is primary
-						c.Start(new(big.Int).Sub(expectedSubject.View.Sequence, common.Big1), common.Address{}, nil)
+						c.current = newTestRoundState(
+							expectedSubject.View,
+							c.valSet,
+						)
 						c.state = StatePreprepared
 					} else {
-						c.Start(big.NewInt(2), common.Address{}, nil)
+						c.current = newTestRoundState(
+							&istanbul.View{
+								Round:    big.NewInt(2),
+								Sequence: big.NewInt(3),
+							},
+							c.valSet,
+						)
 					}
 				}
 				return sys
@@ -88,13 +105,22 @@ func TestHandlePrepare(t *testing.T) {
 
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
-
+					c.valSet = backend.peers
 					if i == 0 {
 						// replica 0 is primary
-						c.Start(new(big.Int).Sub(expectedSubject.View.Sequence, common.Big1), common.Address{}, nil)
+						c.current = newTestRoundState(
+							expectedSubject.View,
+							c.valSet,
+						)
 						c.state = StatePreprepared
 					} else {
-						c.Start(big.NewInt(0), common.Address{}, nil)
+						c.current = newTestRoundState(
+							&istanbul.View{
+								Round:    big.NewInt(0),
+								Sequence: big.NewInt(0),
+							},
+							c.valSet,
+						)
 					}
 				}
 				return sys
@@ -108,13 +134,21 @@ func TestHandlePrepare(t *testing.T) {
 
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
-
+					c.valSet = backend.peers
 					if i == 0 {
 						// replica 0 is primary
-						c.Start(new(big.Int).Sub(expectedSubject.View.Sequence, common.Big1), common.Address{}, nil)
+						c.current = newTestRoundState(
+							expectedSubject.View,
+							c.valSet,
+						)
 						c.state = StatePreprepared
 					} else {
-						c.Start(big.NewInt(0), common.Address{}, nil)
+						c.current = newTestRoundState(
+							&istanbul.View{
+								Round:    big.NewInt(0),
+								Sequence: big.NewInt(1)},
+							c.valSet,
+						)
 					}
 				}
 				return sys
@@ -131,7 +165,11 @@ func TestHandlePrepare(t *testing.T) {
 
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
-					c.Start(new(big.Int).Sub(expectedSubject.View.Sequence, common.Big1), common.Address{}, nil)
+					c.valSet = backend.peers
+					c.current = newTestRoundState(
+						expectedSubject.View,
+						c.valSet,
+					)
 
 					if i == 0 {
 						// replica 0 is primary
@@ -153,16 +191,8 @@ OUTER:
 		r0 := v0.engine.(*core)
 
 		for i, v := range test.system.backends {
-			c := v.engine.(*core)
-			validator := c.valSet.GetByIndex(uint64(i))
-			c.current = newTestRoundState(
-				&istanbul.View{
-					Round:    big.NewInt(0),
-					Sequence: c.current.Sequence(),
-				},
-				c.valSet,
-			)
-			m, _ := Encode(c.current.Subject())
+			validator := r0.valSet.GetByIndex(uint64(i))
+			m, _ := Encode(v.engine.(*core).current.Subject())
 			if err := r0.handlePrepare(&message{
 				Code:    msgPrepare,
 				Msg:     m,
