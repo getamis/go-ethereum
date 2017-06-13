@@ -181,15 +181,15 @@ OUTER:
 			if r0.state != StatePreprepared {
 				t.Error("state should be preprepared")
 			}
-			if int64(r0.current.Prepares.Size()) > 2*r0.F {
-				t.Error("prepare messages size should less than ", 2*r0.F+1)
+			if r0.current.Prepares.Size() > 2*r0.valSet.F() {
+				t.Error("prepare messages size should less than ", 2*r0.valSet.F()+1)
 			}
 
 			continue
 		}
 
 		// core should have 2F+1 prepare messages
-		if int64(r0.current.Prepares.Size()) <= 2*r0.F {
+		if r0.current.Prepares.Size() <= 2*r0.valSet.F() {
 			t.Error("prepare messages size should greater than 2F+1, size:", r0.current.Prepares.Size())
 		}
 

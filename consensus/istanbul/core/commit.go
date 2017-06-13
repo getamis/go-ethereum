@@ -63,7 +63,7 @@ func (c *core) handleCommit(msg *message, src istanbul.Validator) error {
 	//
 	// If we already have a proposal, we may have chance to speed up the consensus process
 	// by committing the proposal without prepare messages.
-	if int64(c.current.Commits.Size()) > 2*c.F && c.state.Cmp(StateCommitted) < 0 {
+	if c.current.Commits.Size() > 2*c.valSet.F() && c.state.Cmp(StateCommitted) < 0 {
 		c.commit()
 	}
 

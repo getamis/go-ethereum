@@ -181,20 +181,20 @@ OUTER:
 			if r0.state != StatePrepared {
 				t.Error("state should be prepared")
 			}
-			if int64(r0.current.Commits.Size()) > 2*r0.F {
-				t.Error("commit messages size should less than ", 2*r0.F+1)
+			if r0.current.Commits.Size() > 2*r0.valSet.F() {
+				t.Error("commit messages size should less than ", 2*r0.valSet.F()+1)
 			}
 
 			continue
 		}
 
 		// core should have 2F+1 prepare messages
-		if int64(r0.current.Commits.Size()) <= 2*r0.F {
+		if r0.current.Commits.Size() <= 2*r0.valSet.F() {
 			t.Error("commit messages size should greater than 2F+1, size:", r0.current.Commits.Size())
 		}
 
 		// check signatures large than 2F+1
-		signedCount := int64(0)
+		signedCount := 0
 		signers := make([]common.Address, len(v0.committedSeals[0])/common.AddressLength)
 		for i := 0; i < len(signers); i++ {
 			copy(signers[i][:], v0.committedSeals[0][i*common.AddressLength:])
@@ -207,8 +207,8 @@ OUTER:
 				}
 			}
 		}
-		if signedCount <= 2*r0.F {
-			t.Errorf("expected signed count larger than:%v, but got:%v", 2*r0.F, signedCount)
+		if signedCount <= 2*r0.valSet.F() {
+			t.Errorf("expected signed count larger than:%v, but got:%v", 2*r0.valSet.F(), signedCount)
 		}
 	}
 }
