@@ -279,7 +279,7 @@ func (c *core) checkValidatorSignature(data []byte, sig []byte) (common.Address,
 }
 
 // prepareProposalSeal returns a slice from the given hash, and msgCode. Replaces msgCode
-// with msgPreprepare if msgCode is lager than uint8.
+// with msgPreprepare if msgCode is larger than uint8.
 func prepareProposalSeal(hash common.Hash, msgCode uint64) []byte {
 	// a sanity check
 	if msgCode > math.MaxUint8 {
