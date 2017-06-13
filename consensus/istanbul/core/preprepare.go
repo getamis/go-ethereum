@@ -16,7 +16,11 @@
 
 package core
 
-import "github.com/ethereum/go-ethereum/consensus/istanbul"
+import (
+	"time"
+
+	"github.com/ethereum/go-ethereum/consensus/istanbul"
+)
 
 func (c *core) sendPreprepare(request *istanbul.Request) {
 	logger := c.logger.New("state", c.state)
@@ -80,5 +84,6 @@ func (c *core) handlePreprepare(msg *message, src istanbul.Validator) error {
 }
 
 func (c *core) acceptPreprepare(preprepare *istanbul.Preprepare) {
+	c.consensusTimestamp = time.Now()
 	c.current.SetPreprepare(preprepare)
 }
