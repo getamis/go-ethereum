@@ -16,7 +16,7 @@
 
 package istanbul
 
-type ProposerPolicy int
+type ProposerPolicy uint64
 
 const (
 	RoundRobin ProposerPolicy = iota
@@ -24,19 +24,17 @@ const (
 )
 
 type Config struct {
-	RequestTimeout   uint64         `toml:",omitempty"` // The timeout for each Istanbul round in milliseconds. This timeout should be larger than BlockPauseTime.
-	BlockPeriod      uint64         `toml:",omitempty"` // Default minimum difference between two consecutive block's timestamps in second
-	BlockPauseTime   uint64         `toml:",omitempty"` // Pause time when zero tx in previous block, values should be larger than istanbul_block_period
-	ProposerPolicy   ProposerPolicy `toml:",omitempty"` // The policy for proposer, the detail is not determined
-	CheckPointPeriod int            `toml:",omitempty"` // Synchronizes the mapping's checkpoint to the blocks on each round
-	Epoch            uint64         `toml:",omitempty"` // The number of blocks after which to checkpoint and reset the pending votes
+	RequestTimeout uint64         `toml:",omitempty"` // The timeout for each Istanbul round in milliseconds. This timeout should be larger than BlockPauseTime.
+	BlockPeriod    uint64         `toml:",omitempty"` // Default minimum difference between two consecutive block's timestamps in second
+	BlockPauseTime uint64         `toml:",omitempty"` // Pause time when zero tx in previous block, values should be larger than istanbul_block_period
+	ProposerPolicy ProposerPolicy `toml:",omitempty"` // The policy for proposer, the detail is not determined
+	Epoch          uint64         `toml:",omitempty"` // The number of blocks after which to checkpoint and reset the pending votes
 }
 
 var DefaultConfig = &Config{
-	RequestTimeout:   10000,
-	BlockPeriod:      1,
-	BlockPauseTime:   2,
-	ProposerPolicy:   RoundRobin,
-	CheckPointPeriod: 100,
-	Epoch:            30000,
+	RequestTimeout: 10000,
+	BlockPeriod:    1,
+	BlockPauseTime: 2,
+	ProposerPolicy: RoundRobin,
+	Epoch:          30000,
 }

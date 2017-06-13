@@ -32,7 +32,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
-	"github.com/ethereum/go-ethereum/consensus/istanbul"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -481,16 +480,6 @@ var (
 		Usage: "Pause time when zero tx in previous block, values should be larger than istanbul.blockperiod",
 		Value: eth.DefaultConfig.Istanbul.BlockPauseTime,
 	}
-	IstanbulProposerPolicyFlag = cli.IntFlag{
-		Name:  "istanbul.proposerpolicy",
-		Usage: "Policy of proposer selection, the detail is not determined",
-		Value: int(eth.DefaultConfig.Istanbul.ProposerPolicy),
-	}
-	IstanbulCheckPointPeriodFlag = cli.IntFlag{
-		Name:  "istanbul.cpperiod",
-		Usage: "Synchronizes the mapping's checkpoint to the blocks on each round",
-		Value: eth.DefaultConfig.Istanbul.CheckPointPeriod,
-	}
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating
@@ -903,12 +892,6 @@ func setIstanbul(ctx *cli.Context, cfg *eth.Config) {
 	}
 	if ctx.GlobalIsSet(IstanbulBlockPauseTimeFlag.Name) {
 		cfg.Istanbul.BlockPauseTime = ctx.GlobalUint64(IstanbulBlockPauseTimeFlag.Name)
-	}
-	if ctx.GlobalIsSet(IstanbulProposerPolicyFlag.Name) {
-		cfg.Istanbul.ProposerPolicy = istanbul.ProposerPolicy(ctx.GlobalInt(IstanbulProposerPolicyFlag.Name))
-	}
-	if ctx.GlobalIsSet(IstanbulCheckPointPeriodFlag.Name) {
-		cfg.Istanbul.CheckPointPeriod = ctx.GlobalInt(IstanbulCheckPointPeriodFlag.Name)
 	}
 }
 
