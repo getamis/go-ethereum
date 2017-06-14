@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 )
 
@@ -48,7 +47,7 @@ func TestHandlePreprepare(t *testing.T) {
 
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
-					c.Start(big.NewInt(0), common.Address{}, nil)
+					c.valSet = backend.peers
 					if i != 0 {
 						c.state = StateAcceptRequest
 					}
@@ -65,12 +64,20 @@ func TestHandlePreprepare(t *testing.T) {
 
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
-
+					c.valSet = backend.peers
 					if i != 0 {
-						c.Start(big.NewInt(0), common.Address{}, nil)
 						c.state = StateAcceptRequest
+						// hack: force set subject that future message can be simulated
+						c.current = newTestRoundState(
+							&istanbul.View{
+								Round:    big.NewInt(0),
+								Sequence: big.NewInt(0),
+							},
+							c.valSet,
+						)
+
 					} else {
-						c.Start(big.NewInt(10), common.Address{}, nil)
+						c.current.SetSequence(big.NewInt(10))
 					}
 				}
 				return sys
@@ -88,9 +95,8 @@ func TestHandlePreprepare(t *testing.T) {
 
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
-
+					c.valSet = backend.peers
 					if i != 0 {
-						c.Start(big.NewInt(0), common.Address{}, nil)
 						// replica 0 is primary
 						c.state = StatePreprepared
 					}
@@ -107,9 +113,8 @@ func TestHandlePreprepare(t *testing.T) {
 
 				for i, backend := range sys.backends {
 					c := backend.engine.(*core)
-
+					c.valSet = backend.peers
 					if i != 0 {
-						c.Start(big.NewInt(10), common.Address{}, nil)
 						c.state = StatePreprepared
 						c.current.SetSequence(big.NewInt(10))
 						c.current.SetRound(big.NewInt(10))
@@ -145,7 +150,7 @@ OUTER:
 			c := v.engine.(*core)
 
 			m, _ := Encode(preprepare)
-			_, val := c.valSet.GetByAddress(v0.Address())
+			_, val := r0.valSet.GetByAddress(v0.Address())
 			// run each backends and verify handlePreprepare function.
 			if err := c.handlePreprepare(&message{
 				Code:    msgPreprepare,
