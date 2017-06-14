@@ -290,6 +290,19 @@ func DefaultRinkebyGenesisBlock() *Genesis {
 	}
 }
 
+// DefaultOttomanGenesisBlock returns the Ottoman network genesis block.
+func DefaultOttomanGenesisBlock() *Genesis {
+	return &Genesis{
+		Config:     params.OttomanChainConfig,
+		Timestamp:  1496993285,
+		ExtraData:  hexutil.MustDecode("0x000000000000000000000000000000000000000000000000000000000000000004475cc98b5521ab2a1335683e7567c8048bfe79ed07d8299de61faed3686ba4c4e6c3b9083d7e23714fe035ce99af680d89e2c4d73aca01dbfc1bd2fddc421209441a754f79c4a4ecd2b49c935aad03120000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		GasLimit:   4700000,
+		Difficulty: big.NewInt(1),
+		Mixhash:    common.HexToHash("0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365"),
+		Alloc:      decodePrealloc(ottomanAllocData),
+	}
+}
+
 // DevGenesisBlock returns the 'geth --dev' genesis block.
 func DevGenesisBlock() *Genesis {
 	return &Genesis{
