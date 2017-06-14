@@ -61,7 +61,7 @@ func (c *core) handlePrepare(msg *message, src istanbul.Validator) error {
 
 	// Change to StatePrepared if we've received enough prepare messages
 	// and we are in earlier state before StatePrepared
-	if int64(c.current.Prepares.Size()) > 2*c.F && c.state.Cmp(StatePrepared) < 0 {
+	if c.current.Prepares.Size() > 2*c.valSet.F() && c.state.Cmp(StatePrepared) < 0 {
 		c.setState(StatePrepared)
 		c.sendCommit()
 	}

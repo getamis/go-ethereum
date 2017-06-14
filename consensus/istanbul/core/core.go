@@ -61,8 +61,6 @@ func New(backend istanbul.Backend, config *istanbul.Config) Engine {
 type core struct {
 	config  *istanbul.Config
 	address common.Address
-	N       int64
-	F       int64
 	state   State
 	logger  log.Logger
 
@@ -210,8 +208,6 @@ func (c *core) startNewRound(newView *istanbul.View, roundChange bool) {
 	}
 
 	c.valSet = c.backend.Validators(c.lastProposal)
-	c.N = int64(c.valSet.Size())
-	c.F = int64(math.Ceil(float64(c.N)/3) - 1)
 	// Clear invalid RoundChange messages
 	c.roundChangeSet = newRoundChangeSet(c.valSet)
 	// New snapshot for new round
@@ -289,4 +285,9 @@ func prepareProposalSeal(hash common.Hash, msgCode uint64) []byte {
 	buf.Write(hash.Bytes())
 	buf.Write([]byte{byte(msgCode)})
 	return buf.Bytes()
+}
+
+// PrepareCommittedSeal returns a slice of committed seal for the given hash
+func PrepareCommittedSeal(hash common.Hash) []byte {
+	return prepareProposalSeal(hash, msgCommit)
 }

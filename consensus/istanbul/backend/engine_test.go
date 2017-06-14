@@ -269,12 +269,12 @@ func TestSealCommitted(t *testing.T) {
 func TestVerifyHeader(t *testing.T) {
 	chain, engine := newBlockChain(1)
 
-	// correct case
+	// errEmptyCommittedSeals case
 	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	block, _ = engine.updateBlock(chain.Genesis().Header(), block)
 	err := engine.VerifyHeader(chain, block.Header(), false)
-	if err != nil {
-		t.Errorf("error should be nil, got: %v", err)
+	if err != errEmptyCommittedSeals {
+		t.Errorf("unexpected error comes, got: %v, expected: errEmptyCommittedSeals", err)
 	}
 
 	// short extra data
@@ -382,6 +382,7 @@ func TestVerifyHeaders(t *testing.T) {
 	headers := []*types.Header{}
 	blocks := []*types.Block{}
 	size := 100
+
 	for i := 0; i < size; i++ {
 		var b *types.Block
 		if i == 0 {
@@ -406,8 +407,10 @@ OUT1:
 		select {
 		case err := <-results:
 			if err != nil {
-				t.Errorf("error should be nil, but got: %v", err)
-				break OUT1
+				if err != errEmptyCommittedSeals && err != errInvalidCommittedSeals {
+					t.Errorf("error should be nil, but got: %v", err)
+					break OUT1
+				}
 			}
 			index++
 			if index == size {
@@ -426,8 +429,10 @@ OUT2:
 		select {
 		case err := <-results:
 			if err != nil {
-				t.Errorf("error should be nil, but got: %v", err)
-				break OUT2
+				if err != errEmptyCommittedSeals && err != errInvalidCommittedSeals {
+					t.Errorf("error should be nil, but got: %v", err)
+					break OUT2
+				}
 			}
 			index++
 			if index == 5 {
@@ -453,7 +458,9 @@ OUT3:
 		select {
 		case err := <-results:
 			if err != nil {
-				errors++
+				if err != errEmptyCommittedSeals && err != errInvalidCommittedSeals {
+					errors++
+				}
 			}
 			index++
 			if index == size {

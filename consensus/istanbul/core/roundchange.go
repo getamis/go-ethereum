@@ -94,7 +94,7 @@ func (c *core) handleRoundChange(msg *message, src istanbul.Validator) error {
 	// Once we received f+1 round change messages, those messages form a weak certificate.
 	// If our round number is smaller than the certificate's round number, we would
 	// try to catch up the round number.
-	if num == int(c.F+1) {
+	if num == int(c.valSet.F()+1) {
 		if cv.Round.Cmp(rc.Round) < 0 {
 			c.catchUpRound(&istanbul.View{
 				Round:    new(big.Int).Sub(rc.Round, common.Big1),
@@ -105,7 +105,7 @@ func (c *core) handleRoundChange(msg *message, src istanbul.Validator) error {
 	}
 
 	// We've received 2f+1 round change messages, start a new round immediately.
-	if num == int(2*c.F+1) {
+	if num == int(2*c.valSet.F()+1) {
 		c.startNewRound(&istanbul.View{
 			Round:    new(big.Int).Set(rc.Round),
 			Sequence: new(big.Int).Set(rc.Sequence),
