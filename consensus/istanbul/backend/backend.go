@@ -123,7 +123,7 @@ func (sb *simpleBackend) Broadcast(valSet istanbul.ValidatorSet, payload []byte)
 }
 
 // Commit implements istanbul.Backend.Commit
-func (sb *simpleBackend) Commit(proposal istanbul.Proposal, signatures []byte) error {
+func (sb *simpleBackend) Commit(proposal istanbul.Proposal, seals []byte) error {
 	// Check if the proposal is a valid block
 	block := &types.Block{}
 	block, ok := proposal.(*types.Block)
@@ -132,8 +132,8 @@ func (sb *simpleBackend) Commit(proposal istanbul.Proposal, signatures []byte) e
 		return errInvalidProposal
 	}
 
-	// Append signatures into extra-data
-	err := types.AppendIstanbulCommittedSealExtra(block, signatures)
+	// Append seals into extra-data
+	err := types.AppendIstanbulCommittedSealExtra(block, seals)
 	if err != nil {
 		return err
 	}

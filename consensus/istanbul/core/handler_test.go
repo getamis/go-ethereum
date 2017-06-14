@@ -45,10 +45,11 @@ func TestHandleMsg(t *testing.T) {
 	})
 	// with a matched payload. msgPreprepare should match with *istanbul.Preprepare in normal case.
 	msg := &message{
-		Code:      msgPreprepare,
-		Msg:       m,
-		Address:   v0.Address(),
-		Signature: []byte{},
+		Code:         msgPreprepare,
+		Msg:          m,
+		Address:      v0.Address(),
+		Signature:    []byte{},
+		ProposalSeal: []byte{},
 	}
 
 	_, val := v0.Validators(nil).GetByAddress(v0.Address())
@@ -65,10 +66,11 @@ func TestHandleMsg(t *testing.T) {
 	})
 	// with a unmatched payload. msgPrepare should match with *istanbul.Subject in normal case.
 	msg = &message{
-		Code:      msgPrepare,
-		Msg:       m,
-		Address:   v0.Address(),
-		Signature: []byte{},
+		Code:         msgPrepare,
+		Msg:          m,
+		Address:      v0.Address(),
+		Signature:    []byte{},
+		ProposalSeal: []byte{},
 	}
 
 	_, val = v0.Validators(nil).GetByAddress(v0.Address())
@@ -85,10 +87,11 @@ func TestHandleMsg(t *testing.T) {
 	})
 	// with a unmatched payload. istanbul.MsgCommit should match with *istanbul.Subject in normal case.
 	msg = &message{
-		Code:      msgCommit,
-		Msg:       m,
-		Address:   v0.Address(),
-		Signature: []byte{},
+		Code:         msgCommit,
+		Msg:          m,
+		Address:      v0.Address(),
+		Signature:    []byte{},
+		ProposalSeal: []byte{},
 	}
 
 	_, val = v0.Validators(nil).GetByAddress(v0.Address())
@@ -105,10 +108,11 @@ func TestHandleMsg(t *testing.T) {
 	})
 	// invalid message code. message code is not exists in list
 	msg = &message{
-		Code:      uint64(99),
-		Msg:       m,
-		Address:   v0.Address(),
-		Signature: []byte{},
+		Code:         uint64(99),
+		Msg:          m,
+		Address:      v0.Address(),
+		Signature:    []byte{},
+		ProposalSeal: []byte{},
 	}
 
 	_, val = v0.Validators(nil).GetByAddress(v0.Address())

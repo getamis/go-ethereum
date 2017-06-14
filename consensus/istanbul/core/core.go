@@ -17,6 +17,7 @@
 package core
 
 import (
+	"bytes"
 	"math"
 	"math/big"
 	"sync"
@@ -95,8 +96,20 @@ type core struct {
 }
 
 func (c *core) finalizeMessage(msg *message) ([]byte, error) {
+	var err error
 	// Add sender address
 	msg.Address = c.Address()
+
+	// Add proof of consensus
+	msg.ProposalSeal = []byte{}
+	// A sanity check
+	if c.current.Proposal() != nil {
+		seal := prepareProposalSeal(c.current.Proposal().Hash(), msg.Code)
+		msg.ProposalSeal, err = c.backend.Sign(seal)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// Sign message
 	data, err := msg.PayloadNoSig()
@@ -178,7 +191,7 @@ func (c *core) commit() {
 	if proposal != nil {
 		var signatures []byte
 		for _, v := range c.current.Commits.Values() {
-			signatures = append(signatures, v.Signature...)
+			signatures = append(signatures, v.ProposalSeal...)
 		}
 
 		if err := c.backend.Commit(proposal, signatures); err != nil {
@@ -263,4 +276,17 @@ func (c *core) newRoundChangeTimer() {
 
 func (c *core) checkValidatorSignature(data []byte, sig []byte) (common.Address, error) {
 	return istanbul.CheckValidatorSignature(c.valSet, data, sig)
+}
+
+// prepareProposalSeal returns a slice from the given hash, and msgCode. Replaces msgCode
+// with msgPreprepare if msgCode is larger than uint8.
+func prepareProposalSeal(hash common.Hash, msgCode uint64) []byte {
+	// a sanity check
+	if msgCode > math.MaxUint8 {
+		msgCode = msgPreprepare
+	}
+	var buf bytes.Buffer
+	buf.Write(hash.Bytes())
+	buf.Write([]byte{byte(msgCode)})
+	return buf.Bytes()
 }

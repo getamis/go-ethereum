@@ -82,10 +82,11 @@ const (
 )
 
 type message struct {
-	Code      uint64
-	Msg       []byte
-	Address   common.Address
-	Signature []byte
+	Code         uint64
+	Msg          []byte
+	Address      common.Address
+	Signature    []byte
+	ProposalSeal []byte
 }
 
 // ==============================================
@@ -94,22 +95,23 @@ type message struct {
 
 // EncodeRLP serializes m into the Ethereum RLP format.
 func (m *message) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, []interface{}{m.Code, m.Msg, m.Address, m.Signature})
+	return rlp.Encode(w, []interface{}{m.Code, m.Msg, m.Address, m.Signature, m.ProposalSeal})
 }
 
 // DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
 func (m *message) DecodeRLP(s *rlp.Stream) error {
 	var msg struct {
-		Code      uint64
-		Msg       []byte
-		Address   common.Address
-		Signature []byte
+		Code         uint64
+		Msg          []byte
+		Address      common.Address
+		Signature    []byte
+		ProposalSeal []byte
 	}
 
 	if err := s.Decode(&msg); err != nil {
 		return err
 	}
-	m.Code, m.Msg, m.Address, m.Signature = msg.Code, msg.Msg, msg.Address, msg.Signature
+	m.Code, m.Msg, m.Address, m.Signature, m.ProposalSeal = msg.Code, msg.Msg, msg.Address, msg.Signature, msg.ProposalSeal
 	return nil
 }
 
@@ -144,10 +146,11 @@ func (m *message) Payload() ([]byte, error) {
 
 func (m *message) PayloadNoSig() ([]byte, error) {
 	return rlp.EncodeToBytes(&message{
-		Code:      m.Code,
-		Msg:       m.Msg,
-		Address:   m.Address,
-		Signature: []byte{},
+		Code:         m.Code,
+		Msg:          m.Msg,
+		Address:      m.Address,
+		Signature:    []byte{},
+		ProposalSeal: m.ProposalSeal,
 	})
 }
 
