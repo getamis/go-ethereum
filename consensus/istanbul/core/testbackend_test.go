@@ -40,6 +40,7 @@ type testSystemBackend struct {
 	events *event.TypeMux
 
 	commitMsgs []istanbul.Proposal
+	commitSigs [][]byte
 	sentMsgs   [][]byte // store the message when Send is called by core
 
 	address common.Address
@@ -86,9 +87,10 @@ func (self *testSystemBackend) NextRound() error {
 	return nil
 }
 
-func (self *testSystemBackend) Commit(proposal istanbul.Proposal) error {
+func (self *testSystemBackend) Commit(proposal istanbul.Proposal, signatures []byte) error {
 	testLogger.Info("commit message", "address", self.Address())
 	self.commitMsgs = append(self.commitMsgs, proposal)
+	self.commitSigs = append(self.commitSigs, signatures)
 
 	// fake new head events
 	go self.events.Post(istanbul.FinalCommittedEvent{

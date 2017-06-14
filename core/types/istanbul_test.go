@@ -18,6 +18,7 @@ package types
 
 import (
 	"bytes"
+	"math/big"
 	"reflect"
 	"testing"
 
@@ -44,6 +45,167 @@ func TestHeaderHash(t *testing.T) {
 	}
 }
 
+func TestExtractToIstanbul(t *testing.T) {
+	expectedIstanbul := &IstanbulExtra{
+		Vanity: append([]byte{1, 2, 3}, bytes.Repeat([]byte{0x00}, IstanbulExtraVanity-3)...),
+		Validators: []common.Address{
+			common.HexToAddress("0x44add0ec310f115a0e603b2d7db9f067778eaf8a"),
+			common.HexToAddress("0x294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212"),
+			common.HexToAddress("0x6beaaed781d2d2ab6350f5c4566a2c6eaac407a6"),
+			common.HexToAddress("0x8be76812f765c24641ec63dc2852b378aba2b440"),
+		},
+		Seal:          append([]byte{1}, bytes.Repeat([]byte{0x00}, IstanbulExtraSeal-1)...),
+		CommittedSeal: [][]byte{append([]byte{1, 2, 3}, bytes.Repeat([]byte{0x00}, IstanbulExtraSeal-3)...)},
+	}
+
+	istanbul := ExtractToIstanbul(&Header{Extra: hexutil.MustDecode("0x01020300000000000000000000000000000000000000000000000000000000000444add0ec310f115a0e603b2d7db9f067778eaf8a294fc7e8f22b3bcdcf955dd7ff3ba2ed833f82126beaaed781d2d2ab6350f5c4566a2c6eaac407a68be76812f765c24641ec63dc2852b378aba2b4400100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010102030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")})
+	if !reflect.DeepEqual(expectedIstanbul, istanbul) {
+		t.Errorf("expected: %v, but got: %v", expectedIstanbul, istanbul)
+	}
+}
+
+func TestExtractToIstanbulIndex(t *testing.T) {
+	expectedIstanbulIndex := &IstanbulIndex{
+		Vanity:              0,
+		ValidatorSize:       32,
+		ValidatorLength:     33,
+		Seal:                113,
+		CommittedSize:       114,
+		CommittedSealLength: 179,
+	}
+
+	testExtra := hexutil.MustDecode("0x00000000000000000000000000000000000000000000000000000000000000000444add0ec310f115a0e603b2d7db9f067778eaf8a294fc7e8f22b3bcdcf955dd7ff3ba2ed833f82126beaaed781d2d2ab6350f5c4566a2c6eaac407a68be76812f765c24641ec63dc2852b378aba2b4400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+
+	extraIndex := ExtractToIstanbulIndex(&Header{Extra: testExtra})
+	if expectedIstanbulIndex.Vanity != extraIndex.Vanity {
+		t.Errorf("expected: %v, but got: %v", expectedIstanbulIndex.Vanity, extraIndex.Vanity)
+	}
+	if expectedIstanbulIndex.ValidatorSize != extraIndex.ValidatorSize {
+		t.Errorf("expected: %v, but got: %v", expectedIstanbulIndex.ValidatorSize, extraIndex.ValidatorSize)
+	}
+	if expectedIstanbulIndex.ValidatorLength != extraIndex.ValidatorLength {
+		t.Errorf("expected: %v, but got: %v", expectedIstanbulIndex.ValidatorLength, extraIndex.ValidatorLength)
+	}
+	if expectedIstanbulIndex.Seal != extraIndex.Seal {
+		t.Errorf("expected: %v, but got: %v", expectedIstanbulIndex.Seal, extraIndex.Seal)
+	}
+}
+
+func TestValidateIstanbulExtra(t *testing.T) {
+	testCases := []struct {
+		expectedErr error
+
+		testExtra []byte
+	}{
+		// valid extra
+		{nil, hexutil.MustDecode("0x00000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")},
+
+		// extra is nil
+		{ErrInvalidIstanbulHeaderExtra, nil},
+
+		// information is not enough
+		{ErrInvalidIstanbulHeaderExtra, append([]byte{1, 2, 3}, bytes.Repeat([]byte{0x00}, IstanbulExtraVanity+IstanbulExtraValidatorSize+IstanbulExtraSeal+IstanbulExtraCommittedSize-3 /*testExtra size is 3*/)...)},
+
+		// validator size not mapping to validator length
+		// validator size is 1, but validator length is 0
+		{ErrInvalidIstanbulHeaderExtra, hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")},
+
+		// wrong seal length, 60 bytes
+		{ErrInvalidIstanbulHeaderExtra, hexutil.MustDecode("0x00000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")},
+
+		// committed message size not mapping to committed message length
+		// committed message size is 1, but committed message length is 0
+		{ErrInvalidIstanbulHeaderExtra, hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001")},
+	}
+
+	for _, test := range testCases {
+		if err := ValidateIstanbulSeal(&Header{Extra: test.testExtra}); err != nil {
+			if err != test.expectedErr {
+				t.Errorf("unexpected error: %v", err)
+			}
+		}
+	}
+}
+
+func TestPrepareIstanbulExtra(t *testing.T) {
+	validatorN := 4
+	cmttedN := 1
+	var buf bytes.Buffer
+	buf.Write(make([]byte, IstanbulExtraVanity))
+	buf.Write([]byte{byte(validatorN)})
+	validators := make([]common.Address, validatorN)
+	for i := 0; i < validatorN; i++ {
+		validators[i] = common.StringToAddress(string(i))
+		buf.Write(validators[i].Bytes())
+	}
+	buf.Write(make([]byte, IstanbulExtraSeal))
+	buf.Write([]byte{byte(cmttedN)})
+	buf.Write(make([]byte, cmttedN*IstanbulExtraSeal))
+
+	// test with block 1
+	parentHeader := &Header{Number: new(big.Int).Set(common.Big0)}
+	parentHeader.Extra = buf.Bytes()
+
+	header := &Header{Number: new(big.Int).Set(common.Big1)}
+	header.Extra = common.StringToHash("123").Bytes()
+
+	index := ExtractToIstanbulIndex(parentHeader)
+
+	expectedExtra := parentHeader.Extra[0:index.CommittedSize]
+	copy(expectedExtra[0:IstanbulExtraVanity], header.Extra)
+
+	extra := PrepareIstanbulExtra(header, validators)
+	if bytes.Compare(extra, expectedExtra) != 0 {
+		t.Errorf("expected: %v, got: %v", expectedExtra, extra)
+	}
+
+	// append useless information
+	buf.Write(make([]byte, 15))
+	header.Extra = buf.Bytes()
+
+	extra = PrepareIstanbulExtra(header, validators)
+	if bytes.Compare(extra, expectedExtra) != 0 {
+		t.Errorf("expected: %v, got: %v", expectedExtra, extra)
+	}
+}
+
+func TestEnsureValidIstanbulExtra(t *testing.T) {
+	testCases := []struct {
+		testExtra []byte
+
+		expectedExtra []byte
+	}{
+		// valid extra
+		{hexutil.MustDecode("0x00000000000000000000000000000000000000000000000000000000000000000444add0ec310f115a0e603b2d7db9f067778eaf8a294fc7e8f22b3bcdcf955dd7ff3ba2ed833f82126beaaed781d2d2ab6350f5c4566a2c6eaac407a68be76812f765c24641ec63dc2852b378aba2b4400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"), hexutil.MustDecode("0x00000000000000000000000000000000000000000000000000000000000000000444add0ec310f115a0e603b2d7db9f067778eaf8a294fc7e8f22b3bcdcf955dd7ff3ba2ed833f82126beaaed781d2d2ab6350f5c4566a2c6eaac407a68be76812f765c24641ec63dc2852b378aba2b4400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")},
+
+		// extra is nil
+		{[]byte{}, bytes.Repeat([]byte{0x00}, IstanbulExtraVanity+IstanbulExtraValidatorSize+IstanbulExtraSeal+IstanbulExtraCommittedSize)},
+
+		// information is not enough
+		{[]byte{1, 2, 3}, append([]byte{1, 2, 3}, bytes.Repeat([]byte{0x00}, IstanbulExtraVanity+IstanbulExtraValidatorSize+IstanbulExtraSeal+IstanbulExtraCommittedSize-3 /*testExtra size is 3*/)...)},
+
+		// validator size not mapping to validator length
+		// validator size is 1, but validator length is 0
+		{hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"), hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")},
+
+		// wrong signature length, 60 bytes
+		{hexutil.MustDecode("0x000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"), hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")},
+
+		// missing 2 committed message
+		{hexutil.MustDecode("0x00000000000000000000000000000000000000000000000000000000000000000444add0ec310f115a0e603b2d7db9f067778eaf8a294fc7e8f22b3bcdcf955dd7ff3ba2ed833f82126beaaed781d2d2ab6350f5c4566a2c6eaac407a68be76812f765c24641ec63dc2852b378aba2b440000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002"), hexutil.MustDecode("0x00000000000000000000000000000000000000000000000000000000000000000444add0ec310f115a0e603b2d7db9f067778eaf8a294fc7e8f22b3bcdcf955dd7ff3ba2ed833f82126beaaed781d2d2ab6350f5c4566a2c6eaac407a68be76812f765c24641ec63dc2852b378aba2b44000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")},
+
+		// too much data in extra
+		{hexutil.MustDecode("0x00000000000000000000000000000000000000000000000000000000000000000444add0ec310f115a0e603b2d7db9f067778eaf8a294fc7e8f22b3bcdcf955dd7ff3ba2ed833f82126beaaed781d2d2ab6350f5c4566a2c6eaac407a68be76812f765c24641ec63dc2852b378aba2b44000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001122334455"), hexutil.MustDecode("0x00000000000000000000000000000000000000000000000000000000000000000444add0ec310f115a0e603b2d7db9f067778eaf8a294fc7e8f22b3bcdcf955dd7ff3ba2ed833f82126beaaed781d2d2ab6350f5c4566a2c6eaac407a68be76812f765c24641ec63dc2852b378aba2b4400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")},
+	}
+
+	for _, test := range testCases {
+		newHeader := ensureValidIstanbulExtra(&Header{Extra: test.testExtra})
+		if !reflect.DeepEqual(newHeader.Extra, test.expectedExtra) {
+			t.Errorf("expected: %v, but got: %v", test.expectedExtra, newHeader.Extra)
+		}
+	}
+}
+
 func TestIstanbulExtraFilter(t *testing.T) {
 	testCases := []struct {
 		testExtra []byte
@@ -54,10 +216,10 @@ func TestIstanbulExtraFilter(t *testing.T) {
 		{hexutil.MustDecode("0x00000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"), hexutil.MustDecode("0x00000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")},
 
 		// extra is nil
-		{[]byte{}, bytes.Repeat([]byte{0x00}, IstanbulExtraVanity + IstanbulExtraValidatorSize + IstanbulExtraSeal)},
+		{[]byte{}, bytes.Repeat([]byte{0x00}, IstanbulExtraVanity+IstanbulExtraValidatorSize+IstanbulExtraSeal)},
 
 		// information is not enough
-		{[]byte{1, 2, 3}, append([]byte{1, 2, 3}, bytes.Repeat([]byte{0x00}, IstanbulExtraVanity + IstanbulExtraValidatorSize + IstanbulExtraSeal -3 /*testExtra size is 3*/)...)},
+		{[]byte{1, 2, 3}, append([]byte{1, 2, 3}, bytes.Repeat([]byte{0x00}, IstanbulExtraVanity+IstanbulExtraValidatorSize+IstanbulExtraSeal-3 /*testExtra size is 3*/)...)},
 
 		// validator size not mapping to validator length
 		// validator size is 1, but validator length is 0
@@ -68,7 +230,7 @@ func TestIstanbulExtraFilter(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		newHeader := IstanbulExtraFilter(&Header{Extra: test.testExtra})
+		newHeader := IstanbulHashFilter(&Header{Extra: test.testExtra})
 
 		if !reflect.DeepEqual(newHeader.Extra, test.expectedExtra) {
 			t.Errorf("expected: %v, but got: %v", test.expectedExtra, newHeader.Extra)

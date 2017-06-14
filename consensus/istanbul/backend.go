@@ -40,7 +40,7 @@ type Backend interface {
 
 	// Commit delivers a approved proposal to backend.
 	// The delivered proposal will be put into blockchain.
-	Commit(Proposal) error
+	Commit(proposal Proposal, signatures []byte) error
 
 	// NextRound is called when we want to trigger next Seal()
 	NextRound() error

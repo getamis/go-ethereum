@@ -100,7 +100,7 @@ type headerMarshaling struct {
 // RLP encoding.
 func (h *Header) Hash() common.Hash {
 	if h.MixDigest == IstanbulDigest {
-		return rlpHash(IstanbulExtraFilter(h))
+		return rlpHash(IstanbulHashFilter(h))
 	}
 	return rlpHash(h)
 }
