@@ -168,11 +168,11 @@ OUTER:
 			validator := r0.valSet.GetByIndex(uint64(i))
 			m, _ := Encode(v.engine.(*core).current.Subject())
 			if err := r0.handleCommit(&message{
-				Code:         msgCommit,
-				Msg:          m,
-				Address:      validator.Address(),
-				Signature:    []byte{},
-				ProposalSeal: validator.Address().Bytes(), // small hack
+				Code:       msgCommit,
+				Msg:        m,
+				Address:    validator.Address(),
+				Signature:  []byte{},
+				CommittedSeal: validator.Address().Bytes(), // small hack
 			}, validator); err != nil {
 				if err != test.expectedErr {
 					t.Error("unexpected error: ", err)

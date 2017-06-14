@@ -99,11 +99,11 @@ func (c *core) finalizeMessage(msg *message) ([]byte, error) {
 	msg.Address = c.Address()
 
 	// Add proof of consensus
-	msg.ProposalSeal = []byte{}
-	// A sanity check
-	if c.current.Proposal() != nil {
+	msg.CommittedSeal = []byte{}
+	// Assign the CommittedSeal if it's a commit message and proposal is not nil
+	if msg.Code == msgCommit && c.current.Proposal() != nil {
 		seal := prepareProposalSeal(c.current.Proposal().Hash(), msg.Code)
-		msg.ProposalSeal, err = c.backend.Sign(seal)
+		msg.CommittedSeal, err = c.backend.Sign(seal)
 		if err != nil {
 			return nil, err
 		}
@@ -189,7 +189,7 @@ func (c *core) commit() {
 	if proposal != nil {
 		var signatures []byte
 		for _, v := range c.current.Commits.Values() {
-			signatures = append(signatures, v.ProposalSeal...)
+			signatures = append(signatures, v.CommittedSeal...)
 		}
 
 		if err := c.backend.Commit(proposal, signatures); err != nil {

@@ -125,11 +125,11 @@ func testSubjectWithSignature(t *testing.T) {
 	subjectPayload, _ := Encode(s)
 	// 1. Encode test
 	m := &message{
-		Code:         msgPreprepare,
-		Msg:          subjectPayload,
-		Address:      common.HexToAddress("0x1234567890"),
-		Signature:    expectedSig,
-		ProposalSeal: []byte{},
+		Code:          msgPreprepare,
+		Msg:           subjectPayload,
+		Address:       common.HexToAddress("0x1234567890"),
+		Signature:     expectedSig,
+		CommittedSeal: []byte{},
 	}
 
 	msgPayload, err := m.Payload()
