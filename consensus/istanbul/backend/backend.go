@@ -132,11 +132,14 @@ func (sb *simpleBackend) Commit(proposal istanbul.Proposal, seals []byte) error 
 		return errInvalidProposal
 	}
 
+	h := block.Header()
 	// Append seals into extra-data
-	err := types.AppendIstanbulCommittedSealExtra(block, seals)
+	err := writeIstanbulCommittedSeals(h, seals)
 	if err != nil {
 		return err
 	}
+	// update block's header
+	block = block.WithSeal(h)
 
 	sb.logger.Info("Committed", "address", sb.Address(), "hash", proposal.Hash(), "number", proposal.Number().Uint64())
 	// - if the proposed and committed blocks are the same, send the proposed hash

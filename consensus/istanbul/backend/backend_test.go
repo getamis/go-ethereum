@@ -134,7 +134,7 @@ func TestCommit(t *testing.T) {
 		},
 		{
 			// invalid signature
-			types.ErrInvalidIstanbulCommittedSeal,
+			errInvalidCommittedSeals,
 			nil,
 			func() *types.Block {
 				chain, engine := newBlockChain(1)

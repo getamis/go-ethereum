@@ -119,7 +119,7 @@ func (sb *simpleBackend) verifyHeader(chain consensus.ChainReader, header *types
 	}
 
 	// Ensure that the extra data format is satisfied
-	if err := types.ValidateIstanbulSeal(header); err != nil {
+	if _, err := types.ExtractToIstanbul(header); err != nil {
 		return errInvalidExtraDataFormat
 	}
 
@@ -253,7 +253,10 @@ func (sb *simpleBackend) verifyCommittedSeals(chain consensus.ChainReader, heade
 		return err
 	}
 
-	extra := types.ExtractToIstanbul(header)
+	extra, err := types.ExtractToIstanbul(header)
+	if err != nil {
+		return err
+	}
 	// The length of Committed seals should be larger than 0
 	if len(extra.CommittedSeal) == 0 {
 		return errEmptyCommittedSeals
@@ -352,7 +355,11 @@ func (sb *simpleBackend) Prepare(chain consensus.ChainReader, header *types.Head
 	}
 
 	// add validators in snapshot to extraData's validators section
-	header.Extra = types.PrepareIstanbulExtra(header, snap.validators())
+	extra, err := prepareIstanbulExtra(header, snap.validators())
+	if err != nil {
+		return err
+	}
+	header.Extra = extra
 	return nil
 }
 
@@ -455,8 +462,10 @@ func (sb *simpleBackend) updateBlock(parent *types.Header, block *types.Block) (
 		return nil, err
 	}
 
-	index := types.ExtractToIstanbulIndex(header)
-	copy(header.Extra[index.Seal:index.Seal+types.IstanbulExtraSeal], sighash)
+	err = writeIstanbulSeal(header, sighash)
+	if err != nil {
+		return nil, err
+	}
 
 	return block.WithSeal(header), nil
 }
@@ -562,7 +571,10 @@ func (sb *simpleBackend) snapshot(chain consensus.ChainReader, number uint64, ha
 			if err := sb.VerifyHeader(chain, genesis, false); err != nil {
 				return nil, err
 			}
-			istanbul := types.ExtractToIstanbul(genesis)
+			istanbul, err := types.ExtractToIstanbul(genesis)
+			if err != nil {
+				return nil, err
+			}
 			snap = newSnapshot(sb.config.Epoch, 0, genesis.Hash(), validator.NewSet(istanbul.Validators, sb.config.ProposerPolicy))
 			if err := snap.store(sb.db); err != nil {
 				return nil, err
@@ -620,24 +632,7 @@ func (sb *simpleBackend) snapshot(chain consensus.ChainReader, number uint64, ha
 func sigHash(header *types.Header) (hash common.Hash) {
 	hasher := sha3.NewKeccak256()
 
-	index := types.ExtractToIstanbulIndex(header)
-	rlp.Encode(hasher, []interface{}{
-		header.ParentHash,
-		header.UncleHash,
-		header.Coinbase,
-		header.Root,
-		header.TxHash,
-		header.ReceiptHash,
-		header.Bloom,
-		header.Difficulty,
-		header.Number,
-		header.GasLimit,
-		header.GasUsed,
-		header.Time,
-		header.Extra[:index.Seal], // Yes, this will panic if extra is too short
-		header.MixDigest,
-		header.Nonce,
-	})
+	rlp.Encode(hasher, types.IstanbulExtraDataFilter(header))
 	hasher.Sum(hash[:0])
 	return hash
 }
@@ -645,7 +640,81 @@ func sigHash(header *types.Header) (hash common.Hash) {
 // ecrecover extracts the Ethereum account address from a signed header.
 func ecrecover(header *types.Header) (common.Address, error) {
 	// Retrieve the signature from the header extra-data
-	index := types.ExtractToIstanbulIndex(header)
-	signature := header.Extra[index.Seal : index.Seal+types.IstanbulExtraSeal]
-	return istanbul.GetSignatureAddress(sigHash(header).Bytes(), signature)
+	istExtra, err := types.ExtractToIstanbul(header)
+	if err != nil {
+		return common.Address{}, err
+	}
+	return istanbul.GetSignatureAddress(sigHash(header).Bytes(), istExtra.Seal)
+}
+
+// prepareIstanbulExtra returns a istanbul extra-data that use the given header, parent to
+// ensure it conforms to Istanbul rules, but seal, and committed seals are not included.
+func prepareIstanbulExtra(header *types.Header, vals []common.Address) ([]byte, error) {
+	var buf bytes.Buffer
+
+	// compensate the lack bytes if header.Extra is not enough IstanbulExtraVanity bytes.
+	if len(header.Extra) < types.IstanbulExtraVanity {
+		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, types.IstanbulExtraVanity-len(header.Extra))...)
+	}
+	buf.Write(header.Extra[:types.IstanbulExtraVanity])
+
+	ist := &types.IstanbulExtra{
+		Validators:    vals,
+		Seal:          []byte{},
+		CommittedSeal: [][]byte{},
+	}
+
+	payload, err := rlp.EncodeToBytes(&ist)
+	if err != nil {
+		return nil, err
+	}
+
+	return append(buf.Bytes(), payload...), nil
+}
+
+// writeIstanbulSeal writes the extra-data field of a block header with given seal.
+func writeIstanbulSeal(h *types.Header, seal []byte) error {
+	if len(seal)%types.IstanbulExtraSeal != 0 {
+		return errInvalidSignature
+	}
+
+	ist, err := types.ExtractToIstanbul(h)
+	if err != nil {
+		return err
+	}
+
+	ist.Seal = seal
+	payload, err := rlp.EncodeToBytes(&ist)
+	if err != nil {
+		return err
+	}
+
+	h.Extra = append(h.Extra[:types.IstanbulExtraVanity], payload...)
+	return nil
+}
+
+// writeIstanbulCommittedSeals writes the extra-data field of a block header with given committed seals.
+func writeIstanbulCommittedSeals(h *types.Header, committedSeals []byte) error {
+	if len(committedSeals)%types.IstanbulExtraSeal != 0 {
+		return errInvalidCommittedSeals
+	}
+
+	ist, err := types.ExtractToIstanbul(h)
+	if err != nil {
+		return err
+	}
+
+	ist.CommittedSeal = make([][]byte, len(committedSeals)/types.IstanbulExtraSeal)
+	for i := 0; i < len(ist.CommittedSeal); i++ {
+		ist.CommittedSeal[i] = make([]byte, types.IstanbulExtraSeal)
+		copy(ist.CommittedSeal[i][:], committedSeals[i*types.IstanbulExtraSeal:])
+	}
+
+	payload, err := rlp.EncodeToBytes(&ist)
+	if err != nil {
+		return err
+	}
+
+	h.Extra = append(h.Extra[:types.IstanbulExtraVanity], payload...)
+	return nil
 }

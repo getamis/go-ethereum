@@ -35,6 +35,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // in this test, we can set n to 1, and it means we can process Istanbul and commit a
@@ -105,22 +106,23 @@ func getGenesisAndKeys(n int) (*core.Genesis, []*ecdsa.PrivateKey) {
 }
 
 func appendValidators(genesis *core.Genesis, addrs []common.Address) {
+
 	if len(genesis.ExtraData) < types.IstanbulExtraVanity {
 		genesis.ExtraData = append(genesis.ExtraData, bytes.Repeat([]byte{0x00}, types.IstanbulExtraVanity)...)
 	}
 	genesis.ExtraData = genesis.ExtraData[:types.IstanbulExtraVanity]
 
-	validatorSize := byte(len(addrs))
-	genesis.ExtraData = append(genesis.ExtraData, validatorSize)
-
-	for _, addr := range addrs {
-		genesis.ExtraData = append(genesis.ExtraData, addr[:]...)
+	ist := &types.IstanbulExtra{
+		Validators:    addrs,
+		Seal:          []byte{},
+		CommittedSeal: [][]byte{},
 	}
-	genesis.ExtraData = append(genesis.ExtraData, make([]byte, types.IstanbulExtraSeal)...)
 
-	// committed seal
-	genesis.ExtraData = append(genesis.ExtraData, byte(0x01))
-	genesis.ExtraData = append(genesis.ExtraData, make([]byte, types.IstanbulExtraSeal)...)
+	istPayload, err := rlp.EncodeToBytes(&ist)
+	if err != nil {
+		panic("failed to encode istanbul extra")
+	}
+	genesis.ExtraData = append(genesis.ExtraData, istPayload...)
 }
 
 func makeHeader(parent *types.Block, config *istanbul.Config) *types.Header {
@@ -472,5 +474,122 @@ OUT3:
 		case <-timeout.C:
 			break OUT3
 		}
+	}
+}
+
+func TestPrepareIstanbulExtra(t *testing.T) {
+	validators := make([]common.Address, 4)
+	validators[0] = common.BytesToAddress(hexutil.MustDecode("0x44add0ec310f115a0e603b2d7db9f067778eaf8a"))
+	validators[1] = common.BytesToAddress(hexutil.MustDecode("0x294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212"))
+	validators[2] = common.BytesToAddress(hexutil.MustDecode("0x6beaaed781d2d2ab6350f5c4566a2c6eaac407a6"))
+	validators[3] = common.BytesToAddress(hexutil.MustDecode("0x8be76812f765c24641ec63dc2852b378aba2b440"))
+
+	vanity := make([]byte, types.IstanbulExtraVanity)
+	expectedResult := append(vanity, hexutil.MustDecode("0xf858f8549444add0ec310f115a0e603b2d7db9f067778eaf8a94294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212946beaaed781d2d2ab6350f5c4566a2c6eaac407a6948be76812f765c24641ec63dc2852b378aba2b44080c0")...)
+
+	h := &types.Header{
+		Extra: vanity,
+	}
+
+	payload, err := prepareIstanbulExtra(h, validators)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !reflect.DeepEqual(payload, expectedResult) {
+		t.Errorf("expected: %v, but got: %v", expectedResult, payload)
+	}
+
+	// append useless information to extra-data
+	h.Extra = append(vanity, make([]byte, 15)...)
+
+	payload, err = prepareIstanbulExtra(h, validators)
+	if !reflect.DeepEqual(payload, expectedResult) {
+		t.Errorf("expected: %v, got: %v", expectedResult, payload)
+	}
+}
+
+func TestWriteIstanbulSeal(t *testing.T) {
+	vanity := bytes.Repeat([]byte{0x00}, types.IstanbulExtraVanity)
+	istRawData := hexutil.MustDecode("0xf858f8549444add0ec310f115a0e603b2d7db9f067778eaf8a94294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212946beaaed781d2d2ab6350f5c4566a2c6eaac407a6948be76812f765c24641ec63dc2852b378aba2b44080c0")
+	expectedSeal := append([]byte{1, 2, 3}, bytes.Repeat([]byte{0x00}, types.IstanbulExtraSeal-3)...)
+	expectedIstExtra := &types.IstanbulExtra{
+		Validators: []common.Address{
+			common.BytesToAddress(hexutil.MustDecode("0x44add0ec310f115a0e603b2d7db9f067778eaf8a")),
+			common.BytesToAddress(hexutil.MustDecode("0x294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212")),
+			common.BytesToAddress(hexutil.MustDecode("0x6beaaed781d2d2ab6350f5c4566a2c6eaac407a6")),
+			common.BytesToAddress(hexutil.MustDecode("0x8be76812f765c24641ec63dc2852b378aba2b440")),
+		},
+		Seal:          expectedSeal,
+		CommittedSeal: [][]byte{},
+	}
+	var expectedErr error
+
+	h := &types.Header{
+		Extra: append(vanity, istRawData...),
+	}
+
+	// normal case
+	err := writeIstanbulSeal(h, expectedSeal)
+	if err != expectedErr {
+		t.Errorf("expected: %v, but got: %v", expectedErr, err)
+	}
+
+	// verify istanbul extra-data
+	istExtra, err := types.ExtractToIstanbul(h)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !reflect.DeepEqual(istExtra, expectedIstExtra) {
+		t.Errorf("expected: %v, got: %v", expectedIstExtra, istExtra)
+	}
+
+	// invalid seal
+	unexpectedSeal := append(expectedSeal, make([]byte, 1)...)
+	err = writeIstanbulSeal(h, unexpectedSeal)
+	if err != errInvalidSignature {
+		t.Errorf("expected: %v, got: %v", errInvalidSignature, err)
+	}
+}
+
+func TestWriteIstanbulCommittedSeals(t *testing.T) {
+	vanity := bytes.Repeat([]byte{0x00}, types.IstanbulExtraVanity)
+	istRawData := hexutil.MustDecode("0xf858f8549444add0ec310f115a0e603b2d7db9f067778eaf8a94294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212946beaaed781d2d2ab6350f5c4566a2c6eaac407a6948be76812f765c24641ec63dc2852b378aba2b44080c0")
+	expectedCommittedSeal := append([]byte{1, 2, 3}, bytes.Repeat([]byte{0x00}, types.IstanbulExtraSeal-3)...)
+	expectedIstExtra := &types.IstanbulExtra{
+		Validators: []common.Address{
+			common.BytesToAddress(hexutil.MustDecode("0x44add0ec310f115a0e603b2d7db9f067778eaf8a")),
+			common.BytesToAddress(hexutil.MustDecode("0x294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212")),
+			common.BytesToAddress(hexutil.MustDecode("0x6beaaed781d2d2ab6350f5c4566a2c6eaac407a6")),
+			common.BytesToAddress(hexutil.MustDecode("0x8be76812f765c24641ec63dc2852b378aba2b440")),
+		},
+		Seal:          []byte{},
+		CommittedSeal: [][]byte{expectedCommittedSeal},
+	}
+	var expectedErr error
+
+	h := &types.Header{
+		Extra: append(vanity, istRawData...),
+	}
+
+	// normal case
+	err := writeIstanbulCommittedSeals(h, expectedCommittedSeal)
+	if err != expectedErr {
+		t.Errorf("expected: %v, but got: %v", expectedErr, err)
+	}
+
+	// verify istanbul extra-data
+	istExtra, err := types.ExtractToIstanbul(h)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !reflect.DeepEqual(istExtra, expectedIstExtra) {
+		t.Errorf("expected: %v, got: %v", expectedIstExtra, istExtra)
+	}
+
+	// invalid seal
+	unexpectedCommittedSeal := append(expectedCommittedSeal, make([]byte, 1)...)
+	err = writeIstanbulCommittedSeals(h, unexpectedCommittedSeal)
+	if err != errInvalidCommittedSeals {
+		t.Errorf("expected: %v, got: %v", errInvalidCommittedSeals, err)
 	}
 }
