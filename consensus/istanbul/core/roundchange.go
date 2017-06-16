@@ -24,14 +24,26 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 )
 
-func (c *core) sendRoundChange() {
+// sendNextRoundChange sends the round change message with current round + 1
+func (c *core) sendNextRoundChange() {
+	cv := c.currentView()
+	c.sendRoundChange(new(big.Int).Add(cv.Round, common.Big1))
+}
+
+// sendRoundChange sends the round change message with the given round
+func (c *core) sendRoundChange(round *big.Int) {
 	logger := c.logger.New("state", c.state)
 	logger.Trace("sendRoundChange")
 
 	cv := c.currentView()
+	if cv.Round.Cmp(round) >= 0 {
+		logger.Error("Cannot send out the round change", "current round", cv.Round, "target round", round)
+		return
+	}
+
 	c.catchUpRound(&istanbul.View{
 		// The round number we'd like to transfer to.
-		Round:    new(big.Int).Add(cv.Round, common.Big1),
+		Round:    new(big.Int).Set(round),
 		Sequence: new(big.Int).Set(cv.Sequence),
 	})
 
@@ -82,10 +94,7 @@ func (c *core) handleRoundChange(msg *message, src istanbul.Validator) error {
 
 	// Add the round change message to its message set and return how many
 	// messages we've got with the same round number and sequence number.
-	num, err := c.roundChangeSet.Add(&istanbul.View{
-		Round:    new(big.Int).Set(rc.Round),
-		Sequence: new(big.Int).Set(rc.Sequence),
-	}, msg)
+	num, err := c.roundChangeSet.Add(rc.Round, msg)
 	if err != nil {
 		logger.Warn("Failed to add round change message", "from", src, "msg", msg, "err", err)
 		return err
@@ -96,11 +105,7 @@ func (c *core) handleRoundChange(msg *message, src istanbul.Validator) error {
 	// try to catch up the round number.
 	if num == int(c.valSet.F()+1) {
 		if cv.Round.Cmp(rc.Round) < 0 {
-			c.catchUpRound(&istanbul.View{
-				Round:    new(big.Int).Sub(rc.Round, common.Big1),
-				Sequence: new(big.Int).Set(rc.Sequence),
-			})
-			c.sendRoundChange()
+			c.sendRoundChange(rc.Round)
 		}
 	}
 
@@ -120,49 +125,59 @@ func (c *core) handleRoundChange(msg *message, src istanbul.Validator) error {
 func newRoundChangeSet(valSet istanbul.ValidatorSet) *roundChangeSet {
 	return &roundChangeSet{
 		validatorSet: valSet,
-		roundChanges: make(map[common.Hash]*messageSet),
+		roundChanges: make(map[uint64]*messageSet),
 		mu:           new(sync.Mutex),
 	}
 }
 
 type roundChangeSet struct {
 	validatorSet istanbul.ValidatorSet
-	roundChanges map[common.Hash]*messageSet
+	roundChanges map[uint64]*messageSet
 	mu           *sync.Mutex
 }
 
-func (rcs *roundChangeSet) Add(v *istanbul.View, msg *message) (int, error) {
+// Add adds the round and message into round change set
+func (rcs *roundChangeSet) Add(r *big.Int, msg *message) (int, error) {
 	rcs.mu.Lock()
 	defer rcs.mu.Unlock()
 
-	h := istanbul.RLPHash(v)
-	if rcs.roundChanges[h] == nil {
-		rcs.roundChanges[h] = newMessageSet(rcs.validatorSet)
+	round := r.Uint64()
+	if rcs.roundChanges[round] == nil {
+		rcs.roundChanges[round] = newMessageSet(rcs.validatorSet)
 	}
-	err := rcs.roundChanges[h].Add(msg)
+	err := rcs.roundChanges[round].Add(msg)
 	if err != nil {
 		return 0, err
 	}
-	return rcs.roundChanges[h].Size(), nil
+	return rcs.roundChanges[round].Size(), nil
 }
 
-func (rcs *roundChangeSet) Clear(v *istanbul.View) {
+// Clear deletes the messages with smaller round
+func (rcs *roundChangeSet) Clear(round *big.Int) {
 	rcs.mu.Lock()
 	defer rcs.mu.Unlock()
 
 	for k, rms := range rcs.roundChanges {
-		if len(rms.Values()) == 0 {
-			delete(rcs.roundChanges, k)
-		}
-
-		var rc *roundChange
-		if err := rms.Values()[0].Decode(&rc); err != nil {
-			continue
-		}
-
-		if rc.Sequence.Cmp(v.Sequence) < 0 ||
-			(rc.Sequence.Cmp(v.Sequence) == 0 && rc.Round.Cmp(v.Round) < 0) {
+		if len(rms.Values()) == 0 || k < round.Uint64() {
 			delete(rcs.roundChanges, k)
 		}
 	}
+}
+
+// MaxRound returns the max round which the number of messages is equal or larger than num
+func (rcs *roundChangeSet) MaxRound(num int) *big.Int {
+	rcs.mu.Lock()
+	defer rcs.mu.Unlock()
+
+	var maxRound *big.Int
+	for k, rms := range rcs.roundChanges {
+		if rms.Size() < num {
+			continue
+		}
+		r := big.NewInt(int64(k))
+		if maxRound == nil || maxRound.Cmp(r) < 0 {
+			maxRound = r
+		}
+	}
+	return maxRound
 }

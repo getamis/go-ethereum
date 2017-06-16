@@ -193,7 +193,7 @@ func (c *core) commit() {
 		}
 
 		if err := c.backend.Commit(proposal, signatures); err != nil {
-			c.sendRoundChange()
+			c.sendNextRoundChange()
 			return
 		}
 	}
@@ -232,6 +232,7 @@ func (c *core) catchUpRound(view *istanbul.View) {
 	}
 	c.waitingForRoundChange = true
 	c.current = newRoundState(view, c.valSet)
+	c.roundChangeSet.Clear(view.Round)
 	c.newRoundChangeTimer()
 
 	logger.Trace("Catch up round", "new_round", view.Round, "new_seq", view.Sequence, "new_proposer", c.valSet)
@@ -266,7 +267,19 @@ func (c *core) newRoundChangeTimer() {
 
 	timeout := time.Duration(c.config.RequestTimeout) * time.Millisecond
 	c.roundChangeTimer = time.AfterFunc(timeout, func() {
-		c.sendRoundChange()
+		// If we're not waiting for round change yet, we can try to catch up
+		// the max round with F+1 round change message. We only need to catch up
+		// if the max round is larger than current round.
+		if !c.waitingForRoundChange {
+			maxRound := c.roundChangeSet.MaxRound(c.valSet.F() + 1)
+			if maxRound != nil && maxRound.Cmp(c.current.Round()) > 0 {
+				c.sendRoundChange(maxRound)
+			} else {
+				c.sendNextRoundChange()
+			}
+		} else {
+			c.sendNextRoundChange()
+		}
 	})
 }
 

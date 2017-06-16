@@ -17,11 +17,10 @@
 package validator
 
 import (
+	"math"
 	"reflect"
 	"sort"
 	"sync"
-
-	"math"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"

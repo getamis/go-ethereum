@@ -70,7 +70,7 @@ func (c *core) handlePreprepare(msg *message, src istanbul.Validator) error {
 	// Verify the proposal we received
 	if err := c.backend.Verify(preprepare.Proposal); err != nil {
 		logger.Warn("Failed to verify proposal", "err", err)
-		c.sendRoundChange()
+		c.sendNextRoundChange()
 		return err
 	}
 
