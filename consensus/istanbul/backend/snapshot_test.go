@@ -60,7 +60,7 @@ func (ap *testerAccountPool) sign(header *types.Header, validator string) {
 	hashData := crypto.Keccak256([]byte(sigHash(header).Bytes()))
 	sig, _ := crypto.Sign(hashData, ap.accounts[validator])
 
-	writeIstanbulSeal(header, sig)
+	writeSeal(header, sig)
 }
 
 func (ap *testerAccountPool) address(account string) common.Address {
@@ -335,7 +335,7 @@ func TestVoting(t *testing.T) {
 			Mixhash:    types.IstanbulDigest,
 		}
 		b, _ := genesis.ToBlock()
-		extra, _ := prepareIstanbulExtra(b.Header(), validators)
+		extra, _ := prepareExtra(b.Header(), validators)
 		genesis.ExtraData = extra
 		// Create a pristine blockchain with the genesis injected
 		db, _ := ethdb.NewMemDatabase()
@@ -359,7 +359,7 @@ func TestVoting(t *testing.T) {
 				Difficulty: defaultDifficulty,
 				MixDigest:  types.IstanbulDigest,
 			}
-			extra, _ := prepareIstanbulExtra(headers[j], validators)
+			extra, _ := prepareExtra(headers[j], validators)
 			headers[j].Extra = extra
 			if j > 0 {
 				headers[j].ParentHash = headers[j-1].Hash()

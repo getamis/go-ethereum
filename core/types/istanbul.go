@@ -17,7 +17,7 @@
 package types
 
 import (
-	"fmt"
+	"errors"
 	"io"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -31,7 +31,9 @@ var (
 	IstanbulExtraVanity = 32 // Fixed number of extra-data bytes reserved for validator vanity
 	IstanbulExtraSeal   = 65 // Fixed number of extra-data bytes reserved for validator seal
 
-	ErrInvalidIstanbulHeaderExtra = fmt.Errorf("Invalid istanbul header extra-data")
+	// ErrInvalidIstanbulHeaderExtra is returned if the header extra-data is less than 32
+	// or the header extra can not decode
+	ErrInvalidIstanbulHeaderExtra = errors.New("Invalid istanbul header extra-data")
 )
 
 type IstanbulExtra struct {
@@ -63,10 +65,10 @@ func (ist *IstanbulExtra) DecodeRLP(s *rlp.Stream) error {
 	return nil
 }
 
-// ExtractToIstanbul extracts all values of the IstanbulExtra from the header. It returns an
+// ExtractToIstanbulExtra extracts all values of the IstanbulExtra from the header. It returns an
 // error if the passed length of header extra-data is less than 32 or the header extra can not
 // decode.
-func ExtractToIstanbul(h *Header) (*IstanbulExtra, error) {
+func ExtractToIstanbulExtra(h *Header) (*IstanbulExtra, error) {
 	if len(h.Extra) < IstanbulExtraVanity {
 		return nil, ErrInvalidIstanbulHeaderExtra
 	}
@@ -79,12 +81,12 @@ func ExtractToIstanbul(h *Header) (*IstanbulExtra, error) {
 	return ist, nil
 }
 
-// IstanbulExtraDataFilter is used to filter out the useless information(like seal, committed seals) to
-// ensure it conforms to istanbul hash rules. It returns nil if extra-data field of header cannot
-// decode/encode by rlp.
-func IstanbulExtraDataFilter(h *Header) *Header {
+// IstanbulFilteredHeader returns a filtered header which some information (like seal, committed seals)
+// are clean to fulfill the Istanbul hash rules. It returns nil if the extra data of header cannot be
+// decoded/encoded by rlp.
+func IstanbulFilteredHeader(h *Header) *Header {
 	newHeader := CopyHeader(h)
-	ist, err := ExtractToIstanbul(newHeader)
+	ist, err := ExtractToIstanbulExtra(newHeader)
 	if err != nil {
 		return nil
 	}

@@ -134,7 +134,7 @@ func (sb *simpleBackend) Commit(proposal istanbul.Proposal, seals []byte) error 
 
 	h := block.Header()
 	// Append seals into extra-data
-	err := writeIstanbulCommittedSeals(h, seals)
+	err := writeCommittedSeals(h, seals)
 	if err != nil {
 		return err
 	}

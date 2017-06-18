@@ -97,13 +97,14 @@ type headerMarshaling struct {
 }
 
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its
-// RLP encoding.
+// RLP encoding. It returns block hash of istanbul if the mix digest of header is conforms to
+// specific istanbul digest.
 func (h *Header) Hash() common.Hash {
 	if h.MixDigest == IstanbulDigest {
-		if istanbulHeader := IstanbulExtraDataFilter(h); istanbulHeader != nil {
+		if istanbulHeader := IstanbulFilteredHeader(h); istanbulHeader != nil {
 			return rlpHash(istanbulHeader)
 		} else {
-			return common.Hash{}
+			return rlpHash(h)
 		}
 	}
 	return rlpHash(h)

@@ -477,7 +477,7 @@ OUT3:
 	}
 }
 
-func TestPrepareIstanbulExtra(t *testing.T) {
+func TestPrepareExtra(t *testing.T) {
 	validators := make([]common.Address, 4)
 	validators[0] = common.BytesToAddress(hexutil.MustDecode("0x44add0ec310f115a0e603b2d7db9f067778eaf8a"))
 	validators[1] = common.BytesToAddress(hexutil.MustDecode("0x294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212"))
@@ -491,7 +491,7 @@ func TestPrepareIstanbulExtra(t *testing.T) {
 		Extra: vanity,
 	}
 
-	payload, err := prepareIstanbulExtra(h, validators)
+	payload, err := prepareExtra(h, validators)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -502,13 +502,13 @@ func TestPrepareIstanbulExtra(t *testing.T) {
 	// append useless information to extra-data
 	h.Extra = append(vanity, make([]byte, 15)...)
 
-	payload, err = prepareIstanbulExtra(h, validators)
+	payload, err = prepareExtra(h, validators)
 	if !reflect.DeepEqual(payload, expectedResult) {
 		t.Errorf("expected: %v, got: %v", expectedResult, payload)
 	}
 }
 
-func TestWriteIstanbulSeal(t *testing.T) {
+func TestWriteSeal(t *testing.T) {
 	vanity := bytes.Repeat([]byte{0x00}, types.IstanbulExtraVanity)
 	istRawData := hexutil.MustDecode("0xf858f8549444add0ec310f115a0e603b2d7db9f067778eaf8a94294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212946beaaed781d2d2ab6350f5c4566a2c6eaac407a6948be76812f765c24641ec63dc2852b378aba2b44080c0")
 	expectedSeal := append([]byte{1, 2, 3}, bytes.Repeat([]byte{0x00}, types.IstanbulExtraSeal-3)...)
@@ -529,13 +529,13 @@ func TestWriteIstanbulSeal(t *testing.T) {
 	}
 
 	// normal case
-	err := writeIstanbulSeal(h, expectedSeal)
+	err := writeSeal(h, expectedSeal)
 	if err != expectedErr {
 		t.Errorf("expected: %v, but got: %v", expectedErr, err)
 	}
 
 	// verify istanbul extra-data
-	istExtra, err := types.ExtractToIstanbul(h)
+	istExtra, err := types.ExtractToIstanbulExtra(h)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -545,13 +545,13 @@ func TestWriteIstanbulSeal(t *testing.T) {
 
 	// invalid seal
 	unexpectedSeal := append(expectedSeal, make([]byte, 1)...)
-	err = writeIstanbulSeal(h, unexpectedSeal)
+	err = writeSeal(h, unexpectedSeal)
 	if err != errInvalidSignature {
 		t.Errorf("expected: %v, got: %v", errInvalidSignature, err)
 	}
 }
 
-func TestWriteIstanbulCommittedSeals(t *testing.T) {
+func TestWriteCommittedSeals(t *testing.T) {
 	vanity := bytes.Repeat([]byte{0x00}, types.IstanbulExtraVanity)
 	istRawData := hexutil.MustDecode("0xf858f8549444add0ec310f115a0e603b2d7db9f067778eaf8a94294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212946beaaed781d2d2ab6350f5c4566a2c6eaac407a6948be76812f765c24641ec63dc2852b378aba2b44080c0")
 	expectedCommittedSeal := append([]byte{1, 2, 3}, bytes.Repeat([]byte{0x00}, types.IstanbulExtraSeal-3)...)
@@ -572,13 +572,13 @@ func TestWriteIstanbulCommittedSeals(t *testing.T) {
 	}
 
 	// normal case
-	err := writeIstanbulCommittedSeals(h, expectedCommittedSeal)
+	err := writeCommittedSeals(h, expectedCommittedSeal)
 	if err != expectedErr {
 		t.Errorf("expected: %v, but got: %v", expectedErr, err)
 	}
 
 	// verify istanbul extra-data
-	istExtra, err := types.ExtractToIstanbul(h)
+	istExtra, err := types.ExtractToIstanbulExtra(h)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -588,7 +588,7 @@ func TestWriteIstanbulCommittedSeals(t *testing.T) {
 
 	// invalid seal
 	unexpectedCommittedSeal := append(expectedCommittedSeal, make([]byte, 1)...)
-	err = writeIstanbulCommittedSeals(h, unexpectedCommittedSeal)
+	err = writeCommittedSeals(h, unexpectedCommittedSeal)
 	if err != errInvalidCommittedSeals {
 		t.Errorf("expected: %v, got: %v", errInvalidCommittedSeals, err)
 	}

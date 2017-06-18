@@ -39,8 +39,8 @@ func TestHeaderHash(t *testing.T) {
 	// append useless information to extra-data
 	unexpectedExtra := append(expectedExtra, []byte{1, 2, 3}...)
 	header.Extra = unexpectedExtra
-	if !reflect.DeepEqual(header.Hash(), common.Hash{}) {
-		t.Errorf("expected: %v, but got: %v", common.Hash{}, header.Hash())
+	if !reflect.DeepEqual(header.Hash(), rlpHash(header)) {
+		t.Errorf("expected: %v, but got: %v", rlpHash(header), header.Hash())
 	}
 }
 
@@ -77,7 +77,7 @@ func TestExtractToIstanbul(t *testing.T) {
 	}
 	for _, test := range testCases {
 		h := &Header{Extra: append(test.vanity, test.istRawData...)}
-		ist, err := ExtractToIstanbul(h)
+		ist, err := ExtractToIstanbulExtra(h)
 		if err != test.expectedErr {
 			t.Errorf("expected: %v, but got: %v", test.expectedErr, err)
 		}
