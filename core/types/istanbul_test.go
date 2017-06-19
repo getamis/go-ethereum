@@ -26,21 +26,21 @@ import (
 )
 
 func TestHeaderHash(t *testing.T) {
-	// 0xbd7d052e48ef42d78a2f0bfbd4dfa75852fef14659f034a81396b7dd0e18628b
+	// 0xcefefd3ade63a5955bca4562ed840b67f39e74df217f7e5f7241a6e9552cca70
 	expectedExtra := common.FromHex("0x0000000000000000000000000000000000000000000000000000000000000000f89af8549444add0ec310f115a0e603b2d7db9f067778eaf8a94294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212946beaaed781d2d2ab6350f5c4566a2c6eaac407a6948be76812f765c24641ec63dc2852b378aba2b440b8410000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c0")
-	expectedHash := common.HexToHash("0xbd7d052e48ef42d78a2f0bfbd4dfa75852fef14659f034a81396b7dd0e18628b")
+	expectedHash := common.HexToHash("0xcefefd3ade63a5955bca4562ed840b67f39e74df217f7e5f7241a6e9552cca70")
 
 	// for istanbul consensus
 	header := &Header{MixDigest: IstanbulDigest, Extra: expectedExtra}
 	if !reflect.DeepEqual(header.Hash(), expectedHash) {
-		t.Errorf("expected: %v, but got: %v", expectedHash, header.Hash())
+		t.Errorf("expected: %v, but got: %v", expectedHash.Hex(), header.Hash().Hex())
 	}
 
 	// append useless information to extra-data
 	unexpectedExtra := append(expectedExtra, []byte{1, 2, 3}...)
 	header.Extra = unexpectedExtra
 	if !reflect.DeepEqual(header.Hash(), rlpHash(header)) {
-		t.Errorf("expected: %v, but got: %v", rlpHash(header), header.Hash())
+		t.Errorf("expected: %v, but got: %v", rlpHash(header).Hex(), header.Hash().Hex())
 	}
 }
 

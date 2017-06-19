@@ -632,7 +632,8 @@ func (sb *simpleBackend) snapshot(chain consensus.ChainReader, number uint64, ha
 func sigHash(header *types.Header) (hash common.Hash) {
 	hasher := sha3.NewKeccak256()
 
-	rlp.Encode(hasher, types.IstanbulFilteredHeader(header))
+	// Clean seal is required for calculating proposer seal.
+	rlp.Encode(hasher, types.IstanbulFilteredHeader(header, false))
 	hasher.Sum(hash[:0])
 	return hash
 }

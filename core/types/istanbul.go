@@ -84,14 +84,16 @@ func ExtractToIstanbulExtra(h *Header) (*IstanbulExtra, error) {
 // IstanbulFilteredHeader returns a filtered header which some information (like seal, committed seals)
 // are clean to fulfill the Istanbul hash rules. It returns nil if the extra data of header cannot be
 // decoded/encoded by rlp.
-func IstanbulFilteredHeader(h *Header) *Header {
+func IstanbulFilteredHeader(h *Header, keepSeal bool) *Header {
 	newHeader := CopyHeader(h)
 	ist, err := ExtractToIstanbulExtra(newHeader)
 	if err != nil {
 		return nil
 	}
 
-	ist.Seal = []byte{}
+	if !keepSeal {
+		ist.Seal = []byte{}
+	}
 	ist.CommittedSeal = [][]byte{}
 
 	payload, err := rlp.EncodeToBytes(&ist)
