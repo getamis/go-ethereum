@@ -119,7 +119,7 @@ func (sb *simpleBackend) verifyHeader(chain consensus.ChainReader, header *types
 	}
 
 	// Ensure that the extra data format is satisfied
-	if _, err := types.ExtractToIstanbulExtra(header); err != nil {
+	if _, err := types.ExtractIstanbulExtra(header); err != nil {
 		return errInvalidExtraDataFormat
 	}
 
@@ -253,7 +253,7 @@ func (sb *simpleBackend) verifyCommittedSeals(chain consensus.ChainReader, heade
 		return err
 	}
 
-	extra, err := types.ExtractToIstanbulExtra(header)
+	extra, err := types.ExtractIstanbulExtra(header)
 	if err != nil {
 		return err
 	}
@@ -571,11 +571,11 @@ func (sb *simpleBackend) snapshot(chain consensus.ChainReader, number uint64, ha
 			if err := sb.VerifyHeader(chain, genesis, false); err != nil {
 				return nil, err
 			}
-			istanbul, err := types.ExtractToIstanbulExtra(genesis)
+			istanbulExtra, err := types.ExtractIstanbulExtra(genesis)
 			if err != nil {
 				return nil, err
 			}
-			snap = newSnapshot(sb.config.Epoch, 0, genesis.Hash(), validator.NewSet(istanbul.Validators, sb.config.ProposerPolicy))
+			snap = newSnapshot(sb.config.Epoch, 0, genesis.Hash(), validator.NewSet(istanbulExtra.Validators, sb.config.ProposerPolicy))
 			if err := snap.store(sb.db); err != nil {
 				return nil, err
 			}
@@ -641,11 +641,11 @@ func sigHash(header *types.Header) (hash common.Hash) {
 // ecrecover extracts the Ethereum account address from a signed header.
 func ecrecover(header *types.Header) (common.Address, error) {
 	// Retrieve the signature from the header extra-data
-	istExtra, err := types.ExtractToIstanbulExtra(header)
+	istanbulExtra, err := types.ExtractIstanbulExtra(header)
 	if err != nil {
 		return common.Address{}, err
 	}
-	return istanbul.GetSignatureAddress(sigHash(header).Bytes(), istExtra.Seal)
+	return istanbul.GetSignatureAddress(sigHash(header).Bytes(), istanbulExtra.Seal)
 }
 
 // prepareExtra returns a extra-data of the given header and validators
@@ -679,13 +679,13 @@ func writeSeal(h *types.Header, seal []byte) error {
 		return errInvalidSignature
 	}
 
-	ist, err := types.ExtractToIstanbulExtra(h)
+	istanbulExtra, err := types.ExtractIstanbulExtra(h)
 	if err != nil {
 		return err
 	}
 
-	ist.Seal = seal
-	payload, err := rlp.EncodeToBytes(&ist)
+	istanbulExtra.Seal = seal
+	payload, err := rlp.EncodeToBytes(&istanbulExtra)
 	if err != nil {
 		return err
 	}
@@ -700,18 +700,18 @@ func writeCommittedSeals(h *types.Header, committedSeals []byte) error {
 		return errInvalidCommittedSeals
 	}
 
-	ist, err := types.ExtractToIstanbulExtra(h)
+	istanbulExtra, err := types.ExtractIstanbulExtra(h)
 	if err != nil {
 		return err
 	}
 
-	ist.CommittedSeal = make([][]byte, len(committedSeals)/types.IstanbulExtraSeal)
-	for i := 0; i < len(ist.CommittedSeal); i++ {
-		ist.CommittedSeal[i] = make([]byte, types.IstanbulExtraSeal)
-		copy(ist.CommittedSeal[i][:], committedSeals[i*types.IstanbulExtraSeal:])
+	istanbulExtra.CommittedSeal = make([][]byte, len(committedSeals)/types.IstanbulExtraSeal)
+	for i := 0; i < len(istanbulExtra.CommittedSeal); i++ {
+		istanbulExtra.CommittedSeal[i] = make([]byte, types.IstanbulExtraSeal)
+		copy(istanbulExtra.CommittedSeal[i][:], committedSeals[i*types.IstanbulExtraSeal:])
 	}
 
-	payload, err := rlp.EncodeToBytes(&ist)
+	payload, err := rlp.EncodeToBytes(&istanbulExtra)
 	if err != nil {
 		return err
 	}

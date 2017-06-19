@@ -68,17 +68,17 @@ func (ist *IstanbulExtra) DecodeRLP(s *rlp.Stream) error {
 // ExtractToIstanbulExtra extracts all values of the IstanbulExtra from the header. It returns an
 // error if the passed length of header extra-data is less than 32 or the header extra can not
 // decode.
-func ExtractToIstanbulExtra(h *Header) (*IstanbulExtra, error) {
+func ExtractIstanbulExtra(h *Header) (*IstanbulExtra, error) {
 	if len(h.Extra) < IstanbulExtraVanity {
 		return nil, ErrInvalidIstanbulHeaderExtra
 	}
 
-	var ist *IstanbulExtra
-	err := rlp.DecodeBytes(h.Extra[IstanbulExtraVanity:], &ist)
+	var istanbulExtra *IstanbulExtra
+	err := rlp.DecodeBytes(h.Extra[IstanbulExtraVanity:], &istanbulExtra)
 	if err != nil {
 		return nil, err
 	}
-	return ist, nil
+	return istanbulExtra, nil
 }
 
 // IstanbulFilteredHeader returns a filtered header which some information (like seal, committed seals)
@@ -86,17 +86,17 @@ func ExtractToIstanbulExtra(h *Header) (*IstanbulExtra, error) {
 // decoded/encoded by rlp.
 func IstanbulFilteredHeader(h *Header, keepSeal bool) *Header {
 	newHeader := CopyHeader(h)
-	ist, err := ExtractToIstanbulExtra(newHeader)
+	istanbulExtra, err := ExtractIstanbulExtra(newHeader)
 	if err != nil {
 		return nil
 	}
 
 	if !keepSeal {
-		ist.Seal = []byte{}
+		istanbulExtra.Seal = []byte{}
 	}
-	ist.CommittedSeal = [][]byte{}
+	istanbulExtra.CommittedSeal = [][]byte{}
 
-	payload, err := rlp.EncodeToBytes(&ist)
+	payload, err := rlp.EncodeToBytes(&istanbulExtra)
 	if err != nil {
 		return nil
 	}

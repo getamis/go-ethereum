@@ -77,12 +77,12 @@ func TestExtractToIstanbul(t *testing.T) {
 	}
 	for _, test := range testCases {
 		h := &Header{Extra: append(test.vanity, test.istRawData...)}
-		ist, err := ExtractToIstanbulExtra(h)
+		istanbulExtra, err := ExtractIstanbulExtra(h)
 		if err != test.expectedErr {
 			t.Errorf("expected: %v, but got: %v", test.expectedErr, err)
 		}
-		if !reflect.DeepEqual(ist, test.expectedResult) {
-			t.Errorf("expected: %v, but got: %v", test.expectedResult, ist)
+		if !reflect.DeepEqual(istanbulExtra, test.expectedResult) {
+			t.Errorf("expected: %v, but got: %v", test.expectedResult, istanbulExtra)
 		}
 	}
 }

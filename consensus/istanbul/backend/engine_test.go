@@ -535,7 +535,7 @@ func TestWriteSeal(t *testing.T) {
 	}
 
 	// verify istanbul extra-data
-	istExtra, err := types.ExtractToIstanbulExtra(h)
+	istExtra, err := types.ExtractIstanbulExtra(h)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -578,7 +578,7 @@ func TestWriteCommittedSeals(t *testing.T) {
 	}
 
 	// verify istanbul extra-data
-	istExtra, err := types.ExtractToIstanbulExtra(h)
+	istExtra, err := types.ExtractIstanbulExtra(h)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
