@@ -41,26 +41,19 @@ import (
 // in this test, we can set n to 1, and it means we can process Istanbul and commit a
 // block by one node. Otherwise, if n is larger than 1, we have to generate
 // other fake events to process Istanbul.
-func newBlockChain(n int) (*core.BlockChain, *simpleBackend) {
+func newBlockChain(n int) (*core.BlockChain, *backend) {
 	genesis, nodeKeys := getGenesisAndKeys(n)
 	eventMux := new(event.TypeMux)
 	memDB, _ := ethdb.NewMemDatabase()
 	config := istanbul.DefaultConfig
 	// Use the first key as private key
-	backend := New(config, eventMux, nodeKeys[0], memDB)
+	b, _ := New(config, eventMux, nodeKeys[0], memDB).(*backend)
 	genesis.MustCommit(memDB)
-	blockchain, err := core.NewBlockChain(memDB, genesis.Config, backend, eventMux, vm.Config{})
+	blockchain, err := core.NewBlockChain(memDB, genesis.Config, b, eventMux, vm.Config{})
 	if err != nil {
 		panic(err)
 	}
-	commitBlock := func(block *types.Block) error {
-		_, err := blockchain.InsertChain([]*types.Block{block})
-		return err
-	}
-	backend.Start(blockchain, commitBlock)
-
-	b, _ := backend.(*simpleBackend)
-
+	b.Start(blockchain, blockchain.InsertChain)
 	snap, err := b.snapshot(blockchain, 0, common.Hash{}, nil)
 	if err != nil {
 		panic(err)
@@ -138,13 +131,13 @@ func makeHeader(parent *types.Block, config *istanbul.Config) *types.Header {
 	return header
 }
 
-func makeBlock(chain *core.BlockChain, engine *simpleBackend, parent *types.Block) *types.Block {
+func makeBlock(chain *core.BlockChain, engine *backend, parent *types.Block) *types.Block {
 	block := makeBlockWithoutSeal(chain, engine, parent)
 	block, _ = engine.Seal(chain, block, nil)
 	return block
 }
 
-func makeBlockWithoutSeal(chain *core.BlockChain, engine *simpleBackend, parent *types.Block) *types.Block {
+func makeBlockWithoutSeal(chain *core.BlockChain, engine *backend, parent *types.Block) *types.Block {
 	header := makeHeader(parent, engine.config)
 	engine.Prepare(chain, header)
 	state, _ := chain.StateAt(parent.Root())

@@ -39,7 +39,7 @@ import (
 func New(config *istanbul.Config, eventMux *event.TypeMux, privateKey *ecdsa.PrivateKey, db ethdb.Database) consensus.Istanbul {
 	// Allocate the snapshot caches and create the engine
 	recents, _ := lru.NewARC(inmemorySnapshots)
-	backend := &simpleBackend{
+	backend := &backend{
 		config:           config,
 		eventMux:         eventMux,
 		istanbulEventMux: new(event.TypeMux),
@@ -58,7 +58,7 @@ func New(config *istanbul.Config, eventMux *event.TypeMux, privateKey *ecdsa.Pri
 
 // ----------------------------------------------------------------------------
 
-type simpleBackend struct {
+type backend struct {
 	config           *istanbul.Config
 	eventMux         *event.TypeMux
 	istanbulEventMux *event.TypeMux
@@ -88,12 +88,12 @@ type simpleBackend struct {
 }
 
 // Address implements istanbul.Backend.Address
-func (sb *simpleBackend) Address() common.Address {
+func (sb *backend) Address() common.Address {
 	return sb.address
 }
 
 // Validators implements istanbul.Backend.Validators
-func (sb *simpleBackend) Validators(proposal istanbul.Proposal) istanbul.ValidatorSet {
+func (sb *backend) Validators(proposal istanbul.Proposal) istanbul.ValidatorSet {
 	snap, err := sb.snapshot(sb.chain, proposal.Number().Uint64(), proposal.Hash(), nil)
 	if err != nil {
 		return validator.NewSet(nil, sb.config.ProposerPolicy)
@@ -101,7 +101,7 @@ func (sb *simpleBackend) Validators(proposal istanbul.Proposal) istanbul.Validat
 	return snap.ValSet
 }
 
-func (sb *simpleBackend) Send(payload []byte, target common.Address) error {
+func (sb *backend) Send(payload []byte, target common.Address) error {
 	go sb.eventMux.Post(istanbul.ConsensusDataEvent{
 		Target: target,
 		Data:   payload,
@@ -110,7 +110,7 @@ func (sb *simpleBackend) Send(payload []byte, target common.Address) error {
 }
 
 // Broadcast implements istanbul.Backend.Send
-func (sb *simpleBackend) Broadcast(valSet istanbul.ValidatorSet, payload []byte) error {
+func (sb *backend) Broadcast(valSet istanbul.ValidatorSet, payload []byte) error {
 	for _, val := range valSet.List() {
 		if val.Address() == sb.Address() {
 			// send to self
@@ -128,7 +128,7 @@ func (sb *simpleBackend) Broadcast(valSet istanbul.ValidatorSet, payload []byte)
 }
 
 // Commit implements istanbul.Backend.Commit
-func (sb *simpleBackend) Commit(proposal istanbul.Proposal, seals []byte) error {
+func (sb *backend) Commit(proposal istanbul.Proposal, seals []byte) error {
 	// Check if the proposal is a valid block
 	block := &types.Block{}
 	block, ok := proposal.(*types.Block)
@@ -171,7 +171,7 @@ func (sb *simpleBackend) Commit(proposal istanbul.Proposal, seals []byte) error 
 }
 
 // NextRound will broadcast ChainHeadEvent to trigger next seal()
-func (sb *simpleBackend) NextRound() error {
+func (sb *backend) NextRound() error {
 	header := sb.chain.CurrentHeader()
 	sb.logger.Debug("NextRound", "address", sb.Address(), "current_hash", header.Hash(), "current_number", header.Number)
 	go sb.eventMux.Post(core.ChainHeadEvent{})
@@ -179,12 +179,12 @@ func (sb *simpleBackend) NextRound() error {
 }
 
 // EventMux implements istanbul.Backend.EventMux
-func (sb *simpleBackend) EventMux() *event.TypeMux {
+func (sb *backend) EventMux() *event.TypeMux {
 	return sb.istanbulEventMux
 }
 
 // Verify implements istanbul.Backend.Verify
-func (sb *simpleBackend) Verify(proposal istanbul.Proposal) (error, time.Duration) {
+func (sb *backend) Verify(proposal istanbul.Proposal) (error, time.Duration) {
 	// Check if the proposal is a valid block
 	block := &types.Block{}
 	block, ok := proposal.(*types.Block)
@@ -204,13 +204,13 @@ func (sb *simpleBackend) Verify(proposal istanbul.Proposal) (error, time.Duratio
 }
 
 // Sign implements istanbul.Backend.Sign
-func (sb *simpleBackend) Sign(data []byte) ([]byte, error) {
+func (sb *backend) Sign(data []byte) ([]byte, error) {
 	hashData := crypto.Keccak256([]byte(data))
 	return crypto.Sign(hashData, sb.privateKey)
 }
 
 // CheckSignature implements istanbul.Backend.CheckSignature
-func (sb *simpleBackend) CheckSignature(data []byte, address common.Address, sig []byte) error {
+func (sb *backend) CheckSignature(data []byte, address common.Address, sig []byte) error {
 	signer, err := istanbul.GetSignatureAddress(data, sig)
 	if err != nil {
 		log.Error("Failed to get signer address", "err", err)

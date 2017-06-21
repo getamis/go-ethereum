@@ -33,7 +33,7 @@ import (
 )
 
 func TestSign(t *testing.T) {
-	b, _, _ := newSimpleBackend()
+	b, _, _ := newBackend()
 	data := []byte("Here is a string....")
 	sig, err := b.Sign(data)
 	if err != nil {
@@ -54,7 +54,7 @@ func TestCheckSignature(t *testing.T) {
 	data := []byte("Here is a string....")
 	hashData := crypto.Keccak256([]byte(data))
 	sig, _ := crypto.Sign(hashData, key)
-	b, _, _ := newSimpleBackend()
+	b, _, _ := newBackend()
 	a := getAddress()
 	err := b.CheckSignature(data, a, sig)
 	if err != nil {
@@ -68,7 +68,7 @@ func TestCheckSignature(t *testing.T) {
 }
 
 func TestCheckValidatorSignature(t *testing.T) {
-	_, keys, vset := newSimpleBackend()
+	_, keys, vset := newBackend()
 
 	// 1. Positive test: sign with validator's key should succeed
 	data := []byte("dummy data")
@@ -113,7 +113,7 @@ func TestCheckValidatorSignature(t *testing.T) {
 }
 
 func TestCommit(t *testing.T) {
-	backend, _, _ := newSimpleBackend()
+	backend, _, _ := newBackend()
 
 	// Case: it's a proposer, so the backend.commit will receive channel result from backend.Commit function
 	testCases := []struct {
@@ -217,10 +217,10 @@ func (slice Keys) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
 
-func newSimpleBackend() (backend *simpleBackend, validatorKeys Keys, validatorSet istanbul.ValidatorSet) {
+func newBackend() (b *backend, validatorKeys Keys, validatorSet istanbul.ValidatorSet) {
 	key, _ := generatePrivateKey()
 	validatorSet, validatorKeys = newTestValidatorSet(5)
-	backend = &simpleBackend{
+	b = &backend{
 		privateKey: key,
 		logger:     log.New("backend", "simple"),
 		commitCh:   make(chan *types.Block, 1),
