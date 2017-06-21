@@ -66,9 +66,7 @@ type backend struct {
 	address          common.Address
 	core             istanbulCore.Engine
 	logger           log.Logger
-	quitSync         chan struct{}
 	db               ethdb.Database
-	timeout          uint64
 	chain            consensus.ChainReader
 	inserter         func(types.Blocks) (int, error)
 
