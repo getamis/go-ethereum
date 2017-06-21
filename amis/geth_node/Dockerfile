@@ -1,0 +1,23 @@
+FROM alpine:3.5
+
+RUN mkdir -p /eth
+RUN echo "{\"config\": {\"chainId\": 2016,\"istanbul\": {}},\"nonce\": \"0x0000000000000000\",\"timestamp\": \"0x0\",\"parentHash\": \"0x0000000000000000000000000000000000000000000000000000000000000000\",\"extraData\": \"0x0000000000000000000000000000000000000000000000000000000000000000f89af8549444add0ec310f115a0e603b2d7db9f067778eaf8a94294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212946beaaed781d2d2ab6350f5c4566a2c6eaac407a6948be76812f765c24641ec63dc2852b378aba2b440b8410000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c0\",\"gasLimit\": \"0x47e7c4\",\"difficulty\": \"0x1\",\"mixhash\": \"0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365\",\"coinbase\": \"0x0000000000000000000000000000000000000000\",\"alloc\": {\"0x1a9afb711302c5f83b5902843d1c007a1a137632\": {\"balance\": \"999900000000000000000000000000000000000000000\"},\"0x26c7ea56af25113f712befbf2077798fd7fbdb7c\": {\"balance\": \"999900000000000000000000000000000000000000000\"},\"0xa4137d4ad166ae825f1b8dbb0c3d48f25f172e9e\": {\"balance\": \"999900000000000000000000000000000000000000000\"},\"0xf5aee8f402a330bbdb5063080c31ff2df47dbb0a\": {\"balance\": \"999900000000000000000000000000000000000000000\"},\"0xcce903202b149c677f91d30dddf83d05a741871a\": {\"balance\": \"999900000000000000000000000000000000000000000\"},\"0xcc09b0634677b41668e6386844233528cee0a7d5\": {\"balance\": \"999900000000000000000000000000000000000000000\"},\"0x3e28ea543417edafa7625e823d35e20b09115baa\": {\"balance\": \"999900000000000000000000000000000000000000000\"}}}" > /eth/genesis.json
+RUN mkdir -p /eth/keystore
+RUN echo "{\"address\":\"1a9afb711302c5f83b5902843d1c007a1a137632\",\"Crypto\":{\"cipher\":\"aes-128-ctr\",\"ciphertext\":\"132b50d7c8944a115824de7c00911c40a90f84f27c614b7a3ef05ee8fd414312\",\"cipherparams\":{\"iv\":\"0f745599d1b3303988ce210fb82b8c7f\"},\"kdf\":\"scrypt\",\"kdfparams\":{\"dklen\":32,\"n\":262144,\"p\":1,\"r\":8,\"salt\":\"bce940bac232b4a9c5a2d50e5be51fde5cecfa7da9d49d8f650f91167bebf0de\"},\"mac\":\"36d515070b797aec58a574a3e04ea109498ee7674b15d7f952322cda7dcb68e3\"},\"id\":\"5d212b4c-3dd0-4c52-a32f-e42bf1b41133\",\"version\":3}" > /eth/keystore/UTC--2016-01-30T11-59-48.610306220Z--1a9afb711302c5f83b5902843d1c007a1a137632
+ADD . /go-ethereum
+RUN \
+  apk add --update git go make gcc musl-dev linux-headers && \
+  (cd go-ethereum && make geth)                           && \
+  cp go-ethereum/build/bin/geth /geth                     && \
+  apk del git go make gcc musl-dev linux-headers          && \
+  rm -rf /go-ethereum && rm -rf /var/cache/apk/*
+
+EXPOSE 8545
+EXPOSE 30307
+EXPOSE 30308
+EXPOSE 30309
+
+ADD amis/geth_node/entrypoint.sh entrypoint.sh
+RUN chmod +x entrypoint.sh
+
+CMD ["sh", "entrypoint.sh"]
