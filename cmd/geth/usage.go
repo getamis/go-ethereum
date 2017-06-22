@@ -211,6 +211,14 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.IstanbulBlockPauseTimeFlag,
 		},
 	},
+	{
+		Name: "ISTANBUL",
+		Flags: []cli.Flag{
+			utils.IstanbulRequestTimeoutFlag,
+			utils.IstanbulBlockPeriodFlag,
+			utils.IstanbulBlockPauseTimeFlag,
+		},
+	},
 }
 
 // byCategory sorts an array of flagGroup by Name in the order
