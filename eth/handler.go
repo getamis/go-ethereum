@@ -125,9 +125,8 @@ type protocolManager struct {
 func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, networkId uint64, maxPeers int, mux *event.TypeMux, txpool txPool, engine consensus.Engine, blockchain *core.BlockChain, chaindb ethdb.Database) (ProtocolManager, error) {
 	if e, ok := engine.(consensus.Istanbul); ok {
 		return newIstanbulProtocolManager(config, mode, networkId, maxPeers, mux, txpool, e, blockchain, chaindb)
-	} else {
-		return newProtocolManager(config, mode, networkId, maxPeers, mux, txpool, engine, blockchain, chaindb)
 	}
+	return newProtocolManager(config, mode, networkId, maxPeers, mux, txpool, engine, blockchain, chaindb)
 }
 
 func newProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, networkId uint64, maxPeers int, mux *event.TypeMux, txpool txPool, engine consensus.Engine, blockchain *core.BlockChain, chaindb ethdb.Database) (*protocolManager, error) {
