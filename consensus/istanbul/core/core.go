@@ -249,19 +249,7 @@ func (c *core) newRoundChangeTimer() {
 	// set timeout based on the round number
 	timeout := time.Duration(c.config.RequestTimeout)*time.Millisecond + time.Duration(c.current.Round().Uint64()*c.config.BlockPeriod)*time.Second
 	c.roundChangeTimer = time.AfterFunc(timeout, func() {
-		// If we're not waiting for round change yet, we can try to catch up
-		// the max round with F+1 round change message. We only need to catch up
-		// if the max round is larger than current round.
-		if !c.waitingForRoundChange {
-			maxRound := c.roundChangeSet.MaxRound(c.valSet.F() + 1)
-			if maxRound != nil && maxRound.Cmp(c.current.Round()) > 0 {
-				c.sendRoundChange(maxRound)
-			} else {
-				c.sendNextRoundChange()
-			}
-		} else {
-			c.sendNextRoundChange()
-		}
+		c.sendEvent(timeoutEvent{})
 	})
 }
 
