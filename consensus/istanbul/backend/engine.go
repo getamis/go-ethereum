@@ -403,8 +403,15 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 		return nil, err
 	}
 
-	// wait for the timestamp of header, use this to adjust the block period
-	delay := time.Unix(block.Header().Time.Int64(), 0).Sub(now())
+	// calculate the block delay based on the number of tx
+	var period uint64
+	if len(block.Transactions()) == 0 {
+		period = sb.config.BlockPauseTime
+	} else {
+		period = sb.config.BlockPeriod
+	}
+	broadcastTimestamp := new(big.Int).Add(parent.Time, new(big.Int).SetUint64(period)).Int64()
+	delay := time.Unix(broadcastTimestamp, 0).Sub(now())
 	select {
 	case <-time.After(delay):
 	case <-stop:
@@ -439,23 +446,9 @@ func (sb *simpleBackend) Seal(chain consensus.ChainReader, block *types.Block, s
 	}
 }
 
-// update timestamp and signature of the block based on its number of transactions
+// updateBlock updates the signature of the block
 func (sb *simpleBackend) updateBlock(parent *types.Header, block *types.Block) (*types.Block, error) {
-	// set block period based the number of tx
-	var period uint64
-	if len(block.Transactions()) == 0 {
-		period = sb.config.BlockPauseTime
-	} else {
-		period = sb.config.BlockPeriod
-	}
-
-	// set header timestamp
 	header := block.Header()
-	header.Time = new(big.Int).Add(parent.Time, new(big.Int).SetUint64(period))
-	time := now().Unix()
-	if header.Time.Int64() < time {
-		header.Time = big.NewInt(time)
-	}
 	// sign the hash
 	seal, err := sb.Sign(sigHash(header).Bytes())
 	if err != nil {
