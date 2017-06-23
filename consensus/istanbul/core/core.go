@@ -24,6 +24,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	metrics "github.com/ethereum/go-ethereum/metrics"
@@ -161,12 +162,13 @@ func (c *core) commit() {
 
 	proposal := c.current.Proposal()
 	if proposal != nil {
-		var signatures []byte
-		for _, v := range c.current.Commits.Values() {
-			signatures = append(signatures, v.CommittedSeal...)
+		committedSeals := make([][]byte, c.current.Commits.Size())
+		for i, v := range c.current.Commits.Values() {
+			committedSeals[i] = make([]byte, types.IstanbulExtraSeal)
+			copy(committedSeals[i][:], v.CommittedSeal[:])
 		}
 
-		if err := c.backend.Commit(proposal, signatures); err != nil {
+		if err := c.backend.Commit(proposal, committedSeals); err != nil {
 			c.sendNextRoundChange()
 			return
 		}

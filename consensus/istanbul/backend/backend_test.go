@@ -115,16 +115,17 @@ func TestCheckValidatorSignature(t *testing.T) {
 func TestCommit(t *testing.T) {
 	backend, _, _ := newBackend()
 
+	quitCh := make(chan struct{}, 1)
 	// Case: it's a proposer, so the backend.commit will receive channel result from backend.Commit function
 	testCases := []struct {
 		expectedErr       error
-		expectedSignature []byte
+		expectedSignature [][]byte
 		expectedBlock     func() *types.Block
 	}{
 		{
 			// normal case
 			nil,
-			append([]byte{1}, bytes.Repeat([]byte{0x00}, types.IstanbulExtraSeal-1)...),
+			[][]byte{append([]byte{1}, bytes.Repeat([]byte{0x00}, types.IstanbulExtraSeal-1)...)},
 			func() *types.Block {
 				chain, engine := newBlockChain(1)
 				block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
@@ -155,8 +156,10 @@ func TestCommit(t *testing.T) {
 						t.Errorf("hash mismatch: have %v, want %v", result.Hash(), expBlock.Hash())
 					}
 					return
-				case <-time.After(time.Second):
+				case <-time.After(2 * time.Second):
 					t.Error("unexpected timeout occurs")
+				case <-quitCh:
+					return
 				}
 			}
 		}()
@@ -167,6 +170,7 @@ func TestCommit(t *testing.T) {
 				t.Errorf("error mismatch: have %v, want %v", err, test.expectedErr)
 			}
 		}
+		quitCh <- struct{}{}
 	}
 }
 

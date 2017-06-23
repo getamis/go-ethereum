@@ -228,7 +228,7 @@ func TestSealCommittedOtherHash(t *testing.T) {
 			if !ok {
 				t.Errorf("unexpected event comes: %v", reflect.TypeOf(ev.Data))
 			}
-			engine.Commit(otherBlock, []byte{})
+			engine.Commit(otherBlock, [][]byte{})
 		}
 		eventSub.Unsubscribe()
 	}
@@ -565,7 +565,7 @@ func TestWriteCommittedSeals(t *testing.T) {
 	}
 
 	// normal case
-	err := writeCommittedSeals(h, expectedCommittedSeal)
+	err := writeCommittedSeals(h, [][]byte{expectedCommittedSeal})
 	if err != expectedErr {
 		t.Errorf("error mismatch: have %v, want %v", err, expectedErr)
 	}
@@ -581,7 +581,7 @@ func TestWriteCommittedSeals(t *testing.T) {
 
 	// invalid seal
 	unexpectedCommittedSeal := append(expectedCommittedSeal, make([]byte, 1)...)
-	err = writeCommittedSeals(h, unexpectedCommittedSeal)
+	err = writeCommittedSeals(h, [][]byte{unexpectedCommittedSeal})
 	if err != errInvalidCommittedSeals {
 		t.Errorf("error mismatch: have %v, want %v", err, errInvalidCommittedSeals)
 	}

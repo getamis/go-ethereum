@@ -126,7 +126,7 @@ func (sb *backend) Broadcast(valSet istanbul.ValidatorSet, payload []byte) error
 }
 
 // Commit implements istanbul.Backend.Commit
-func (sb *backend) Commit(proposal istanbul.Proposal, seals []byte) error {
+func (sb *backend) Commit(proposal istanbul.Proposal, seals [][]byte) error {
 	// Check if the proposal is a valid block
 	block := &types.Block{}
 	block, ok := proposal.(*types.Block)

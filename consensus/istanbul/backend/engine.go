@@ -728,9 +728,15 @@ func writeSeal(h *types.Header, seal []byte) error {
 }
 
 // writeCommittedSeals writes the extra-data field of a block header with given committed seals.
-func writeCommittedSeals(h *types.Header, committedSeals []byte) error {
-	if len(committedSeals)%types.IstanbulExtraSeal != 0 {
+func writeCommittedSeals(h *types.Header, committedSeals [][]byte) error {
+	if len(committedSeals) == 0 {
 		return errInvalidCommittedSeals
+	}
+
+	for _, seal := range committedSeals {
+		if len(seal) != types.IstanbulExtraSeal {
+			return errInvalidCommittedSeals
+		}
 	}
 
 	istanbulExtra, err := types.ExtractIstanbulExtra(h)
@@ -738,11 +744,8 @@ func writeCommittedSeals(h *types.Header, committedSeals []byte) error {
 		return err
 	}
 
-	istanbulExtra.CommittedSeal = make([][]byte, len(committedSeals)/types.IstanbulExtraSeal)
-	for i := 0; i < len(istanbulExtra.CommittedSeal); i++ {
-		istanbulExtra.CommittedSeal[i] = make([]byte, types.IstanbulExtraSeal)
-		copy(istanbulExtra.CommittedSeal[i][:], committedSeals[i*types.IstanbulExtraSeal:])
-	}
+	istanbulExtra.CommittedSeal = make([][]byte, len(committedSeals))
+	copy(istanbulExtra.CommittedSeal, committedSeals)
 
 	payload, err := rlp.EncodeToBytes(&istanbulExtra)
 	if err != nil {
