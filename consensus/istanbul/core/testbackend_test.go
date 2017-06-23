@@ -19,6 +19,7 @@ package core
 import (
 	"crypto/ecdsa"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
@@ -99,8 +100,8 @@ func (self *testSystemBackend) Commit(proposal istanbul.Proposal, seals []byte) 
 	return nil
 }
 
-func (self *testSystemBackend) Verify(proposal istanbul.Proposal) error {
-	return nil
+func (self *testSystemBackend) Verify(proposal istanbul.Proposal) (error, time.Duration) {
+	return nil, 0
 }
 
 func (self *testSystemBackend) Sign(data []byte) ([]byte, error) {

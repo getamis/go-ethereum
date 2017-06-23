@@ -17,6 +17,8 @@
 package istanbul
 
 import (
+	"time"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 )
@@ -45,8 +47,9 @@ type Backend interface {
 	// NextRound is called when we want to trigger next Seal()
 	NextRound() error
 
-	// Verify verifies the proposal.
-	Verify(Proposal) error
+	// Verify verifies the proposal. If a consensus.ErrFutureBlock error is returned,
+	// the time difference of the proposal and current time is also returned.
+	Verify(Proposal) (error, time.Duration)
 
 	// Sign signs input data with the backend's private key
 	Sign([]byte) ([]byte, error)

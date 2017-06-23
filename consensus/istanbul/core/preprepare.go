@@ -19,6 +19,7 @@ package core
 import (
 	"time"
 
+	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 )
 
@@ -66,9 +67,19 @@ func (c *core) handlePreprepare(msg *message, src istanbul.Validator) error {
 	}
 
 	// Verify the proposal we received
-	if err := c.backend.Verify(preprepare.Proposal); err != nil {
-		logger.Warn("Failed to verify proposal", "err", err)
-		c.sendNextRoundChange()
+	if err, duration := c.backend.Verify(preprepare.Proposal); err != nil {
+		logger.Warn("Failed to verify proposal", "err", err, "duration", duration)
+		// if it's a future block, we will handle it again after the duration
+		if err == consensus.ErrFutureBlock {
+			time.AfterFunc(duration, func() {
+				c.sendEvent(backlogEvent{
+					src: src,
+					msg: msg,
+				})
+			})
+		} else {
+			c.sendNextRoundChange()
+		}
 		return err
 	}
 

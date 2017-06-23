@@ -19,6 +19,7 @@ package backend
 import (
 	"crypto/ecdsa"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
@@ -172,21 +173,23 @@ func (sb *simpleBackend) EventMux() *event.TypeMux {
 }
 
 // Verify implements istanbul.Backend.Verify
-func (sb *simpleBackend) Verify(proposal istanbul.Proposal) error {
+func (sb *simpleBackend) Verify(proposal istanbul.Proposal) (error, time.Duration) {
 	// Check if the proposal is a valid block
 	block := &types.Block{}
 	block, ok := proposal.(*types.Block)
 	if !ok {
 		sb.logger.Error("Invalid proposal, %v", proposal)
-		return errInvalidProposal
+		return errInvalidProposal, 0
 	}
 	// verify the header of proposed block
 	err := sb.VerifyHeader(sb.chain, block.Header(), false)
-	// Ignore errEmptyCommittedSeals error because we don't have the committed seals yet
-	if err != nil && err != errEmptyCommittedSeals {
-		return err
+	// ignore errEmptyCommittedSeals error because we don't have the committed seals yet
+	if err == nil || err == errEmptyCommittedSeals {
+		return nil, 0
+	} else if err == consensus.ErrFutureBlock {
+		return consensus.ErrFutureBlock, time.Unix(block.Header().Time.Int64(), 0).Sub(now())
 	}
-	return nil
+	return err, 0
 }
 
 // Sign implements istanbul.Backend.Sign
