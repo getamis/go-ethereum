@@ -46,7 +46,7 @@ func (c *core) Start(lastSequence *big.Int, lastProposer common.Address, lastPro
 
 // Stop implements core.Engine.Stop
 func (c *core) Stop() error {
-	c.roundChangeTimer.Stop()
+	c.stopTimer()
 	c.unsubscribeEvents()
 	return nil
 }

@@ -60,8 +60,9 @@ type core struct {
 	state   State
 	logger  log.Logger
 
-	backend istanbul.Backend
-	events  *event.TypeMuxSubscription
+	backend               istanbul.Backend
+	events                *event.TypeMuxSubscription
+	futurePreprepareTimer *time.Timer
 
 	lastProposer          common.Address
 	lastProposal          istanbul.Proposal
@@ -241,10 +242,21 @@ func (c *core) Address() common.Address {
 	return c.address
 }
 
-func (c *core) newRoundChangeTimer() {
+func (c *core) stopFuturePreprepareTimer() {
+	if c.futurePreprepareTimer != nil {
+		c.futurePreprepareTimer.Stop()
+	}
+}
+
+func (c *core) stopTimer() {
+	c.stopFuturePreprepareTimer()
 	if c.roundChangeTimer != nil {
 		c.roundChangeTimer.Stop()
 	}
+}
+
+func (c *core) newRoundChangeTimer() {
+	c.stopTimer()
 
 	// set timeout based on the round number
 	timeout := time.Duration(c.config.RequestTimeout)*time.Millisecond + time.Duration(c.current.Round().Uint64()*c.config.BlockPeriod)*time.Second
