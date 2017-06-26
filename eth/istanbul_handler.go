@@ -23,7 +23,6 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -97,15 +96,13 @@ func newIstanbulProtocolManager(config *params.ChainConfig, mode downloader.Sync
 
 func (pm *istanbulProtocolManager) Start() {
 	// Subscribe required events
-	pm.eventSub = pm.eventMux.Subscribe(istanbul.ConsensusDataEvent{}, core.ChainHeadEvent{})
+	pm.eventSub = pm.eventMux.Subscribe(istanbul.ConsensusDataEvent{}, core.ChainHeadEvent{}, istanbul.NewCommittedEvent{})
 	go pm.eventLoop()
 	pm.protocolManager.Start()
-	pm.engine.Start(pm.protocolManager.blockchain, pm.commitBlock)
 }
 
 func (pm *istanbulProtocolManager) Stop() {
 	log.Info("Stopping Ethereum protocol")
-	pm.engine.Stop()
 	pm.protocolManager.Stop()
 	pm.eventSub.Unsubscribe() // quits eventLoop
 }
@@ -137,6 +134,8 @@ func (pm *istanbulProtocolManager) eventLoop() {
 		switch ev := obj.Data.(type) {
 		case istanbul.ConsensusDataEvent:
 			pm.sendEvent(ev)
+		case istanbul.NewCommittedEvent:
+			pm.BroadcastBlock(ev.Block, false)
 		case core.ChainHeadEvent:
 			pm.newHead(ev)
 		}
@@ -152,16 +151,6 @@ func (pm *istanbulProtocolManager) sendEvent(event istanbul.ConsensusDataEvent) 
 		return
 	}
 	p2p.Send(p.rw, IstanbulMsg, event.Data)
-}
-
-func (pm *istanbulProtocolManager) commitBlock(block *types.Block) error {
-	if _, err := pm.blockchain.InsertChain(types.Blocks{block}); err != nil {
-		log.Debug("Failed to insert block", "number", block.Number(), "hash", block.Hash(), "err", err)
-		return err
-	}
-	// Only announce the block, don't broadcast it
-	go pm.BroadcastBlock(block, false)
-	return nil
 }
 
 func (pm *istanbulProtocolManager) newHead(event core.ChainHeadEvent) {

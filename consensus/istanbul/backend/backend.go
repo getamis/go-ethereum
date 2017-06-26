@@ -45,12 +45,14 @@ func New(config *istanbul.Config, eventMux *event.TypeMux, privateKey *ecdsa.Pri
 		istanbulEventMux: new(event.TypeMux),
 		privateKey:       privateKey,
 		address:          crypto.PubkeyToAddress(privateKey.PublicKey),
-		logger:           log.New("backend", "simple"),
+		logger:           log.New(),
 		db:               db,
 		commitCh:         make(chan *types.Block, 1),
 		recents:          recents,
 		candidates:       make(map[common.Address]bool),
+		coreStarted:      false,
 	}
+	backend.core = istanbulCore.New(backend, backend.config)
 	return backend
 }
 
@@ -68,12 +70,14 @@ type simpleBackend struct {
 	db               ethdb.Database
 	timeout          uint64
 	chain            consensus.ChainReader
-	inserter         func(block *types.Block) error
+	inserter         func(types.Blocks) (int, error)
 
 	// the channels for istanbul engine notifications
 	commitCh          chan *types.Block
 	proposedBlockHash common.Hash
 	sealMu            sync.Mutex
+	coreStarted       bool
+	coreMu            sync.Mutex
 
 	// Current list of candidates we are pushing
 	candidates map[common.Address]bool
@@ -155,8 +159,15 @@ func (sb *simpleBackend) Commit(proposal istanbul.Proposal, seals []byte) error 
 		// TODO: how do we check the block is inserted correctly?
 		return nil
 	}
-
-	return sb.inserter(block)
+	// if I'm not a proposer, insert the block directly and broadcast NewCommittedEvent
+	if _, err := sb.inserter(types.Blocks{block}); err != nil {
+		return err
+	}
+	msg := istanbul.NewCommittedEvent{
+		Block: block,
+	}
+	go sb.eventMux.Post(msg)
+	return nil
 }
 
 // NextRound will broadcast ChainHeadEvent to trigger next seal()

@@ -482,6 +482,11 @@ func (sb *simpleBackend) APIs(chain consensus.ChainReader) []rpc.API {
 
 // HandleMsg implements consensus.Istanbul.HandleMsg
 func (sb *simpleBackend) HandleMsg(pubKey *ecdsa.PublicKey, data []byte) error {
+	sb.coreMu.Lock()
+	defer sb.coreMu.Unlock()
+	if !sb.coreStarted {
+		return istanbul.ErrStoppedEngine
+	}
 	addr := crypto.PubkeyToAddress(*pubKey)
 	// get the latest snapshot
 	curHeader := sb.chain.CurrentHeader()
@@ -503,23 +508,41 @@ func (sb *simpleBackend) HandleMsg(pubKey *ecdsa.PublicKey, data []byte) error {
 }
 
 // NewChainHead implements consensus.Istanbul.NewChainHead
-func (sb *simpleBackend) NewChainHead(block *types.Block) {
+func (sb *simpleBackend) NewChainHead(block *types.Block) error {
+	sb.coreMu.Lock()
+	defer sb.coreMu.Unlock()
+	if !sb.coreStarted {
+		return istanbul.ErrStoppedEngine
+	}
 	p, err := sb.Author(block.Header())
 	if err != nil {
 		sb.logger.Error("Failed to get block proposer", "err", err)
-		return
+		return err
 	}
 	go sb.istanbulEventMux.Post(istanbul.FinalCommittedEvent{
 		Proposal: block,
 		Proposer: p,
 	})
+	return nil
 }
 
 // Start implements consensus.Istanbul.Start
-func (sb *simpleBackend) Start(chain consensus.ChainReader, inserter func(block *types.Block) error) error {
+func (sb *simpleBackend) Start(chain consensus.ChainReader, inserter func(types.Blocks) (int, error)) error {
+	sb.coreMu.Lock()
+	defer sb.coreMu.Unlock()
+	if sb.coreStarted {
+		return istanbul.ErrStartedEngine
+	}
+
+	// clear previous data
+	sb.proposedBlockHash = common.Hash{}
+	if sb.commitCh != nil {
+		close(sb.commitCh)
+	}
+	sb.commitCh = make(chan *types.Block, 1)
+
 	sb.chain = chain
 	sb.inserter = inserter
-	sb.core = istanbulCore.New(sb, sb.config)
 
 	curHeader := chain.CurrentHeader()
 	lastSequence := new(big.Int).Set(curHeader.Number)
@@ -533,14 +556,24 @@ func (sb *simpleBackend) Start(chain consensus.ChainReader, inserter func(block 
 		lastProposer = p
 	}
 	block := chain.GetBlock(curHeader.Hash(), lastSequence.Uint64())
-	return sb.core.Start(lastSequence, lastProposer, block)
+	if err := sb.core.Start(lastSequence, lastProposer, block); err != nil {
+		return err
+	}
+	sb.coreStarted = true
+	return nil
 }
 
 // Stop implements consensus.Istanbul.Stop
 func (sb *simpleBackend) Stop() error {
-	if sb.core != nil {
-		return sb.core.Stop()
+	sb.coreMu.Lock()
+	defer sb.coreMu.Unlock()
+	if !sb.coreStarted {
+		return istanbul.ErrStoppedEngine
 	}
+	if err := sb.core.Stop(); err != nil {
+		return err
+	}
+	sb.coreStarted = false
 	return nil
 }
 
