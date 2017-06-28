@@ -48,6 +48,7 @@ import (
 var (
 	blockInsertTimer = metrics.NewTimer("chain/inserts")
 	txInsertCounter  = metrics.NewCounter("chain/tx/inserts")
+	txInsertMeter    = metrics.NewMeter("chain/tx/inserts/rate")
 	forkBlockCounter = metrics.NewCounter("chain/forkblocks")
 
 	ErrNoGenesis = errors.New("Genesis not found in chain")
@@ -870,6 +871,7 @@ func (bc *BlockChain) WriteBlock(block *types.Block) (status WriteStatus, err er
 
 	bc.futureBlocks.Remove(block.Hash())
 	txInsertCounter.Inc(int64(len(block.Transactions())))
+	txInsertMeter.Mark(int64(len(block.Transactions())))
 
 	return
 }
