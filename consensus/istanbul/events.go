@@ -23,8 +23,8 @@ import (
 
 // ConsensusDataEvent is posted when sending Istanbul consensus data
 type ConsensusDataEvent struct {
-	// target to send message
-	Target common.Address
+	// targets to send message
+	Targets map[common.Address]bool
 	// consensus message data
 	Data []byte
 }

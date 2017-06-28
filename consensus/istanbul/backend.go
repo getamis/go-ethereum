@@ -34,9 +34,6 @@ type Backend interface {
 	// EventMux returns the event mux in backend
 	EventMux() *event.TypeMux
 
-	// Send sends a message to specific target
-	Send(payload []byte, target common.Address) error
-
 	// Broadcast sends a message to all validators
 	Broadcast(valSet ValidatorSet, payload []byte) error
 

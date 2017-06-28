@@ -19,7 +19,6 @@ package eth
 import (
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 	"github.com/ethereum/go-ethereum/core"
@@ -144,13 +143,20 @@ func (pm *istanbulProtocolManager) eventLoop() {
 
 // sendEvent sends a p2p message with given data to a peer
 func (pm *istanbulProtocolManager) sendEvent(event istanbul.ConsensusDataEvent) {
-	// FIXME: it's inefficient because it retrieves all peers every time
-	p := pm.findPeer(event.Target)
-	if p == nil {
-		log.Warn("Failed to find peer by address", "addr", event.Target)
-		return
+	for _, p := range pm.peers.Peers() {
+		pubKey, err := p.ID().Pubkey()
+		if err != nil {
+			continue
+		}
+		addr := crypto.PubkeyToAddress(*pubKey)
+		if event.Targets[addr] {
+			p2p.Send(p.rw, IstanbulMsg, event.Data)
+			delete(event.Targets, addr)
+			if len(event.Targets) == 0 {
+				return
+			}
+		}
 	}
-	p2p.Send(p.rw, IstanbulMsg, event.Data)
 }
 
 func (pm *istanbulProtocolManager) newHead(event core.ChainHeadEvent) {
@@ -158,18 +164,4 @@ func (pm *istanbulProtocolManager) newHead(event core.ChainHeadEvent) {
 	if block != nil {
 		pm.engine.NewChainHead(block)
 	}
-}
-
-// findPeer retrieves a peer by given address
-func (pm *istanbulProtocolManager) findPeer(addr common.Address) *peer {
-	for _, p := range pm.peers.Peers() {
-		pubKey, err := p.ID().Pubkey()
-		if err != nil {
-			continue
-		}
-		if crypto.PubkeyToAddress(*pubKey) == addr {
-			return p
-		}
-	}
-	return nil
 }

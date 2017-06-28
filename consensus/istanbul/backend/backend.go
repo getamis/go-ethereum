@@ -99,16 +99,9 @@ func (sb *backend) Validators(proposal istanbul.Proposal) istanbul.ValidatorSet 
 	return snap.ValSet
 }
 
-func (sb *backend) Send(payload []byte, target common.Address) error {
-	go sb.eventMux.Post(istanbul.ConsensusDataEvent{
-		Target: target,
-		Data:   payload,
-	})
-	return nil
-}
-
 // Broadcast implements istanbul.Backend.Send
 func (sb *backend) Broadcast(valSet istanbul.ValidatorSet, payload []byte) error {
+	targets := make(map[common.Address]bool)
 	for _, val := range valSet.List() {
 		if val.Address() == sb.Address() {
 			// send to self
@@ -119,8 +112,15 @@ func (sb *backend) Broadcast(valSet istanbul.ValidatorSet, payload []byte) error
 
 		} else {
 			// send to other peers
-			sb.Send(payload, val.Address())
+			targets[val.Address()] = true
 		}
+	}
+
+	if len(targets) > 0 {
+		go sb.eventMux.Post(istanbul.ConsensusDataEvent{
+			Targets: targets,
+			Data:    payload,
+		})
 	}
 	return nil
 }
