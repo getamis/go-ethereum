@@ -35,7 +35,7 @@ import (
 const (
 	// istanbul is compatible with eth63 protocol
 	istanbulName           = "istanbul"
-	istanbulVersion        = 64
+	IstanbulVersion        = 64
 	istanbulProtocolLength = 18
 
 	IstanbulMsg = 0x11
@@ -65,10 +65,10 @@ func newIstanbulProtocolManager(config *params.ChainConfig, mode downloader.Sync
 	manager.SubProtocols = []p2p.Protocol{
 		p2p.Protocol{
 			Name:    istanbulName,
-			Version: istanbulVersion,
+			Version: IstanbulVersion,
 			Length:  istanbulProtocolLength,
 			Run: func(p *p2p.Peer, rw p2p.MsgReadWriter) error {
-				peer := manager.newPeer(int(istanbulVersion), p, rw)
+				peer := manager.newPeer(int(IstanbulVersion), p, rw)
 				select {
 				case manager.newPeerCh <- peer:
 					manager.wg.Add(1)
