@@ -580,6 +580,7 @@ func (pool *TxPool) promoteTxs(addr common.Address, txs *types.Transactions) {
 		pool.pendingState.SetNonce(addr, tx.Nonce()+1)
 		insertedTxs = append(insertedTxs, tx)
 	}
+	go pool.eventMux.Post(TxBatchEvent{insertedTxs})
 }
 
 // Add queues a single transaction in the pool if it is valid.
@@ -740,14 +741,14 @@ func (pool *TxPool) promoteExecutables(state *state.StateDB, accounts []common.A
 			queuedNofundsCounter.Inc(1)
 		}
 		// Gather all executable transactions and promote them
-		for _, tx := range list.Ready(pool.pendingState.GetNonce(addr)) {
-			hash := tx.Hash()
-			log.Trace("Promoting queued transaction", "hash", hash)
-			pool.promoteTx(addr, hash, tx)
-		}
-		// txs := list.Ready(pool.pendingState.GetNonce(addr))
-		// log.Info("Promoting queued transaction", "txs", len(txs))
-		// pool.promoteTxs(addr, &txs)
+		// for _, tx := range list.Ready(pool.pendingState.GetNonce(addr)) {
+		// 	hash := tx.Hash()
+		// 	log.Trace("Promoting queued transaction", "hash", hash)
+		// 	pool.promoteTx(addr, hash, tx)
+		// }
+		txs := list.Ready(pool.pendingState.GetNonce(addr))
+		log.Info("Promoting queued transaction", "txs", len(txs))
+		pool.promoteTxs(addr, &txs)
 		// Drop all transactions over the allowed limit
 		for _, tx := range list.Cap(int(pool.config.AccountQueue)) {
 			hash := tx.Hash()

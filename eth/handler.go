@@ -240,7 +240,7 @@ func (pm *protocolManager) removePeer(id string) {
 func (pm *protocolManager) Start() {
 	// broadcast transactions
 	pm.txSub = pm.eventMux.Subscribe(core.TxPreEvent{})
-	go pm.txBroadcastLoop()
+	// go pm.txBroadcastLoop()
 	// broadcast mined blocks
 	pm.minedBlockSub = pm.eventMux.Subscribe(core.NewMinedBlockEvent{})
 	go pm.minedBroadcastLoop()

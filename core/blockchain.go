@@ -47,7 +47,7 @@ import (
 
 var (
 	blockInsertTimer = metrics.NewTimer("chain/inserts")
-	txInsertCounter  = metrics.NewCounter("chain/tx/inserts")
+	txInsertCounter  = metrics.NewCounter("chain/tx/insertscounter")
 	txInsertMeter    = metrics.NewMeter("chain/tx/inserts/rate")
 	forkBlockCounter = metrics.NewCounter("chain/forkblocks")
 
