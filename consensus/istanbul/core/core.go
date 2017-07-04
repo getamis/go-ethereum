@@ -176,6 +176,9 @@ func (c *core) commit() {
 
 	proposal := c.current.Proposal()
 	if proposal != nil {
+		if c.roundChangeTimer != nil {
+			c.roundChangeTimer.Stop()
+		}
 		var signatures []byte
 		for _, v := range c.current.Commits.Values() {
 			signatures = append(signatures, v.CommittedSeal...)
