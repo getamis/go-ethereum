@@ -126,6 +126,14 @@ func (b *EthApiBackend) SendTx(ctx context.Context, signedTx *types.Transaction)
 	return b.eth.txPool.Add(signedTx)
 }
 
+func (b *EthApiBackend) SendTxs(ctx context.Context, signedTxs *[]*types.Transaction) error {
+	b.eth.txMu.Lock()
+	defer b.eth.txMu.Unlock()
+
+	b.eth.txPool.SetBatchLocal(signedTxs)
+	return b.eth.txPool.AddBatch(*signedTxs)
+}
+
 func (b *EthApiBackend) RemoveTx(txHash common.Hash) {
 	b.eth.txMu.Lock()
 	defer b.eth.txMu.Unlock()

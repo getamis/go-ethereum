@@ -54,6 +54,7 @@ type Backend interface {
 	GetEVM(ctx context.Context, msg core.Message, state State, header *types.Header, vmCfg vm.Config) (*vm.EVM, func() error, error)
 	// TxPool API
 	SendTx(ctx context.Context, signedTx *types.Transaction) error
+	SendTxs(ctx context.Context, signedTxs *[]*types.Transaction) error
 	RemoveTx(txHash common.Hash)
 	GetPoolTransactions() (types.Transactions, error)
 	GetPoolTransaction(txHash common.Hash) *types.Transaction

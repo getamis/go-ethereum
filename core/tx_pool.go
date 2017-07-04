@@ -354,6 +354,16 @@ func (pool *TxPool) SetLocal(tx *types.Transaction) {
 	pool.locals.add(tx.Hash())
 }
 
+// SetBatchLocal marks a transaction as local, skipping gas price
+//  check against local miner minimum in the future
+func (pool *TxPool) SetBatchLocal(txs *[]*types.Transaction) {
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
+	for _, tx := range *txs {
+		pool.locals.add(tx.Hash())
+	}
+}
+
 // validateTx checks whether a transaction is valid according
 // to the consensus rules.
 func (pool *TxPool) validateTx(tx *types.Transaction) error {
@@ -530,6 +540,48 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 	go pool.eventMux.Post(TxPreEvent{tx})
 }
 
+// promoteTxs adds a transaction to the pending (processable) list of transactions.
+//
+// Note, this method assumes the pool lock is held!
+func (pool *TxPool) promoteTxs(addr common.Address, txs *types.Transactions) {
+	log.Info("promoteTxs", "len", txs.Len(), "address", addr)
+	// Try to insert the transaction into the pending queue
+	if pool.pending[addr] == nil {
+		pool.pending[addr] = newTxList(true)
+	}
+	list := pool.pending[addr]
+
+	var insertedTxs types.Transactions
+	for _, tx := range *txs {
+		inserted, old := list.Add(tx, pool.config.PriceBump)
+		hash := tx.Hash()
+		if !inserted {
+			// An older transaction was better, discard this
+			delete(pool.all, hash)
+			pool.priced.Removed()
+
+			pendingDiscardCounter.Inc(1)
+			return
+		}
+		// Otherwise discard any previous transaction and mark this
+		if old != nil {
+			delete(pool.all, old.Hash())
+			pool.priced.Removed()
+
+			pendingReplaceCounter.Inc(1)
+		}
+		// Failsafe to work around direct pending inserts (tests)
+		if pool.all[hash] == nil {
+			pool.all[hash] = tx
+			pool.priced.Put(tx)
+		}
+		// Set the potentially new pending nonce and notify any subsystems of the new tx
+		pool.beats[addr] = time.Now()
+		pool.pendingState.SetNonce(addr, tx.Nonce()+1)
+		insertedTxs = append(insertedTxs, tx)
+	}
+}
+
 // Add queues a single transaction in the pool if it is valid.
 func (pool *TxPool) Add(tx *types.Transaction) error {
 	pool.mu.Lock()
@@ -693,6 +745,9 @@ func (pool *TxPool) promoteExecutables(state *state.StateDB, accounts []common.A
 			log.Trace("Promoting queued transaction", "hash", hash)
 			pool.promoteTx(addr, hash, tx)
 		}
+		// txs := list.Ready(pool.pendingState.GetNonce(addr))
+		// log.Info("Promoting queued transaction", "txs", len(txs))
+		// pool.promoteTxs(addr, &txs)
 		// Drop all transactions over the allowed limit
 		for _, tx := range list.Cap(int(pool.config.AccountQueue)) {
 			hash := tx.Hash()
