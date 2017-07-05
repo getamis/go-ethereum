@@ -115,7 +115,7 @@ func TestCheckValidatorSignature(t *testing.T) {
 func TestCommit(t *testing.T) {
 	backend, _, _ := newBackend()
 
-	quitCh := make(chan struct{}, 1)
+	commitCh := make(chan *types.Block)
 	// Case: it's a proposer, so the backend.commit will receive channel result from backend.Commit function
 	testCases := []struct {
 		expectedErr       error
@@ -149,18 +149,10 @@ func TestCommit(t *testing.T) {
 	for _, test := range testCases {
 		expBlock := test.expectedBlock()
 		go func() {
-			for {
-				select {
-				case result := <-backend.commitCh:
-					if result.Hash() != expBlock.Hash() {
-						t.Errorf("hash mismatch: have %v, want %v", result.Hash(), expBlock.Hash())
-					}
-					return
-				case <-time.After(2 * time.Second):
-					t.Error("unexpected timeout occurs")
-				case <-quitCh:
-					return
-				}
+			select {
+			case result := <-backend.commitCh:
+				commitCh <- result
+				return
 			}
 		}()
 
@@ -170,7 +162,18 @@ func TestCommit(t *testing.T) {
 				t.Errorf("error mismatch: have %v, want %v", err, test.expectedErr)
 			}
 		}
-		quitCh <- struct{}{}
+
+		if test.expectedErr == nil {
+			// to avoid race condition is occurred by goroutine
+			select {
+			case result := <-commitCh:
+				if result.Hash() != expBlock.Hash() {
+					t.Errorf("hash mismatch: have %v, want %v", result.Hash(), expBlock.Hash())
+				}
+			case <-time.After(10 * time.Second):
+				t.Fatal("timeout")
+			}
+		}
 	}
 }
 

@@ -17,6 +17,7 @@
 package core
 
 import (
+	"bytes"
 	"math/big"
 	"testing"
 
@@ -201,13 +202,10 @@ OUTER:
 
 		// check signatures large than 2F+1
 		signedCount := 0
-		signers := make([]common.Address, len(v0.committedSeals[0])/common.AddressLength)
-		for i := 0; i < len(signers); i++ {
-			copy(signers[i][:], v0.committedSeals[0][i*common.AddressLength:])
-		}
+		committedSeals := v0.committedMsgs[0].committedSeals
 		for _, validator := range r0.valSet.List() {
-			for _, signer := range signers {
-				if validator.Address() == signer {
+			for _, seal := range committedSeals {
+				if bytes.Compare(validator.Address().Bytes(), seal[:common.AddressLength]) == 0 {
 					signedCount++
 					break
 				}

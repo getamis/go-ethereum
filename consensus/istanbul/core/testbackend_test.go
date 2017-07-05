@@ -40,12 +40,16 @@ type testSystemBackend struct {
 	peers  istanbul.ValidatorSet
 	events *event.TypeMux
 
-	commitMsgs     []istanbul.Proposal
-	committedSeals [][]byte
-	sentMsgs       [][]byte // store the message when Send is called by core
+	committedMsgs []testCommittedMsgs
+	sentMsgs      [][]byte // store the message when Send is called by core
 
 	address common.Address
 	db      ethdb.Database
+}
+
+type testCommittedMsgs struct {
+	commitProposal istanbul.Proposal
+	committedSeals [][]byte
 }
 
 // ==============================================
@@ -88,10 +92,12 @@ func (self *testSystemBackend) NextRound() error {
 	return nil
 }
 
-func (self *testSystemBackend) Commit(proposal istanbul.Proposal, seals []byte) error {
+func (self *testSystemBackend) Commit(proposal istanbul.Proposal, seals [][]byte) error {
 	testLogger.Info("commit message", "address", self.Address())
-	self.commitMsgs = append(self.commitMsgs, proposal)
-	self.committedSeals = append(self.committedSeals, seals)
+	self.committedMsgs = append(self.committedMsgs, testCommittedMsgs{
+		commitProposal: proposal,
+		committedSeals: seals,
+	})
 
 	// fake new head events
 	go self.events.Post(istanbul.FinalCommittedEvent{

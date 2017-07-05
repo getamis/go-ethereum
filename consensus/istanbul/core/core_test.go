@@ -69,14 +69,14 @@ func TestNewRequest(t *testing.T) {
 	}
 
 	for _, backend := range sys.backends {
-		if len(backend.commitMsgs) != 2 {
-			t.Errorf("the number of executed requests mismatch: have %v, want 2", len(backend.commitMsgs))
+		if len(backend.committedMsgs) != 2 {
+			t.Errorf("the number of executed requests mismatch: have %v, want 2", len(backend.committedMsgs))
 		}
-		if !reflect.DeepEqual(request1.Number(), backend.commitMsgs[0].Number()) {
-			t.Errorf("the number of requests mismatch: have %v, want %v", request1.Number(), backend.commitMsgs[0].Number())
+		if !reflect.DeepEqual(request1.Number(), backend.committedMsgs[0].commitProposal.Number()) {
+			t.Errorf("the number of requests mismatch: have %v, want %v", request1.Number(), backend.committedMsgs[0].commitProposal.Number())
 		}
-		if !reflect.DeepEqual(request2.Number(), backend.commitMsgs[1].Number()) {
-			t.Errorf("the number of requests mismatch: have %v, want %v", request2.Number(), backend.commitMsgs[1].Number())
+		if !reflect.DeepEqual(request2.Number(), backend.committedMsgs[1].commitProposal.Number()) {
+			t.Errorf("the number of requests mismatch: have %v, want %v", request2.Number(), backend.committedMsgs[1].commitProposal.Number())
 		}
 	}
 }
