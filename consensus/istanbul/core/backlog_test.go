@@ -26,7 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 	"github.com/ethereum/go-ethereum/consensus/istanbul/validator"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
@@ -199,7 +198,7 @@ func TestStoreBacklog(t *testing.T) {
 
 func TestProcessFutureBacklog(t *testing.T) {
 	backend := &testSystemBackend{
-		events: new(event.TypeMux),
+		eventQueue: new(istanbul.EventQueue),
 	}
 	c := &core{
 		logger:     log.New("backend", "test", "id", 0),
@@ -236,7 +235,7 @@ func TestProcessFutureBacklog(t *testing.T) {
 	const timeoutDura = 2 * time.Second
 	timeout := time.NewTimer(timeoutDura)
 	select {
-	case e := <-c.events.Chan():
+	case e := <-c.eventSub.Chan():
 		t.Errorf("unexpected events comes: %v", e)
 	case <-timeout.C:
 		// success
@@ -282,8 +281,8 @@ func TestProcessBacklog(t *testing.T) {
 func testProcessBacklog(t *testing.T, msg *message) {
 	vset := newTestValidatorSet(1)
 	backend := &testSystemBackend{
-		events: new(event.TypeMux),
-		peers:  vset,
+		eventQueue: new(istanbul.EventQueue),
+		peers:      vset,
 	}
 	c := &core{
 		logger:     log.New("backend", "test", "id", 0),
@@ -305,10 +304,10 @@ func testProcessBacklog(t *testing.T, msg *message) {
 	const timeoutDura = 2 * time.Second
 	timeout := time.NewTimer(timeoutDura)
 	select {
-	case ev := <-c.events.Chan():
-		e, ok := ev.Data.(backlogEvent)
+	case ev := <-c.eventSub.Chan():
+		e, ok := ev.(backlogEvent)
 		if !ok {
-			t.Errorf("unexpected event comes: %v", reflect.TypeOf(ev.Data))
+			t.Errorf("unexpected event comes: %v", reflect.TypeOf(ev))
 		}
 		if e.msg.Code != msg.Code {
 			t.Errorf("message code mismatch: have %v, want %v", e.msg.Code, msg.Code)

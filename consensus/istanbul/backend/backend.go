@@ -40,17 +40,17 @@ func New(config *istanbul.Config, eventMux *event.TypeMux, privateKey *ecdsa.Pri
 	// Allocate the snapshot caches and create the engine
 	recents, _ := lru.NewARC(inmemorySnapshots)
 	backend := &backend{
-		config:           config,
-		eventMux:         eventMux,
-		istanbulEventMux: new(event.TypeMux),
-		privateKey:       privateKey,
-		address:          crypto.PubkeyToAddress(privateKey.PublicKey),
-		logger:           log.New(),
-		db:               db,
-		commitCh:         make(chan *types.Block, 1),
-		recents:          recents,
-		candidates:       make(map[common.Address]bool),
-		coreStarted:      false,
+		config:      config,
+		eventMux:    eventMux,
+		eventQueue:  new(istanbul.EventQueue),
+		privateKey:  privateKey,
+		address:     crypto.PubkeyToAddress(privateKey.PublicKey),
+		logger:      log.New(),
+		db:          db,
+		commitCh:    make(chan *types.Block, 1),
+		recents:     recents,
+		candidates:  make(map[common.Address]bool),
+		coreStarted: false,
 	}
 	backend.core = istanbulCore.New(backend, backend.config)
 	return backend
@@ -59,16 +59,16 @@ func New(config *istanbul.Config, eventMux *event.TypeMux, privateKey *ecdsa.Pri
 // ----------------------------------------------------------------------------
 
 type backend struct {
-	config           *istanbul.Config
-	eventMux         *event.TypeMux
-	istanbulEventMux *event.TypeMux
-	privateKey       *ecdsa.PrivateKey
-	address          common.Address
-	core             istanbulCore.Engine
-	logger           log.Logger
-	db               ethdb.Database
-	chain            consensus.ChainReader
-	inserter         func(types.Blocks) (int, error)
+	config     *istanbul.Config
+	eventMux   *event.TypeMux
+	eventQueue *istanbul.EventQueue
+	privateKey *ecdsa.PrivateKey
+	address    common.Address
+	core       istanbulCore.Engine
+	logger     log.Logger
+	db         ethdb.Database
+	chain      consensus.ChainReader
+	inserter   func(types.Blocks) (int, error)
 
 	// the channels for istanbul engine notifications
 	commitCh          chan *types.Block
@@ -108,7 +108,7 @@ func (sb *backend) Broadcast(valSet istanbul.ValidatorSet, payload []byte) error
 			msg := istanbul.MessageEvent{
 				Payload: payload,
 			}
-			go sb.istanbulEventMux.Post(msg)
+			go sb.eventQueue.Post(msg)
 
 		} else {
 			// send to other peers
@@ -176,9 +176,9 @@ func (sb *backend) NextRound() error {
 	return nil
 }
 
-// EventMux implements istanbul.Backend.EventMux
-func (sb *backend) EventMux() *event.TypeMux {
-	return sb.istanbulEventMux
+// EventMux implements istanbul.Backend.EventQueue
+func (sb *backend) EventQueue() *istanbul.EventQueue {
+	return sb.eventQueue
 }
 
 // Verify implements istanbul.Backend.Verify

@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
@@ -81,7 +80,7 @@ func TestCheckRequestMsg(t *testing.T) {
 
 func TestStoreRequestMsg(t *testing.T) {
 	backend := &testSystemBackend{
-		events: new(event.TypeMux),
+		eventQueue: new(istanbul.EventQueue),
 	}
 	c := &core{
 		logger:  log.New("backend", "test", "id", 0),
@@ -123,10 +122,10 @@ func TestStoreRequestMsg(t *testing.T) {
 	const timeoutDura = 2 * time.Second
 	timeout := time.NewTimer(timeoutDura)
 	select {
-	case ev := <-c.events.Chan():
-		e, ok := ev.Data.(istanbul.RequestEvent)
+	case ev := <-c.eventSub.Chan():
+		e, ok := ev.(istanbul.RequestEvent)
 		if !ok {
-			t.Errorf("unexpected event comes: %v", reflect.TypeOf(ev.Data))
+			t.Errorf("unexpected event comes: %v", reflect.TypeOf(ev))
 		}
 		if e.Proposal.Number().Cmp(requests[2].Proposal.Number()) != 0 {
 			t.Errorf("the number of proposal mismatch: have %v, want %v", e.Proposal.Number(), requests[2].Proposal.Number())

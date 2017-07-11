@@ -421,7 +421,7 @@ func (sb *backend) Seal(chain consensus.ChainReader, block *types.Block, stop <-
 	defer clear()
 
 	// post block into Istanbul engine
-	go sb.EventMux().Post(istanbul.RequestEvent{
+	go sb.eventQueue.Post(istanbul.RequestEvent{
 		Proposal: block,
 	})
 
@@ -501,7 +501,7 @@ func (sb *backend) HandleMsg(pubKey *ecdsa.PublicKey, data []byte) error {
 		return istanbul.ErrUnauthorizedAddress
 	}
 
-	go sb.istanbulEventMux.Post(istanbul.MessageEvent{
+	go sb.eventQueue.Post(istanbul.MessageEvent{
 		Payload: data,
 	})
 	return nil
@@ -519,7 +519,7 @@ func (sb *backend) NewChainHead(block *types.Block) error {
 		sb.logger.Error("Failed to get block proposer", "err", err)
 		return err
 	}
-	go sb.istanbulEventMux.Post(istanbul.FinalCommittedEvent{
+	go sb.eventQueue.Post(istanbul.FinalCommittedEvent{
 		Proposal: block,
 		Proposer: p,
 	})

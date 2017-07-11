@@ -162,18 +162,20 @@ func TestPrepare(t *testing.T) {
 func TestSealStopChannel(t *testing.T) {
 	chain, engine := newBlockChain(4)
 	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
+	// only test backend, so stop core engine to unsubscribe the event queue
+	engine.core.Stop()
 	stop := make(chan struct{}, 1)
-	eventSub := engine.EventMux().Subscribe(istanbul.RequestEvent{})
+	eventSub, _ := engine.EventQueue().Subscribe()
+	defer eventSub.Unsubscribe()
 	eventLoop := func() {
 		select {
 		case ev := <-eventSub.Chan():
-			_, ok := ev.Data.(istanbul.RequestEvent)
+			_, ok := ev.(istanbul.RequestEvent)
 			if !ok {
-				t.Errorf("unexpected event comes: %v", reflect.TypeOf(ev.Data))
+				t.Errorf("unexpected event comes: %v", reflect.TypeOf(ev))
 			}
 			stop <- struct{}{}
 		}
-		eventSub.Unsubscribe()
 	}
 	go eventLoop()
 	finalBlock, err := engine.Seal(chain, block, stop)
@@ -188,17 +190,19 @@ func TestSealStopChannel(t *testing.T) {
 func TestSealRoundChange(t *testing.T) {
 	chain, engine := newBlockChain(4)
 	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
-	eventSub := engine.EventMux().Subscribe(istanbul.RequestEvent{})
+	// only test backend, so stop core engine to unsubscribe the event queue
+	engine.core.Stop()
+	eventSub, _ := engine.EventQueue().Subscribe()
+	defer eventSub.Unsubscribe()
 	eventLoop := func() {
 		select {
 		case ev := <-eventSub.Chan():
-			_, ok := ev.Data.(istanbul.RequestEvent)
+			_, ok := ev.(istanbul.RequestEvent)
 			if !ok {
-				t.Errorf("unexpected event comes: %v", reflect.TypeOf(ev.Data))
+				t.Errorf("unexpected event comes: %v", reflect.TypeOf(ev))
 			}
 			engine.NextRound()
 		}
-		eventSub.Unsubscribe()
 	}
 	go eventLoop()
 
@@ -220,17 +224,19 @@ func TestSealCommittedOtherHash(t *testing.T) {
 	chain, engine := newBlockChain(4)
 	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
 	otherBlock := makeBlockWithoutSeal(chain, engine, block)
-	eventSub := engine.EventMux().Subscribe(istanbul.RequestEvent{})
+	// only test backend, so stop core engine to unsubscribe the event queue
+	engine.core.Stop()
+	eventSub, _ := engine.EventQueue().Subscribe()
+	defer eventSub.Unsubscribe()
 	eventLoop := func() {
 		select {
 		case ev := <-eventSub.Chan():
-			_, ok := ev.Data.(istanbul.RequestEvent)
+			_, ok := ev.(istanbul.RequestEvent)
 			if !ok {
-				t.Errorf("unexpected event comes: %v", reflect.TypeOf(ev.Data))
+				t.Errorf("unexpected event comes: %v", reflect.TypeOf(ev))
 			}
 			engine.Commit(otherBlock, []byte{})
 		}
-		eventSub.Unsubscribe()
 	}
 	go eventLoop()
 	seal := func() {

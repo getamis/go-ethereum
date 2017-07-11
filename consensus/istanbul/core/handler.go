@@ -38,7 +38,9 @@ func (c *core) Start(lastSequence *big.Int, lastProposer common.Address, lastPro
 
 	// Tests will handle events itself, so we have to make subscribeEvents()
 	// be able to call in test.
-	c.subscribeEvents()
+	if err := c.subscribeEvents(); err != nil {
+		return err
+	}
 	go c.handleEvents()
 
 	return nil
@@ -52,29 +54,33 @@ func (c *core) Stop() error {
 }
 
 // ----------------------------------------------------------------------------
-
 // Subscribe both internal and external events
-func (c *core) subscribeEvents() {
-	c.events = c.backend.EventMux().Subscribe(
-		// external events
-		istanbul.RequestEvent{},
-		istanbul.MessageEvent{},
-		istanbul.FinalCommittedEvent{},
-		// internal events
-		backlogEvent{},
-		timeoutEvent{},
-	)
+func (c *core) subscribeEvents() error {
+	// will handle the following events:
+	// (1) external events
+	// istanbul.RequestEvent{},
+	// istanbul.MessageEvent{},
+	// istanbul.FinalCommittedEvent{},
+	// (2) internal events
+	// backlogEvent{},
+	// timeoutEvent{},
+	sub, err := c.backend.EventQueue().Subscribe()
+	if err != nil {
+		return err
+	}
+	c.eventSub = sub
+	return nil
 }
 
 // Unsubscribe all events
 func (c *core) unsubscribeEvents() {
-	c.events.Unsubscribe()
+	c.eventSub.Unsubscribe()
 }
 
 func (c *core) handleEvents() {
-	for event := range c.events.Chan() {
+	for event := range c.eventSub.Chan() {
 		// A real event arrived, process interesting content
-		switch ev := event.Data.(type) {
+		switch ev := event.(type) {
 		case istanbul.RequestEvent:
 			r := &istanbul.Request{
 				Proposal: ev.Proposal,
@@ -98,7 +104,7 @@ func (c *core) handleEvents() {
 
 // sendEvent sends events to mux
 func (c *core) sendEvent(ev interface{}) {
-	c.backend.EventMux().Post(ev)
+	c.backend.EventQueue().Post(ev)
 }
 
 func (c *core) handleMsg(payload []byte) error {

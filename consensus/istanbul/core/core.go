@@ -24,7 +24,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	metrics "github.com/ethereum/go-ethereum/metrics"
 	goMetrics "github.com/rcrowley/go-metrics"
@@ -60,8 +59,8 @@ type core struct {
 	state   State
 	logger  log.Logger
 
-	backend istanbul.Backend
-	events  *event.TypeMuxSubscription
+	backend  istanbul.Backend
+	eventSub *istanbul.EventQueueSubscription
 
 	lastProposer          common.Address
 	lastProposal          istanbul.Proposal

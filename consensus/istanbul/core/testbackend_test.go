@@ -26,7 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/istanbul/validator"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/event"
 	elog "github.com/ethereum/go-ethereum/log"
 )
 
@@ -36,9 +35,9 @@ type testSystemBackend struct {
 	id  uint64
 	sys *testSystem
 
-	engine Engine
-	peers  istanbul.ValidatorSet
-	events *event.TypeMux
+	engine     Engine
+	peers      istanbul.ValidatorSet
+	eventQueue *istanbul.EventQueue
 
 	commitMsgs     []istanbul.Proposal
 	committedSeals [][]byte
@@ -61,8 +60,8 @@ func (self *testSystemBackend) Validators(proposal istanbul.Proposal) istanbul.V
 	return self.peers
 }
 
-func (self *testSystemBackend) EventMux() *event.TypeMux {
-	return self.events
+func (self *testSystemBackend) EventQueue() *istanbul.EventQueue {
+	return self.eventQueue
 }
 
 func (self *testSystemBackend) Send(message []byte, target common.Address) error {
@@ -94,7 +93,7 @@ func (self *testSystemBackend) Commit(proposal istanbul.Proposal, seals []byte) 
 	self.committedSeals = append(self.committedSeals, seals)
 
 	// fake new head events
-	go self.events.Post(istanbul.FinalCommittedEvent{
+	go self.eventQueue.Post(istanbul.FinalCommittedEvent{
 		Proposal: proposal,
 	})
 	return nil
@@ -122,7 +121,7 @@ func (self *testSystemBackend) Hash(b interface{}) common.Hash {
 }
 
 func (self *testSystemBackend) NewRequest(request istanbul.Proposal) {
-	go self.events.Post(istanbul.RequestEvent{
+	go self.eventQueue.Post(istanbul.RequestEvent{
 		Proposal: request,
 	})
 }
@@ -200,7 +199,7 @@ func (t *testSystem) listen() {
 		case queuedMessage := <-t.queuedMessage:
 			testLogger.Info("consuming a queue message...")
 			for _, backend := range t.backends {
-				go backend.EventMux().Post(queuedMessage)
+				go backend.EventQueue().Post(queuedMessage)
 			}
 		}
 	}
@@ -236,10 +235,10 @@ func (t *testSystem) NewBackend(id uint64) *testSystemBackend {
 	// assume always success
 	ethDB, _ := ethdb.NewMemDatabase()
 	backend := &testSystemBackend{
-		id:     id,
-		sys:    t,
-		events: new(event.TypeMux),
-		db:     ethDB,
+		id:         id,
+		sys:        t,
+		eventQueue: new(istanbul.EventQueue),
+		db:         ethDB,
 	}
 
 	t.backends[id] = backend
