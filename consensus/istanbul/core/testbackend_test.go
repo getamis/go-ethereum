@@ -100,8 +100,8 @@ func (self *testSystemBackend) Commit(proposal istanbul.Proposal, seals []byte) 
 	return nil
 }
 
-func (self *testSystemBackend) Verify(proposal istanbul.Proposal) (error, time.Duration) {
-	return nil, 0
+func (self *testSystemBackend) Verify(proposal istanbul.Proposal) (time.Duration, error) {
+	return 0, nil
 }
 
 func (self *testSystemBackend) Sign(data []byte) ([]byte, error) {
