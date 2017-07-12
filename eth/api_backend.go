@@ -32,8 +32,13 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
+	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
+)
+
+var (
+	txSendCounter = metrics.NewCounter("api/txsend")
 )
 
 // EthApiBackend implements ethapi.Backend for full nodes
@@ -123,7 +128,16 @@ func (b *EthApiBackend) SendTx(ctx context.Context, signedTx *types.Transaction)
 	defer b.eth.txMu.Unlock()
 
 	b.eth.txPool.SetLocal(signedTx)
+	txSendCounter.Inc(1)
 	return b.eth.txPool.Add(signedTx)
+}
+
+func (b *EthApiBackend) SendTxs(ctx context.Context, signedTxs *[]*types.Transaction) error {
+	b.eth.txMu.Lock()
+	defer b.eth.txMu.Unlock()
+
+	b.eth.txPool.SetBatchLocal(signedTxs)
+	return b.eth.txPool.AddBatch(*signedTxs)
 }
 
 func (b *EthApiBackend) RemoveTx(txHash common.Hash) {
