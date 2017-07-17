@@ -239,7 +239,7 @@ func (pm *protocolManager) removePeer(id string) {
 
 func (pm *protocolManager) Start() {
 	// broadcast transactions
-	pm.txSub = pm.eventMux.Subscribe(core.TxPreEvent{})
+	pm.txSub = pm.eventMux.Subscribe(core.TxPreEvent{}, core.BatchTxEvent{})
 	go pm.txBroadcastLoop()
 	// broadcast mined blocks
 	pm.minedBlockSub = pm.eventMux.Subscribe(core.NewMinedBlockEvent{})
@@ -752,6 +752,18 @@ func (pm *protocolManager) BroadcastTx(hash common.Hash, tx *types.Transaction) 
 	log.Trace("Broadcast transaction", "hash", hash, "recipients", len(peers))
 }
 
+// BroadcastTxs will propagate transactions to all peers which are not known to
+// already have the given transaction.
+func (pm *protocolManager) BroadcastTxs(txs []*types.Transaction) {
+	// Broadcast transaction to a batch of peers not knowing about it
+	peers := pm.peers.PeersWithoutTxs(txs)
+	//FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
+	for peer, ts := range peers {
+		peer.SendTransactions(ts)
+	}
+	log.Info("Broadcast transactions", "recipients", len(peers), "txs", len(txs))
+}
+
 // Mined broadcast loop
 func (self *protocolManager) minedBroadcastLoop() {
 	// automatically stops if unsubscribe
@@ -767,8 +779,12 @@ func (self *protocolManager) minedBroadcastLoop() {
 func (self *protocolManager) txBroadcastLoop() {
 	// automatically stops if unsubscribe
 	for obj := range self.txSub.Chan() {
-		event := obj.Data.(core.TxPreEvent)
-		self.BroadcastTx(event.Tx.Hash(), event.Tx)
+		switch ev := obj.Data.(type) {
+		case core.TxPreEvent:
+			self.BroadcastTx(ev.Tx.Hash(), ev.Tx)
+		case core.BatchTxEvent:
+			go self.BroadcastTxs(ev.Txs)
+		}
 	}
 }
 

@@ -484,6 +484,13 @@ var (
 		Usage: "Pause time when zero tx in previous block, values should be larger than istanbul.blockperiod",
 		Value: eth.DefaultConfig.Istanbul.BlockPauseTime,
 	}
+
+	// Prometheus settings
+	PrometheusAddrFlag = cli.StringFlag{
+		Name:  metrics.PrometheusAddrFlag,
+		Usage: "prometheus push-gateway address",
+		Value: "",
+	}
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating

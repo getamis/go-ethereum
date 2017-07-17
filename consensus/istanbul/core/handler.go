@@ -34,7 +34,7 @@ func (c *core) Start(lastSequence *big.Int, lastProposer common.Address, lastPro
 	c.startNewRound(&istanbul.View{
 		Sequence: new(big.Int).Add(lastSequence, common.Big1),
 		Round:    common.Big0,
-	}, false)
+	})
 
 	// Tests will handle events itself, so we have to make subscribeEvents()
 	// be able to call in test.

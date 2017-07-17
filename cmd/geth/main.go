@@ -114,6 +114,7 @@ var (
 		utils.IstanbulRequestTimeoutFlag,
 		utils.IstanbulBlockPeriodFlag,
 		utils.IstanbulBlockPauseTimeFlag,
+		utils.PrometheusAddrFlag,
 	}
 
 	rpcFlags = []cli.Flag{

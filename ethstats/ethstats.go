@@ -133,6 +133,9 @@ func (s *Service) loop() {
 	txSub := emux.Subscribe(core.TxPreEvent{})
 	defer txSub.Unsubscribe()
 
+	txsSub := emux.Subscribe(core.BatchTxEvent{})
+	defer txsSub.Unsubscribe()
+
 	// Start a goroutine that exhausts the subsciptions to avoid events piling up
 	var (
 		quitCh = make(chan struct{})
@@ -157,6 +160,20 @@ func (s *Service) loop() {
 
 			// Notify of new transaction events, but drop if too frequent
 			case _, ok := <-txSub.Chan():
+				if !ok { // node stopped
+					close(quitCh)
+					return
+				}
+				if time.Duration(mclock.Now()-lastTx) < time.Second {
+					continue
+				}
+				lastTx = mclock.Now()
+
+				select {
+				case txCh <- struct{}{}:
+				default:
+				}
+			case _, ok := <-txsSub.Chan():
 				if !ok { // node stopped
 					close(quitCh)
 					return

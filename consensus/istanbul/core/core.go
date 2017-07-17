@@ -175,7 +175,7 @@ func (c *core) commit() {
 	}
 }
 
-func (c *core) startNewRound(newView *istanbul.View, roundChange bool) {
+func (c *core) startNewRound(newView *istanbul.View) {
 	var logger log.Logger
 	if c.current == nil {
 		logger = c.logger.New("old_round", -1, "old_seq", 0, "old_proposer", c.valSet.GetProposer())
@@ -192,7 +192,7 @@ func (c *core) startNewRound(newView *istanbul.View, roundChange bool) {
 	c.valSet.CalcProposer(c.lastProposer, newView.Round.Uint64())
 	c.waitingForRoundChange = false
 	c.setState(StateAcceptRequest)
-	if roundChange && c.isProposer() {
+	if c.isProposer() {
 		c.backend.NextRound()
 	}
 	c.newRoundChangeTimer()
