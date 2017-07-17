@@ -18,6 +18,8 @@
 package consensus
 
 import (
+	"crypto/ecdsa"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -98,4 +100,21 @@ type PoW interface {
 
 	// Hashrate returns the current mining hashrate of a PoW consensus engine.
 	Hashrate() float64
+}
+
+// Istanbul is a consensus engine to avoid byzantine failure
+type Istanbul interface {
+	Engine
+
+	// HandleMsg handles a message from peer
+	HandleMsg(pubKey *ecdsa.PublicKey, data []byte) error
+
+	// NewChainHead is called if a new chain head block comes
+	NewChainHead(block *types.Block) error
+
+	// Start starts the engine
+	Start(chain ChainReader, inserter func(types.Blocks) (int, error)) error
+
+	// Stop stops the engine
+	Stop() error
 }
