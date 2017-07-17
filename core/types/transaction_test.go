@@ -149,7 +149,7 @@ func TestTransactionPriceNonceSort(t *testing.T) {
 	for {
 		if tx := txset.Peek(); tx != nil {
 			txs = append(txs, tx)
-			txset.Shift()
+			txset.Shift(signer)
 		}
 		break
 	}

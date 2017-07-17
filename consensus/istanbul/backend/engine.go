@@ -37,6 +37,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 const (
@@ -88,6 +89,9 @@ var (
 
 	nonceAuthVote = hexutil.MustDecode("0xffffffffffffffff") // Magic nonce number to vote on adding a new validator
 	nonceDropVote = hexutil.MustDecode("0x0000000000000000") // Magic nonce number to vote on removing a validator.
+
+	inmemoryAddresses  = 20 // Number of recent addresses from ecrecover
+	recentAddresses, _ = lru.NewARC(inmemoryAddresses)
 )
 
 // Author retrieves the Ethereum address of the account that minted the given
@@ -673,12 +677,23 @@ func sigHash(header *types.Header) (hash common.Hash) {
 
 // ecrecover extracts the Ethereum account address from a signed header.
 func ecrecover(header *types.Header) (common.Address, error) {
+	hash := header.Hash()
+	if addr, ok := recentAddresses.Get(hash); ok {
+		return addr.(common.Address), nil
+	}
+
 	// Retrieve the signature from the header extra-data
 	istanbulExtra, err := types.ExtractIstanbulExtra(header)
 	if err != nil {
 		return common.Address{}, err
 	}
-	return istanbul.GetSignatureAddress(sigHash(header).Bytes(), istanbulExtra.Seal)
+
+	addr, err := istanbul.GetSignatureAddress(sigHash(header).Bytes(), istanbulExtra.Seal)
+	if err != nil {
+		return addr, err
+	}
+	recentAddresses.Add(hash, addr)
+	return addr, nil
 }
 
 // prepareExtra returns a extra-data of the given header and validators

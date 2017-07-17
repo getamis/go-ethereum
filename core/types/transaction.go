@@ -415,8 +415,7 @@ func (t *TransactionsByPriceAndNonce) Peek() *Transaction {
 }
 
 // Shift replaces the current best head with the next one from the same account.
-func (t *TransactionsByPriceAndNonce) Shift() {
-	signer := deriveSigner(t.heads[0].data.V)
+func (t *TransactionsByPriceAndNonce) Shift(signer Signer) {
 	// derive signer but don't cache.
 	acc, _ := Sender(signer, t.heads[0]) // we only sort valid txs so this cannot fail
 	if txs, ok := t.txs[acc]; ok && len(txs) > 0 {

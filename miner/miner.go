@@ -46,7 +46,7 @@ type Backend interface {
 type Miner struct {
 	mux *event.TypeMux
 
-	worker *worker
+	worker Worker
 
 	coinbase common.Address
 	mining   int32
@@ -147,7 +147,7 @@ func (self *Miner) HashRate() (tot int64) {
 	// do we care this might race? is it worth we're rewriting some
 	// aspects of the worker/locking up agents so we can get an accurate
 	// hashrate?
-	for agent := range self.worker.agents {
+	for agent := range self.worker.agentMap() {
 		if _, ok := agent.(*CpuAgent); !ok {
 			tot += agent.GetHashRate()
 		}

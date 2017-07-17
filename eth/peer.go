@@ -399,6 +399,27 @@ func (ps *peerSet) PeersWithoutTx(hash common.Hash) []*peer {
 	return list
 }
 
+// PeersWithoutTxs retrieves a map of peers that do not have given transactions
+// in their set of known txs.
+func (ps *peerSet) PeersWithoutTxs(txs []*types.Transaction) map[*peer][]*types.Transaction {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+
+	peers := make(map[*peer][]*types.Transaction)
+	for _, p := range ps.peers {
+		var ts []*types.Transaction
+		for _, tx := range txs {
+			if !p.knownTxs.Has(tx.Hash()) {
+				ts = append(ts, tx)
+			}
+		}
+		if len(ts) > 0 {
+			peers[p] = ts
+		}
+	}
+	return peers
+}
+
 // BestPeer retrieves the known peer with the currently highest total difficulty.
 func (ps *peerSet) BestPeer() *peer {
 	ps.lock.RLock()

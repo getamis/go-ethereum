@@ -44,7 +44,7 @@ func (c *core) handleFinalCommitted(proposal istanbul.Proposal, proposer common.
 		c.startNewRound(&istanbul.View{
 			Sequence: new(big.Int).Add(proposal.Number(), common.Big1),
 			Round:    new(big.Int).Set(common.Big0),
-		}, false)
+		})
 	}
 
 	return nil
