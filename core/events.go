@@ -24,6 +24,9 @@ import (
 // TxPreEvent is posted when a transaction enters the transaction pool.
 type TxPreEvent struct{ Tx *types.Transaction }
 
+// BatchTxEvent is posted when transactions enter the transaction pool.
+type BatchTxEvent struct{ Txs []*types.Transaction }
+
 // TxPostEvent is posted when a transaction has been processed.
 type TxPostEvent struct{ Tx *types.Transaction }
 

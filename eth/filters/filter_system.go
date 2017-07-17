@@ -315,6 +315,14 @@ func (es *EventSystem) broadcast(filters filterIndex, ev *event.TypeMuxEvent) {
 				f.hashes <- e.Tx.Hash()
 			}
 		}
+	case core.BatchTxEvent:
+		for _, f := range filters[PendingTransactionsSubscription] {
+			for _, tx := range e.Txs {
+				if ev.Time.After(f.created) {
+					f.hashes <- tx.Hash()
+				}
+			}
+		}
 	case core.ChainEvent:
 		for _, f := range filters[BlocksSubscription] {
 			if ev.Time.After(f.created) {
@@ -396,7 +404,7 @@ func (es *EventSystem) lightFilterLogs(header *types.Header, addresses []common.
 func (es *EventSystem) eventLoop() {
 	var (
 		index = make(filterIndex)
-		sub   = es.mux.Subscribe(core.PendingLogsEvent{}, core.RemovedLogsEvent{}, []*types.Log{}, core.TxPreEvent{}, core.ChainEvent{})
+		sub   = es.mux.Subscribe(core.PendingLogsEvent{}, core.RemovedLogsEvent{}, []*types.Log{}, core.TxPreEvent{}, core.ChainEvent{}, core.BatchTxEvent{})
 	)
 
 	for i := UnknownSubscription; i < LastIndexSubscription; i++ {
