@@ -92,7 +92,13 @@ func (sb *backend) Address() common.Address {
 
 // Validators implements istanbul.Backend.Validators
 func (sb *backend) Validators(proposal istanbul.Proposal) istanbul.ValidatorSet {
-	snap, err := sb.snapshot(sb.chain, proposal.Number().Uint64(), proposal.Hash(), nil)
+	block, ok := proposal.(*types.Block)
+	if !ok {
+		sb.logger.Error("Invalid proposal, %v", proposal)
+		return validator.NewSet(nil, sb.config.ProposerPolicy)
+	}
+
+	snap, err := sb.snapshot(sb.chain, block.NumberU64()-1, block.ParentHash(), nil)
 	if err != nil {
 		return validator.NewSet(nil, sb.config.ProposerPolicy)
 	}
@@ -128,7 +134,6 @@ func (sb *backend) Broadcast(valSet istanbul.ValidatorSet, payload []byte) error
 // Commit implements istanbul.Backend.Commit
 func (sb *backend) Commit(proposal istanbul.Proposal, seals [][]byte) error {
 	// Check if the proposal is a valid block
-	block := &types.Block{}
 	block, ok := proposal.(*types.Block)
 	if !ok {
 		sb.logger.Error("Invalid proposal, %v", proposal)
