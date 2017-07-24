@@ -19,6 +19,7 @@ package core
 import (
 	"crypto/ecdsa"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
@@ -39,12 +40,16 @@ type testSystemBackend struct {
 	peers  istanbul.ValidatorSet
 	events *event.TypeMux
 
-	commitMsgs     []istanbul.Proposal
-	committedSeals [][]byte
-	sentMsgs       [][]byte // store the message when Send is called by core
+	committedMsgs []testCommittedMsgs
+	sentMsgs      [][]byte // store the message when Send is called by core
 
 	address common.Address
 	db      ethdb.Database
+}
+
+type testCommittedMsgs struct {
+	commitProposal istanbul.Proposal
+	committedSeals [][]byte
 }
 
 // ==============================================
@@ -87,10 +92,12 @@ func (self *testSystemBackend) NextRound() error {
 	return nil
 }
 
-func (self *testSystemBackend) Commit(proposal istanbul.Proposal, seals []byte) error {
+func (self *testSystemBackend) Commit(proposal istanbul.Proposal, seals [][]byte) error {
 	testLogger.Info("commit message", "address", self.Address())
-	self.commitMsgs = append(self.commitMsgs, proposal)
-	self.committedSeals = append(self.committedSeals, seals)
+	self.committedMsgs = append(self.committedMsgs, testCommittedMsgs{
+		commitProposal: proposal,
+		committedSeals: seals,
+	})
 
 	// fake new head events
 	go self.events.Post(istanbul.FinalCommittedEvent{
@@ -99,8 +106,8 @@ func (self *testSystemBackend) Commit(proposal istanbul.Proposal, seals []byte) 
 	return nil
 }
 
-func (self *testSystemBackend) Verify(proposal istanbul.Proposal) error {
-	return nil
+func (self *testSystemBackend) Verify(proposal istanbul.Proposal) (time.Duration, error) {
+	return 0, nil
 }
 
 func (self *testSystemBackend) Sign(data []byte) ([]byte, error) {
@@ -124,6 +131,19 @@ func (self *testSystemBackend) NewRequest(request istanbul.Proposal) {
 	go self.events.Post(istanbul.RequestEvent{
 		Proposal: request,
 	})
+}
+
+// Only block height 5 will return true
+func (self *testSystemBackend) HasBlock(hash common.Hash, number *big.Int) bool {
+	return number.Cmp(big.NewInt(5)) == 0
+}
+
+func (self *testSystemBackend) GetProposer(number uint64) common.Address {
+	return common.Address{}
+}
+
+func (self *testSystemBackend) ParentValidators(proposal istanbul.Proposal) istanbul.ValidatorSet {
+	return self.peers
 }
 
 // ==============================================
@@ -180,7 +200,7 @@ func NewTestSystemWithBackend(n, f uint64) *testSystem {
 		core.current = newRoundState(&istanbul.View{
 			Round:    big.NewInt(0),
 			Sequence: big.NewInt(1),
-		}, vset)
+		}, vset, common.Hash{}, nil)
 		core.logger = testLogger
 		core.validateFn = backend.CheckValidatorSignature
 

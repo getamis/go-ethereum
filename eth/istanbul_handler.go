@@ -19,11 +19,9 @@ package eth
 import (
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -37,7 +35,7 @@ import (
 const (
 	// istanbul is compatible with eth63 protocol
 	istanbulName           = "istanbul"
-	istanbulVersion        = 64
+	IstanbulVersion        = 64
 	istanbulProtocolLength = 18
 
 	IstanbulMsg = 0x11
@@ -67,10 +65,10 @@ func newIstanbulProtocolManager(config *params.ChainConfig, mode downloader.Sync
 	manager.SubProtocols = []p2p.Protocol{
 		p2p.Protocol{
 			Name:    istanbulName,
-			Version: istanbulVersion,
+			Version: IstanbulVersion,
 			Length:  istanbulProtocolLength,
 			Run: func(p *p2p.Peer, rw p2p.MsgReadWriter) error {
-				peer := manager.newPeer(int(istanbulVersion), p, rw)
+				peer := manager.newPeer(int(IstanbulVersion), p, rw)
 				select {
 				case manager.newPeerCh <- peer:
 					manager.wg.Add(1)
@@ -97,15 +95,13 @@ func newIstanbulProtocolManager(config *params.ChainConfig, mode downloader.Sync
 
 func (pm *istanbulProtocolManager) Start() {
 	// Subscribe required events
-	pm.eventSub = pm.eventMux.Subscribe(istanbul.ConsensusDataEvent{}, core.ChainHeadEvent{})
+	pm.eventSub = pm.eventMux.Subscribe(istanbul.ConsensusDataEvent{}, core.ChainHeadEvent{}, istanbul.NewCommittedEvent{})
 	go pm.eventLoop()
 	pm.protocolManager.Start()
-	pm.engine.Start(pm.protocolManager.blockchain, pm.commitBlock)
 }
 
 func (pm *istanbulProtocolManager) Stop() {
 	log.Info("Stopping Ethereum protocol")
-	pm.engine.Stop()
 	pm.protocolManager.Stop()
 	pm.eventSub.Unsubscribe() // quits eventLoop
 }
@@ -137,6 +133,8 @@ func (pm *istanbulProtocolManager) eventLoop() {
 		switch ev := obj.Data.(type) {
 		case istanbul.ConsensusDataEvent:
 			pm.sendEvent(ev)
+		case istanbul.NewCommittedEvent:
+			pm.BroadcastBlock(ev.Block, false)
 		case core.ChainHeadEvent:
 			pm.newHead(ev)
 		}
@@ -145,23 +143,20 @@ func (pm *istanbulProtocolManager) eventLoop() {
 
 // sendEvent sends a p2p message with given data to a peer
 func (pm *istanbulProtocolManager) sendEvent(event istanbul.ConsensusDataEvent) {
-	// FIXME: it's inefficient because it retrieves all peers every time
-	p := pm.findPeer(event.Target)
-	if p == nil {
-		log.Warn("Failed to find peer by address", "addr", event.Target)
-		return
+	for _, p := range pm.peers.Peers() {
+		pubKey, err := p.ID().Pubkey()
+		if err != nil {
+			continue
+		}
+		addr := crypto.PubkeyToAddress(*pubKey)
+		if event.Targets[addr] {
+			p2p.Send(p.rw, IstanbulMsg, event.Data)
+			delete(event.Targets, addr)
+			if len(event.Targets) == 0 {
+				return
+			}
+		}
 	}
-	p2p.Send(p.rw, IstanbulMsg, event.Data)
-}
-
-func (pm *istanbulProtocolManager) commitBlock(block *types.Block) error {
-	if _, err := pm.blockchain.InsertChain(types.Blocks{block}); err != nil {
-		log.Debug("Failed to insert block", "number", block.Number(), "hash", block.Hash(), "err", err)
-		return err
-	}
-	// Only announce the block, don't broadcast it
-	go pm.BroadcastBlock(block, false)
-	return nil
 }
 
 func (pm *istanbulProtocolManager) newHead(event core.ChainHeadEvent) {
@@ -169,18 +164,4 @@ func (pm *istanbulProtocolManager) newHead(event core.ChainHeadEvent) {
 	if block != nil {
 		pm.engine.NewChainHead(block)
 	}
-}
-
-// findPeer retrieves a peer by given address
-func (pm *istanbulProtocolManager) findPeer(addr common.Address) *peer {
-	for _, p := range pm.peers.Peers() {
-		pubKey, err := p.ID().Pubkey()
-		if err != nil {
-			continue
-		}
-		if crypto.PubkeyToAddress(*pubKey) == addr {
-			return p
-		}
-	}
-	return nil
 }

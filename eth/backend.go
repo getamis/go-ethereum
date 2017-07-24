@@ -352,6 +352,8 @@ func (s *Ethereum) StartMining(local bool) error {
 			return fmt.Errorf("singer missing: %v", err)
 		}
 		clique.Authorize(eb, wallet.SignHash)
+	} else if istanbul, ok := s.engine.(consensus.Istanbul); ok {
+		istanbul.Start(s.blockchain, s.blockchain.InsertChain)
 	}
 	if local {
 		// If local (CPU) mining is started, we can disable the transaction rejection
@@ -364,7 +366,12 @@ func (s *Ethereum) StartMining(local bool) error {
 	return nil
 }
 
-func (s *Ethereum) StopMining()         { s.miner.Stop() }
+func (s *Ethereum) StopMining() {
+	s.miner.Stop()
+	if istanbul, ok := s.engine.(consensus.Istanbul); ok {
+		istanbul.Stop()
+	}
+}
 func (s *Ethereum) IsMining() bool      { return s.miner.Mining() }
 func (s *Ethereum) Miner() *miner.Miner { return s.miner }
 

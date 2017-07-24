@@ -18,23 +18,32 @@ package istanbul
 
 import (
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
+// ConsensusDataEvent is posted when sending Istanbul consensus data
 type ConsensusDataEvent struct {
-	// target to send message
-	Target common.Address
+	// targets to send message
+	Targets map[common.Address]bool
 	// consensus message data
 	Data []byte
 }
 
+// NewCommittedEvent is posted when I'm not a proposer but
+// a block has been committed from Istanbul consensus.
+type NewCommittedEvent struct{ Block *types.Block }
+
+// RequestEvent is posted to propose a proposal
 type RequestEvent struct {
 	Proposal Proposal
 }
 
+// MessageEvent is posted for Istanbul engine communication
 type MessageEvent struct {
 	Payload []byte
 }
 
+// FinalCommittedEvent is posted when a proposal is committed
 type FinalCommittedEvent struct {
 	Proposal Proposal
 	Proposer common.Address

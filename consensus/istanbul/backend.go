@@ -17,6 +17,9 @@
 package istanbul
 
 import (
+	"math/big"
+	"time"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 )
@@ -32,21 +35,19 @@ type Backend interface {
 	// EventMux returns the event mux in backend
 	EventMux() *event.TypeMux
 
-	// Send sends a message to specific target
-	Send(payload []byte, target common.Address) error
-
 	// Broadcast sends a message to all validators
 	Broadcast(valSet ValidatorSet, payload []byte) error
 
 	// Commit delivers an approved proposal to backend.
 	// The delivered proposal will be put into blockchain.
-	Commit(proposal Proposal, seals []byte) error
+	Commit(proposal Proposal, seals [][]byte) error
 
 	// NextRound is called when we want to trigger next Seal()
 	NextRound() error
 
-	// Verify verifies the proposal.
-	Verify(Proposal) error
+	// Verify verifies the proposal. If a consensus.ErrFutureBlock error is returned,
+	// the time difference of the proposal and current time is also returned.
+	Verify(Proposal) (time.Duration, error)
 
 	// Sign signs input data with the backend's private key
 	Sign([]byte) ([]byte, error)
@@ -54,4 +55,13 @@ type Backend interface {
 	// CheckSignature verifies the signature by checking if it's signed by
 	// the given validator
 	CheckSignature(data []byte, addr common.Address, sig []byte) error
+
+	// HasBlock checks if the combination of the given hash and height matches any existing blocks
+	HasBlock(hash common.Hash, number *big.Int) bool
+
+	// GetProposer returns the proposer of the given block height
+	GetProposer(number uint64) common.Address
+
+	// ParentValidators returns the validator set of the given proposal's parent block
+	ParentValidators(proposal Proposal) ValidatorSet
 }

@@ -33,7 +33,7 @@ import (
 )
 
 func TestSign(t *testing.T) {
-	b, _, _ := newSimpleBackend()
+	b, _, _ := newBackend()
 	data := []byte("Here is a string....")
 	sig, err := b.Sign(data)
 	if err != nil {
@@ -54,7 +54,7 @@ func TestCheckSignature(t *testing.T) {
 	data := []byte("Here is a string....")
 	hashData := crypto.Keccak256([]byte(data))
 	sig, _ := crypto.Sign(hashData, key)
-	b, _, _ := newSimpleBackend()
+	b, _, _ := newBackend()
 	a := getAddress()
 	err := b.CheckSignature(data, a, sig)
 	if err != nil {
@@ -68,7 +68,7 @@ func TestCheckSignature(t *testing.T) {
 }
 
 func TestCheckValidatorSignature(t *testing.T) {
-	_, keys, vset := newSimpleBackend()
+	_, keys, vset := newBackend()
 
 	// 1. Positive test: sign with validator's key should succeed
 	data := []byte("dummy data")
@@ -113,18 +113,19 @@ func TestCheckValidatorSignature(t *testing.T) {
 }
 
 func TestCommit(t *testing.T) {
-	backend, _, _ := newSimpleBackend()
+	backend, _, _ := newBackend()
 
+	commitCh := make(chan *types.Block)
 	// Case: it's a proposer, so the backend.commit will receive channel result from backend.Commit function
 	testCases := []struct {
 		expectedErr       error
-		expectedSignature []byte
+		expectedSignature [][]byte
 		expectedBlock     func() *types.Block
 	}{
 		{
 			// normal case
 			nil,
-			append([]byte{1}, bytes.Repeat([]byte{0x00}, types.IstanbulExtraSeal-1)...),
+			[][]byte{append([]byte{1}, bytes.Repeat([]byte{0x00}, types.IstanbulExtraSeal-1)...)},
 			func() *types.Block {
 				chain, engine := newBlockChain(1)
 				block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
@@ -148,16 +149,10 @@ func TestCommit(t *testing.T) {
 	for _, test := range testCases {
 		expBlock := test.expectedBlock()
 		go func() {
-			for {
-				select {
-				case result := <-backend.commitCh:
-					if result.Hash() != expBlock.Hash() {
-						t.Errorf("hash mismatch: have %v, want %v", result.Hash(), expBlock.Hash())
-					}
-					return
-				case <-time.After(time.Second):
-					t.Error("unexpected timeout occurs")
-				}
+			select {
+			case result := <-backend.commitCh:
+				commitCh <- result
+				return
 			}
 		}()
 
@@ -167,6 +162,56 @@ func TestCommit(t *testing.T) {
 				t.Errorf("error mismatch: have %v, want %v", err, test.expectedErr)
 			}
 		}
+
+		if test.expectedErr == nil {
+			// to avoid race condition is occurred by goroutine
+			select {
+			case result := <-commitCh:
+				if result.Hash() != expBlock.Hash() {
+					t.Errorf("hash mismatch: have %v, want %v", result.Hash(), expBlock.Hash())
+				}
+			case <-time.After(10 * time.Second):
+				t.Fatal("timeout")
+			}
+		}
+	}
+}
+
+func TestHasBlock(t *testing.T) {
+	chain, engine := newBlockChain(1)
+	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
+	finalBlock, _ := engine.Seal(chain, block, nil)
+	chain.InsertChain(types.Blocks{finalBlock})
+	if engine.HasBlock(block.Hash(), finalBlock.Number()) {
+		t.Errorf("error mismatch: have true, want false")
+	}
+	if !engine.HasBlock(finalBlock.Hash(), finalBlock.Number()) {
+		t.Errorf("error mismatch: have false, want true")
+	}
+}
+
+func TestGetProposer(t *testing.T) {
+	chain, engine := newBlockChain(1)
+	block := makeBlock(chain, engine, chain.Genesis())
+	chain.InsertChain(types.Blocks{block})
+	expected := engine.GetProposer(1)
+	actual := engine.Address()
+	if actual != expected {
+		t.Errorf("proposer mismatch: have %v, want %v", actual.Hex(), expected.Hex())
+	}
+}
+
+func TestParentValidators(t *testing.T) {
+	chain, engine := newBlockChain(1)
+	block := makeBlock(chain, engine, chain.Genesis())
+	chain.InsertChain(types.Blocks{block})
+	expected := engine.Validators(block).List()
+	//Block without seal will make empty validator set
+	block = makeBlockWithoutSeal(chain, engine, block)
+	chain.InsertChain(types.Blocks{block})
+	actual := engine.ParentValidators(block).List()
+	if len(expected) != len(actual) || expected[0] != actual[0] {
+		t.Errorf("validator set mismatch: have %v, want %v", actual, expected)
 	}
 }
 
@@ -217,10 +262,10 @@ func (slice Keys) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
 
-func newSimpleBackend() (backend *simpleBackend, validatorKeys Keys, validatorSet istanbul.ValidatorSet) {
+func newBackend() (b *backend, validatorKeys Keys, validatorSet istanbul.ValidatorSet) {
 	key, _ := generatePrivateKey()
 	validatorSet, validatorKeys = newTestValidatorSet(5)
-	backend = &simpleBackend{
+	b = &backend{
 		privateKey: key,
 		logger:     log.New("backend", "simple"),
 		commitCh:   make(chan *types.Block, 1),

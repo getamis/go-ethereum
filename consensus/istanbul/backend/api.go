@@ -26,7 +26,7 @@ import (
 // API is a user facing RPC API to dump Istanbul state
 type API struct {
 	chain    consensus.ChainReader
-	istanbul *simpleBackend
+	istanbul *backend
 }
 
 // GetSnapshot retrieves the state snapshot at a given block.

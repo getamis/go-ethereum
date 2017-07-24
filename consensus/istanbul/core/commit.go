@@ -19,13 +19,26 @@ package core
 import (
 	"reflect"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 )
 
 func (c *core) sendCommit() {
+	sub := c.current.Subject()
+	c.broadcastCommit(sub)
+}
+
+func (c *core) sendCommitForOldBlock(view *istanbul.View, digest common.Hash) {
+	sub := &istanbul.Subject{
+		View:   view,
+		Digest: digest,
+	}
+	c.broadcastCommit(sub)
+}
+
+func (c *core) broadcastCommit(sub *istanbul.Subject) {
 	logger := c.logger.New("state", c.state)
 
-	sub := c.current.Subject()
 	encodedSubject, err := Encode(sub)
 	if err != nil {
 		logger.Error("Failed to encode", "subject", sub)
@@ -60,6 +73,8 @@ func (c *core) handleCommit(msg *message, src istanbul.Validator) error {
 	// If we already have a proposal, we may have chance to speed up the consensus process
 	// by committing the proposal without prepare messages.
 	if c.current.Commits.Size() > 2*c.valSet.F() && c.state.Cmp(StateCommitted) < 0 {
+		// Still need to call LockBlock here since state can skip Prepared state and jump directly to Committed state.
+		c.current.LockHash()
 		c.commit()
 	}
 

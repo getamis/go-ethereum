@@ -24,3 +24,5 @@ type backlogEvent struct {
 	src istanbul.Validator
 	msg *message
 }
+
+type timeoutEvent struct{}

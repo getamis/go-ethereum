@@ -18,12 +18,14 @@ package core
 
 import (
 	"bytes"
+	"math"
 	"math/big"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	metrics "github.com/ethereum/go-ethereum/metrics"
@@ -60,8 +62,9 @@ type core struct {
 	state   State
 	logger  log.Logger
 
-	backend istanbul.Backend
-	events  *event.TypeMuxSubscription
+	backend               istanbul.Backend
+	events                *event.TypeMuxSubscription
+	futurePreprepareTimer *time.Timer
 
 	lastProposer          common.Address
 	lastProposal          istanbul.Proposal
@@ -124,22 +127,6 @@ func (c *core) finalizeMessage(msg *message) ([]byte, error) {
 	return payload, nil
 }
 
-func (c *core) send(msg *message, target common.Address) {
-	logger := c.logger.New("state", c.state)
-
-	payload, err := c.finalizeMessage(msg)
-	if err != nil {
-		logger.Error("Failed to finalize message", "msg", msg, "err", err)
-		return
-	}
-
-	// Send payload
-	if err = c.backend.Send(payload, target); err != nil {
-		logger.Error("Failed to send message", "msg", msg, "err", err)
-		return
-	}
-}
-
 func (c *core) broadcast(msg *message) {
 	logger := c.logger.New("state", c.state)
 
@@ -176,12 +163,14 @@ func (c *core) commit() {
 
 	proposal := c.current.Proposal()
 	if proposal != nil {
-		var signatures []byte
-		for _, v := range c.current.Commits.Values() {
-			signatures = append(signatures, v.CommittedSeal...)
+		committedSeals := make([][]byte, c.current.Commits.Size())
+		for i, v := range c.current.Commits.Values() {
+			committedSeals[i] = make([]byte, types.IstanbulExtraSeal)
+			copy(committedSeals[i][:], v.CommittedSeal[:])
 		}
 
-		if err := c.backend.Commit(proposal, signatures); err != nil {
+		if err := c.backend.Commit(proposal, committedSeals); err != nil {
+			c.current.UnlockHash() //Unlock block when insertion fails
 			c.sendNextRoundChange()
 			return
 		}
@@ -200,13 +189,21 @@ func (c *core) startNewRound(newView *istanbul.View, roundChange bool) {
 	// Clear invalid round change messages
 	c.roundChangeSet = newRoundChangeSet(c.valSet)
 	// New snapshot for new round
-	c.current = newRoundState(newView, c.valSet)
+	c.updateRoundState(newView, c.valSet, roundChange)
 	// Calculate new proposer
 	c.valSet.CalcProposer(c.lastProposer, newView.Round.Uint64())
 	c.waitingForRoundChange = false
 	c.setState(StateAcceptRequest)
 	if roundChange && c.isProposer() {
-		c.backend.NextRound()
+		// If it is locked, propose the old proposal
+		if c.current != nil && c.current.IsHashLocked() {
+			r := &istanbul.Request{
+				Proposal: c.current.Proposal(), //c.current.Proposal would be the locked proposal by previous proposer, see updateRoundState
+			}
+			c.sendPreprepare(r)
+		} else {
+			c.backend.NextRound()
+		}
 	}
 	c.newRoundChangeTimer()
 
@@ -220,11 +217,23 @@ func (c *core) catchUpRound(view *istanbul.View) {
 		c.roundMeter.Mark(new(big.Int).Sub(view.Round, c.current.Round()).Int64())
 	}
 	c.waitingForRoundChange = true
-	c.current = newRoundState(view, c.valSet)
+
+	//Needs to keep block lock for round catching up
+	c.updateRoundState(view, c.valSet, true)
 	c.roundChangeSet.Clear(view.Round)
 	c.newRoundChangeTimer()
 
 	logger.Trace("Catch up round", "new_round", view.Round, "new_seq", view.Sequence, "new_proposer", c.valSet)
+}
+
+// updateRoundState updates round state by checking if locking block is necessary
+func (c *core) updateRoundState(view *istanbul.View, validatorSet istanbul.ValidatorSet, roundChange bool) {
+	// Lock only if both roundChange is true and it is locked
+	if roundChange && c.current != nil && c.current.IsHashLocked() {
+		c.current = newRoundState(view, validatorSet, c.current.GetLockedHash(), c.current.Preprepare)
+	} else {
+		c.current = newRoundState(view, validatorSet, common.Hash{}, nil)
+	}
 }
 
 func (c *core) setState(state State) {
@@ -241,27 +250,27 @@ func (c *core) Address() common.Address {
 	return c.address
 }
 
-func (c *core) newRoundChangeTimer() {
+func (c *core) stopFuturePreprepareTimer() {
+	if c.futurePreprepareTimer != nil {
+		c.futurePreprepareTimer.Stop()
+	}
+}
+
+func (c *core) stopTimer() {
+	c.stopFuturePreprepareTimer()
 	if c.roundChangeTimer != nil {
 		c.roundChangeTimer.Stop()
 	}
+}
+
+func (c *core) newRoundChangeTimer() {
+	c.stopTimer()
 
 	// set timeout based on the round number
-	timeout := time.Duration(c.config.RequestTimeout)*time.Millisecond + time.Duration(c.current.Round().Uint64()*c.config.BlockPeriod)*time.Second
+	t := uint64(math.Pow(2, float64(c.current.Round().Uint64()))) * c.config.RequestTimeout
+	timeout := time.Duration(t) * time.Millisecond
 	c.roundChangeTimer = time.AfterFunc(timeout, func() {
-		// If we're not waiting for round change yet, we can try to catch up
-		// the max round with F+1 round change message. We only need to catch up
-		// if the max round is larger than current round.
-		if !c.waitingForRoundChange {
-			maxRound := c.roundChangeSet.MaxRound(c.valSet.F() + 1)
-			if maxRound != nil && maxRound.Cmp(c.current.Round()) > 0 {
-				c.sendRoundChange(maxRound)
-			} else {
-				c.sendNextRoundChange()
-			}
-		} else {
-			c.sendNextRoundChange()
-		}
+		c.sendEvent(timeoutEvent{})
 	})
 }
 

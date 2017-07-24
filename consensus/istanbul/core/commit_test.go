@@ -17,6 +17,7 @@
 package core
 
 import (
+	"bytes"
 	"math/big"
 	"testing"
 
@@ -177,6 +178,9 @@ OUTER:
 				if err != test.expectedErr {
 					t.Errorf("error mismatch: have %v, want %v", err, test.expectedErr)
 				}
+				if r0.current.IsHashLocked() {
+					t.Errorf("block should not be locked")
+				}
 				continue OUTER
 			}
 		}
@@ -190,7 +194,9 @@ OUTER:
 			if r0.current.Commits.Size() > 2*r0.valSet.F() {
 				t.Errorf("the size of commit messages should be less than %v", 2*r0.valSet.F()+1)
 			}
-
+			if r0.current.IsHashLocked() {
+				t.Errorf("block should not be locked")
+			}
 			continue
 		}
 
@@ -201,13 +207,10 @@ OUTER:
 
 		// check signatures large than 2F+1
 		signedCount := 0
-		signers := make([]common.Address, len(v0.committedSeals[0])/common.AddressLength)
-		for i := 0; i < len(signers); i++ {
-			copy(signers[i][:], v0.committedSeals[0][i*common.AddressLength:])
-		}
+		committedSeals := v0.committedMsgs[0].committedSeals
 		for _, validator := range r0.valSet.List() {
-			for _, signer := range signers {
-				if validator.Address() == signer {
+			for _, seal := range committedSeals {
+				if bytes.Compare(validator.Address().Bytes(), seal[:common.AddressLength]) == 0 {
 					signedCount++
 					break
 				}
@@ -215,6 +218,9 @@ OUTER:
 		}
 		if signedCount <= 2*r0.valSet.F() {
 			t.Errorf("the expected signed count should be larger than %v, but got %v", 2*r0.valSet.F(), signedCount)
+		}
+		if !r0.current.IsHashLocked() {
+			t.Errorf("block should be locked")
 		}
 	}
 }

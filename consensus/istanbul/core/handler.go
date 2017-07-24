@@ -46,6 +46,7 @@ func (c *core) Start(lastSequence *big.Int, lastProposer common.Address, lastPro
 
 // Stop implements core.Engine.Stop
 func (c *core) Stop() error {
+	c.stopTimer()
 	c.unsubscribeEvents()
 	return nil
 }
@@ -61,6 +62,7 @@ func (c *core) subscribeEvents() {
 		istanbul.FinalCommittedEvent{},
 		// internal events
 		backlogEvent{},
+		timeoutEvent{},
 	)
 }
 
@@ -88,6 +90,8 @@ func (c *core) handleEvents() {
 		case backlogEvent:
 			// No need to check signature for internal messages
 			c.handleCheckedMsg(ev.msg, ev.src)
+		case timeoutEvent:
+			c.handleTimeoutMsg()
 		}
 	}
 }
@@ -144,4 +148,18 @@ func (c *core) handleCheckedMsg(msg *message, src istanbul.Validator) error {
 	}
 
 	return errInvalidMessage
+}
+
+func (c *core) handleTimeoutMsg() {
+	// If we're not waiting for round change yet, we can try to catch up
+	// the max round with F+1 round change message. We only need to catch up
+	// if the max round is larger than current round.
+	if !c.waitingForRoundChange {
+		maxRound := c.roundChangeSet.MaxRound(c.valSet.F() + 1)
+		if maxRound != nil && maxRound.Cmp(c.current.Round()) > 0 {
+			c.sendRoundChange(maxRound)
+			return
+		}
+	}
+	c.sendNextRoundChange()
 }
