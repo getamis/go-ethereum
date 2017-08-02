@@ -53,6 +53,19 @@ type Agent interface {
 	GetHashRate() int64
 }
 
+type Worker interface {
+	pendingBlock() *types.Block
+	pending() (*types.Block, *state.StateDB)
+	setEtherbase(addr common.Address)
+	setExtra(extra []byte)
+	stop()
+	start()
+	register(agent Agent)
+	unregister(agent Agent)
+	agentMap() map[Agent]struct{}
+	commitNewWork()
+}
+
 // Work is the workers current environment and holds
 // all of the current state information
 type Work struct {
@@ -124,7 +137,15 @@ type worker struct {
 	fullValidation bool
 }
 
-func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase common.Address, eth Backend, mux *event.TypeMux) *worker {
+func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase common.Address, eth Backend, mux *event.TypeMux) Worker {
+	if config.Istanbul != nil {
+		return newIstanbulWorker(config, engine, coinbase, eth, mux)
+	} else {
+		return newDefaultWorker(config, engine, coinbase, eth, mux)
+	}
+}
+
+func newDefaultWorker(config *params.ChainConfig, engine consensus.Engine, coinbase common.Address, eth Backend, mux *event.TypeMux) *worker {
 	worker := &worker{
 		config:         config,
 		engine:         engine,
@@ -241,8 +262,6 @@ func (self *worker) update() {
 	for event := range self.events.Chan() {
 		// A real event arrived, process interesting content
 		switch ev := event.Data.(type) {
-		case NewBlockEvent:
-			self.commitNewWork()
 		case core.ChainHeadEvent:
 			self.commitNewWork()
 		case core.ChainSideEvent:
@@ -504,6 +523,10 @@ func (self *worker) commitUncle(work *Work, uncle *types.Header) error {
 	}
 	work.uncles.Add(uncle.Hash())
 	return nil
+}
+
+func (w *worker) agentMap() map[Agent]struct{} {
+	return w.agents
 }
 
 func (env *Work) commitTransactions(mux *event.TypeMux, txs *types.TransactionsByPriceAndNonce, bc *core.BlockChain, coinbase common.Address) {

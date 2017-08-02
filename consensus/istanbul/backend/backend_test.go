@@ -29,7 +29,8 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/istanbul/validator"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/event"
 )
 
 func TestSign(t *testing.T) {
@@ -265,10 +266,10 @@ func (slice Keys) Swap(i, j int) {
 func newBackend() (b *backend, validatorKeys Keys, validatorSet istanbul.ValidatorSet) {
 	key, _ := generatePrivateKey()
 	validatorSet, validatorKeys = newTestValidatorSet(5)
-	b = &backend{
-		privateKey: key,
-		logger:     log.New("backend", "simple"),
-		commitCh:   make(chan *types.Block, 1),
-	}
+	eventMux := new(event.TypeMux)
+	memDB, _ := ethdb.NewMemDatabase()
+	config := istanbul.DefaultConfig
+	// Use the first key as private key
+	b, _ = New(config, eventMux, key, memDB).(*backend)
 	return
 }

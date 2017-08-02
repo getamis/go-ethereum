@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
 	istanbulCore "github.com/ethereum/go-ethereum/consensus/istanbul/core"
 	"github.com/ethereum/go-ethereum/consensus/istanbul/validator"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -69,7 +70,10 @@ type backend struct {
 	logger           log.Logger
 	db               ethdb.Database
 	chain            consensus.ChainReader
-	inserter         func(types.Blocks) (int, error)
+	// commitProposedWork tries to commit the transactions in proposed block into chain DB
+	commitProposedWork func(*types.Block) error
+	// writeProposedWork tries to write the proposed block into chain DB
+	writeProposedWork func(*types.Block) bool
 
 	// the channels for istanbul engine notifications
 	commitCh          chan *types.Block
@@ -151,12 +155,13 @@ func (sb *backend) Commit(proposal istanbul.Proposal, seals [][]byte) error {
 	if sb.proposedBlockHash == block.Hash() {
 		// feed block hash to Seal() and wait the Seal() result
 		sb.commitCh <- block
-		// TODO: how do we check the block is inserted correctly?
+		go sb.eventMux.Post(core.NewMinedBlockEvent{Block: block})
 		return nil
 	}
-	// if I'm not a proposer, insert the block directly and broadcast NewCommittedEvent
-	if _, err := sb.inserter(types.Blocks{block}); err != nil {
-		return err
+	if result := sb.writeProposedWork(block); !result {
+		// if I'm not a proposer, insert the block directly and broadcast NewCommittedEvent
+		sb.logger.Warn("Write work failed")
+		return nil
 	}
 	msg := istanbul.NewCommittedEvent{
 		Block: block,
@@ -190,12 +195,12 @@ func (sb *backend) Verify(proposal istanbul.Proposal) (time.Duration, error) {
 	// verify the header of proposed block
 	err := sb.VerifyHeader(sb.chain, block.Header(), false)
 	// ignore errEmptyCommittedSeals error because we don't have the committed seals yet
-	if err == nil || err == errEmptyCommittedSeals {
-		return 0, nil
-	} else if err == consensus.ErrFutureBlock {
+	if err == consensus.ErrFutureBlock {
 		return time.Unix(block.Header().Time.Int64(), 0).Sub(now()), consensus.ErrFutureBlock
+	} else if err != nil && err != errEmptyCommittedSeals {
+		return 0, err
 	}
-	return 0, err
+	return 0, sb.commitProposedWork(block)
 }
 
 // Sign implements istanbul.Backend.Sign

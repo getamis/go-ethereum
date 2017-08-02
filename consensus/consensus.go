@@ -113,8 +113,11 @@ type Istanbul interface {
 	NewChainHead(block *types.Block) error
 
 	// Start starts the engine
-	Start(chain ChainReader, inserter func(types.Blocks) (int, error)) error
+	Start(chain ChainReader) error
 
 	// Stop stops the engine
 	Stop() error
+
+	// Set commit and write proposed work functions
+	SetWorkerFns(func(*types.Block) error, func(*types.Block) bool)
 }

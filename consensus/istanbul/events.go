@@ -31,7 +31,9 @@ type ConsensusDataEvent struct {
 
 // NewCommittedEvent is posted when I'm not a proposer but
 // a block has been committed from Istanbul consensus.
-type NewCommittedEvent struct{ Block *types.Block }
+type NewCommittedEvent struct {
+	Block *types.Block
+}
 
 // RequestEvent is posted to propose a proposal
 type RequestEvent struct {

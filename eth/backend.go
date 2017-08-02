@@ -355,7 +355,7 @@ func (s *Ethereum) StartMining(local bool) error {
 		}
 		clique.Authorize(eb, wallet.SignHash)
 	} else if istanbul, ok := s.engine.(consensus.Istanbul); ok {
-		istanbul.Start(s.blockchain, s.blockchain.InsertChain)
+		istanbul.Start(s.blockchain)
 	}
 	if local {
 		// If local (CPU) mining is started, we can disable the transaction rejection

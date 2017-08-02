@@ -531,7 +531,7 @@ func (sb *backend) NewChainHead(block *types.Block) error {
 }
 
 // Start implements consensus.Istanbul.Start
-func (sb *backend) Start(chain consensus.ChainReader, inserter func(types.Blocks) (int, error)) error {
+func (sb *backend) Start(chain consensus.ChainReader) error {
 	sb.coreMu.Lock()
 	defer sb.coreMu.Unlock()
 	if sb.coreStarted {
@@ -546,7 +546,6 @@ func (sb *backend) Start(chain consensus.ChainReader, inserter func(types.Blocks
 	sb.commitCh = make(chan *types.Block, 1)
 
 	sb.chain = chain
-	sb.inserter = inserter
 
 	curHeader := chain.CurrentHeader()
 	lastSequence := new(big.Int).Set(curHeader.Number)
@@ -581,6 +580,11 @@ func (sb *backend) Stop() error {
 	}
 	sb.coreStarted = false
 	return nil
+}
+
+func (sb *backend) SetWorkerFns(commitFn func(*types.Block) error, writeFn func(*types.Block) bool) {
+	sb.commitProposedWork = commitFn
+	sb.writeProposedWork = writeFn
 }
 
 // snapshot retrieves the authorization snapshot at a given point in time.

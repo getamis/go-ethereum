@@ -177,7 +177,7 @@ func (c *core) commit() {
 	}
 }
 
-func (c *core) startNewRound(newView *istanbul.View, roundChange bool) {
+func (c *core) startNewRound(newView *istanbul.View) {
 	var logger log.Logger
 	if c.current == nil {
 		logger = c.logger.New("old_round", -1, "old_seq", 0, "old_proposer", c.valSet.GetProposer())
@@ -189,12 +189,12 @@ func (c *core) startNewRound(newView *istanbul.View, roundChange bool) {
 	// Clear invalid round change messages
 	c.roundChangeSet = newRoundChangeSet(c.valSet)
 	// New snapshot for new round
-	c.updateRoundState(newView, c.valSet, roundChange)
+	c.updateRoundState(newView, c.valSet)
 	// Calculate new proposer
 	c.valSet.CalcProposer(c.lastProposer, newView.Round.Uint64())
 	c.waitingForRoundChange = false
 	c.setState(StateAcceptRequest)
-	if roundChange && c.isProposer() {
+	if c.isProposer() {
 		// If it is locked, propose the old proposal
 		if c.current != nil && c.current.IsHashLocked() {
 			r := &istanbul.Request{
@@ -219,7 +219,7 @@ func (c *core) catchUpRound(view *istanbul.View) {
 	c.waitingForRoundChange = true
 
 	//Needs to keep block lock for round catching up
-	c.updateRoundState(view, c.valSet, true)
+	c.updateRoundState(view, c.valSet)
 	c.roundChangeSet.Clear(view.Round)
 	c.newRoundChangeTimer()
 
@@ -227,9 +227,9 @@ func (c *core) catchUpRound(view *istanbul.View) {
 }
 
 // updateRoundState updates round state by checking if locking block is necessary
-func (c *core) updateRoundState(view *istanbul.View, validatorSet istanbul.ValidatorSet, roundChange bool) {
-	// Lock only if both roundChange is true and it is locked
-	if roundChange && c.current != nil && c.current.IsHashLocked() {
+func (c *core) updateRoundState(view *istanbul.View, validatorSet istanbul.ValidatorSet) {
+	// Lock only if it is locked and new sequence is equal to the old one
+	if c.current != nil && c.current.IsHashLocked() && c.current.Sequence().Cmp(view.Sequence) == 0 {
 		c.current = newRoundState(view, validatorSet, c.current.GetLockedHash(), c.current.Preprepare)
 	} else {
 		c.current = newRoundState(view, validatorSet, common.Hash{}, nil)

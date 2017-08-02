@@ -112,7 +112,7 @@ func (c *core) handleRoundChange(msg *message, src istanbul.Validator) error {
 		c.startNewRound(&istanbul.View{
 			Round:    new(big.Int).Set(rc.Round),
 			Sequence: new(big.Int).Set(rc.Sequence),
-		}, true)
+		})
 	}
 
 	return nil
