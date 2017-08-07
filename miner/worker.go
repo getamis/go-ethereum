@@ -80,6 +80,9 @@ type Result struct {
 	Block *types.Block
 }
 
+// NewBlockEvent is posted when a new block is required
+type NewBlockEvent struct{}
+
 // worker is the main object which takes care of applying messages to the new state
 type worker struct {
 	config *params.ChainConfig
@@ -138,7 +141,12 @@ func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase com
 		unconfirmed:    newUnconfirmedBlocks(eth.BlockChain(), 5),
 		fullValidation: false,
 	}
-	worker.events = worker.mux.Subscribe(core.ChainHeadEvent{}, core.ChainSideEvent{}, core.TxPreEvent{})
+	worker.events = worker.mux.Subscribe(
+		core.ChainHeadEvent{},
+		core.ChainSideEvent{},
+		core.TxPreEvent{},
+		NewBlockEvent{},
+	)
 	go worker.update()
 
 	go worker.wait()
@@ -233,6 +241,8 @@ func (self *worker) update() {
 	for event := range self.events.Chan() {
 		// A real event arrived, process interesting content
 		switch ev := event.Data.(type) {
+		case NewBlockEvent:
+			self.commitNewWork()
 		case core.ChainHeadEvent:
 			self.commitNewWork()
 		case core.ChainSideEvent:
