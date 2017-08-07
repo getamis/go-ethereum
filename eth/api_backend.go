@@ -31,8 +31,13 @@ import (
 	"github.com/ethereum/go-ethereum/eth/gasprice"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
+)
+
+var (
+	txSendCounter = metrics.NewCounter("api/txsend")
 )
 
 // EthApiBackend implements ethapi.Backend for full nodes
@@ -116,6 +121,7 @@ func (b *EthApiBackend) GetEVM(ctx context.Context, msg core.Message, state *sta
 }
 
 func (b *EthApiBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
+	txSendCounter.Inc(1)
 	return b.eth.txPool.AddLocal(signedTx)
 }
 
