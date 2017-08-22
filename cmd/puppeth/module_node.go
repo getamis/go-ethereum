@@ -40,7 +40,7 @@ ADD genesis.json /genesis.json
 RUN \
   echo '/geth init /genesis.json' > geth.sh && \{{if .Unlock}}
 	echo 'mkdir -p /root/.ethereum/keystore/ && cp /signer.json /root/.ethereum/keystore/' >> geth.sh && \{{end}}
-	echo $'/geth --networkid {{.NetworkID}} --cache 512 --port {{.Port}} --maxpeers {{.Peers}} {{.LightFlag}} --ethstats \'{{.Ethstats}}\' {{if .BootV4}}--bootnodesv4 {{.BootV4}}{{end}} {{if .BootV5}}--bootnodesv5 {{.BootV5}}{{end}} {{if .Etherbase}}--etherbase {{.Etherbase}} --mine{{end}}{{if .Unlock}}--unlock 0 --password /signer.pass --mine{{end}} --targetgaslimit {{.GasTarget}} --gasprice {{.GasPrice}}' >> geth.sh
+	echo $'/geth --networkid {{.NetworkID}} --cache 512 --port {{.Port}} --maxpeers {{.Peers}} {{.LightFlag}} --ethstats \'{{.Ethstats}}\' {{if .BootV4}}--bootnodesv4 {{.BootV4}}{{end}} {{if .BootV5}}--bootnodesv5 {{.BootV5}}{{end}} {{if .Etherbase}}--etherbase {{.Etherbase}} --mine{{end}}{{if .Unlock}}--unlock 0 --password /signer.pass --mine{{end}} --targetgaslimit {{.GasTarget}} --gasprice {{.GasPrice}} {{if .NodeKey}}--nodekeyhex {{.NodeKey}} {{.NodeKey}}{{end}}' >> geth.sh
 
 ENTRYPOINT ["/bin/sh", "geth.sh"]
 `
@@ -67,7 +67,8 @@ services:
       - STATS_NAME={{.Ethstats}}
       - MINER_NAME={{.Etherbase}}
       - GAS_TARGET={{.GasTarget}}
-      - GAS_PRICE={{.GasPrice}}
+      - GAS_PRICE={{.GasPrice}}{{if .NodeKey}}
+      - NODE_KEY={{.NodeKey}}{{end}}
     logging:
       driver: "json-file"
       options:
@@ -107,6 +108,7 @@ func deployNode(client *sshClient, network string, bootv4, bootv5 []string, conf
 		"GasTarget": uint64(1000000 * config.gasTarget),
 		"GasPrice":  uint64(1000000000 * config.gasPrice),
 		"Unlock":    config.keyJSON != "",
+		"NodeKey":   config.nodeKey,
 	})
 	files[filepath.Join(workdir, "Dockerfile")] = dockerfile.Bytes()
 
@@ -124,6 +126,7 @@ func deployNode(client *sshClient, network string, bootv4, bootv5 []string, conf
 		"Etherbase":  config.etherbase,
 		"GasTarget":  config.gasTarget,
 		"GasPrice":   config.gasPrice,
+		"NodeKey":    config.nodeKey,
 	})
 	files[filepath.Join(workdir, "docker-compose.yaml")] = composefile.Bytes()
 
@@ -162,6 +165,7 @@ type nodeInfos struct {
 	keyPass    string
 	gasTarget  float64
 	gasPrice   float64
+	nodeKey    string
 }
 
 // String implements the stringer interface.
@@ -194,6 +198,7 @@ func checkNode(client *sshClient, network string, boot bool) (*nodeInfos, error)
 	lightPeers, _ := strconv.Atoi(infos.envvars["LIGHT_PEERS"])
 	gasTarget, _ := strconv.ParseFloat(infos.envvars["GAS_TARGET"], 64)
 	gasPrice, _ := strconv.ParseFloat(infos.envvars["GAS_PRICE"], 64)
+	nodeKey := infos.envvars["NODE_KEY"]
 
 	// Container available, retrieve its node ID and its genesis json
 	var out []byte
@@ -233,6 +238,7 @@ func checkNode(client *sshClient, network string, boot bool) (*nodeInfos, error)
 		keyPass:    keyPass,
 		gasTarget:  gasTarget,
 		gasPrice:   gasPrice,
+		nodeKey:    nodeKey,
 	}
 	stats.enodeFull = fmt.Sprintf("enode://%s@%s:%d", id, client.address, stats.portFull)
 	if stats.portLight != 0 {

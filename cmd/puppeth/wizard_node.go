@@ -134,6 +134,10 @@ func (w *wizard) deployNode(boot bool) {
 					return
 				}
 			}
+		} else if w.conf.genesis.Config.Istanbul != nil {
+			fmt.Println()
+			fmt.Println("Please paste the node key:")
+			infos.nodeKey = w.readString()
 		}
 		// Establish the gas dynamics to be enforced by the signer
 		fmt.Println()

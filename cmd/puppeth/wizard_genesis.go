@@ -24,9 +24,12 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/istanbul"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // makeGenesis creates a new genesis struct based on some user input.
@@ -49,6 +52,7 @@ func (w *wizard) makeGenesis() {
 	fmt.Println("Which consensus engine to use? (default = clique)")
 	fmt.Println(" 1. Ethash - proof-of-work")
 	fmt.Println(" 2. Clique - proof-of-authority")
+	fmt.Println(" 3. Istanbul - IBFT")
 
 	choice := w.read()
 	switch {
@@ -95,6 +99,48 @@ func (w *wizard) makeGenesis() {
 			copy(genesis.ExtraData[32+i*common.AddressLength:], signer[:])
 		}
 
+	case choice == "3":
+		// In the case of istanbul, configure the consensus parameters
+		genesis.Difficulty = big.NewInt(1)
+		genesis.Mixhash = types.IstanbulDigest
+		genesis.Config.Istanbul = &params.IstanbulConfig{
+			ProposerPolicy: uint64(istanbul.DefaultConfig.ProposerPolicy),
+			Epoch:          istanbul.DefaultConfig.Epoch,
+		}
+		fmt.Println()
+		fmt.Println("Select one proposer policy: Round Robin = 0, Sticky = 1 (default = 0)")
+		genesis.Config.Istanbul.ProposerPolicy = uint64(w.readDefaultInt(0))
+
+		// We also need the initial list of signers
+		fmt.Println()
+		fmt.Println("Which accounts are allowed to seal? (mandatory at least one)")
+
+		var signers []common.Address
+		for {
+			if address := w.readAddress(); address != nil {
+				signers = append(signers, *address)
+				continue
+			}
+			if len(signers) > 0 {
+				break
+			}
+		}
+		// Sort the signers and embed into the extra-data section
+		for i := 0; i < len(signers); i++ {
+			for j := i + 1; j < len(signers); j++ {
+				if bytes.Compare(signers[i][:], signers[j][:]) > 0 {
+					signers[i], signers[j] = signers[j], signers[i]
+				}
+			}
+		}
+
+		ist := &types.IstanbulExtra{
+			Validators:    signers,
+			Seal:          []byte{},
+			CommittedSeal: [][]byte{},
+		}
+		payload, _ := rlp.EncodeToBytes(&ist)
+		genesis.ExtraData = append(bytes.Repeat([]byte{0x00}, 32), payload...)
 	default:
 		log.Crit("Invalid consensus engine choice", "choice", choice)
 	}
