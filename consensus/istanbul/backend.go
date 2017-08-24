@@ -17,6 +17,7 @@
 package istanbul
 
 import (
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -44,9 +45,6 @@ type Backend interface {
 	// The delivered proposal will be put into blockchain.
 	Commit(proposal Proposal, seals [][]byte) error
 
-	// NextRound is called when we want to trigger next Seal()
-	NextRound() error
-
 	// Verify verifies the proposal. If a consensus.ErrFutureBlock error is returned,
 	// the time difference of the proposal and current time is also returned.
 	Verify(Proposal) (time.Duration, error)
@@ -60,4 +58,19 @@ type Backend interface {
 
 	// LastProposal retrieves latest committed proposal and the address of proposer
 	LastProposal() (Proposal, common.Address)
+
+	// MarkProposal marks the proposal as known for the address.
+	MarkProposal(addr common.Address, proposal Proposal) bool
+
+	// SetParentHead marks the parent of the proposal to the head of the address.
+	SetParentHead(addr common.Address, proposal Proposal) bool
+
+	// HasBlock checks if the combination of the given hash and height matches any existing blocks
+	HasBlock(hash common.Hash, number *big.Int) bool
+
+	// GetProposer returns the proposer of the given block height
+	GetProposer(number uint64) common.Address
+
+	// ParentValidators returns the validator set of the given proposal's parent block
+	ParentValidators(proposal Proposal) ValidatorSet
 }

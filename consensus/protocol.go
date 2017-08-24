@@ -18,6 +18,8 @@
 package consensus
 
 import (
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 )
@@ -56,6 +58,15 @@ type Broadcaster interface {
 
 // Peer defines the interface to communicate with peer
 type Peer interface {
+	// Address returns the peer's address
+	Address() common.Address
 	// Send sends the message to this peer
 	Send(msgcode uint64, data interface{}) error
+	// MarkBlock marks a block as known for the peer, ensuring that the block will never be propagated to this particular peer.
+	MarkBlock(hash common.Hash)
+	// SetHead updates the head hash and total difficulty of the peer.
+	SetHead(hash common.Hash, td *big.Int)
+	// Head retrieves a copy of the current head hash and total difficulty of the
+	// peer.
+	Head() (hash common.Hash, td *big.Int)
 }

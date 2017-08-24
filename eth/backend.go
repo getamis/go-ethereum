@@ -230,7 +230,7 @@ func CreateConsensusEngine(ctx *node.ServiceContext, config *Config, chainConfig
 			config.Istanbul.Epoch = chainConfig.Istanbul.Epoch
 		}
 		config.Istanbul.ProposerPolicy = istanbul.ProposerPolicy(chainConfig.Istanbul.ProposerPolicy)
-		return istanbulBackend.New(&config.Istanbul, ctx.EventMux, ctx.NodeKey(), db)
+		return istanbulBackend.New(&config.Istanbul, ctx.NodeKey(), db)
 	}
 
 	// Otherwise assume proof-of-work
@@ -355,8 +355,6 @@ func (s *Ethereum) StartMining(local bool) error {
 			return fmt.Errorf("singer missing: %v", err)
 		}
 		clique.Authorize(eb, wallet.SignHash)
-	} else if istanbul, ok := s.engine.(consensus.Istanbul); ok {
-		istanbul.Start(s.blockchain, s.blockchain.InsertChain)
 	}
 	if local {
 		// If local (CPU) mining is started, we can disable the transaction rejection
@@ -371,9 +369,6 @@ func (s *Ethereum) StartMining(local bool) error {
 
 func (s *Ethereum) StopMining() {
 	s.miner.Stop()
-	if istanbul, ok := s.engine.(consensus.Istanbul); ok {
-		istanbul.Stop()
-	}
 }
 func (s *Ethereum) IsMining() bool      { return s.miner.Mining() }
 func (s *Ethereum) Miner() *miner.Miner { return s.miner }

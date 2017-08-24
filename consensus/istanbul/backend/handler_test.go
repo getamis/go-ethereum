@@ -17,6 +17,7 @@
 package backend
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -26,6 +27,10 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 )
 
+var (
+	addr = common.StringToAddress("address")
+)
+
 func TestIstanbulMessage(t *testing.T) {
 	_, backend := newBlockChain(1)
 
@@ -33,7 +38,6 @@ func TestIstanbulMessage(t *testing.T) {
 	data := []byte("data1")
 	hash := istanbul.RLPHash(data)
 	msg := makeMsg(istanbulMsg, data)
-	addr := common.StringToAddress("address")
 
 	// 1. this message should not be in cache
 	// for peers
@@ -47,7 +51,8 @@ func TestIstanbulMessage(t *testing.T) {
 	}
 
 	// 2. this message should be in cache after we handle it
-	_, err := backend.HandleMsg(addr, msg)
+	peer := &MockPeer{}
+	_, err := backend.HandleMsg(peer, msg)
 	if err != nil {
 		t.Fatalf("handle message failed: %v", err)
 	}
@@ -69,4 +74,26 @@ func TestIstanbulMessage(t *testing.T) {
 func makeMsg(msgcode uint64, data interface{}) p2p.Msg {
 	size, r, _ := rlp.EncodeToReader(data)
 	return p2p.Msg{Code: msgcode, Size: uint32(size), Payload: r}
+}
+
+type MockPeer struct{}
+
+func (*MockPeer) Address() common.Address {
+	return addr
+}
+
+func (*MockPeer) Send(msgcode uint64, data interface{}) error {
+	return nil
+}
+
+func (*MockPeer) MarkBlock(hash common.Hash) {
+	return
+}
+
+func (*MockPeer) SetHead(hash common.Hash, td *big.Int) {
+	return
+}
+
+func (*MockPeer) Head() (hash common.Hash, td *big.Int) {
+	return
 }

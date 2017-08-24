@@ -182,8 +182,8 @@ func (valSet *defaultSet) RemoveValidator(address common.Address) bool {
 }
 
 func (valSet *defaultSet) Copy() istanbul.ValidatorSet {
-	valSet.validatorMu.Lock()
-	defer valSet.validatorMu.Unlock()
+	valSet.validatorMu.RLock()
+	defer valSet.validatorMu.RUnlock()
 
 	addresses := make([]common.Address, 0, len(valSet.validators))
 	for _, v := range valSet.validators {

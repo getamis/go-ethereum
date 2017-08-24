@@ -108,10 +108,7 @@ func (c *core) handleRoundChange(msg *message, src istanbul.Validator) error {
 		return nil
 	} else if num == int(2*c.valSet.F()+1) && (c.waitingForRoundChange || cv.Round.Cmp(rc.Round) < 0) {
 		// We've received 2f+1 ROUND CHANGE messages, start a new round immediately.
-		c.startNewRound(&istanbul.View{
-			Round:    new(big.Int).Set(rc.Round),
-			Sequence: new(big.Int).Set(rc.Sequence),
-		}, nil, common.Address{}, true)
+		c.startNewRound(rc.Round)
 		return nil
 	} else if cv.Round.Cmp(rc.Round) < 0 {
 		// We consider the message with larger round as future messages and not

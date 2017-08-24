@@ -87,9 +87,6 @@ type Result struct {
 	Block *types.Block
 }
 
-// NewBlockEvent is posted when a new block is required
-type NewBlockEvent struct{}
-
 // worker is the main object which takes care of applying messages to the new state
 type worker struct {
 	config *params.ChainConfig
@@ -213,6 +210,10 @@ func (self *worker) start() {
 
 	atomic.StoreInt32(&self.mining, 1)
 
+	if istanbul, ok := self.engine.(consensus.Istanbul); ok {
+		istanbul.Start(self.chain, self.chain.CurrentBlock, self.chain.InsertChain)
+	}
+
 	// spin up agents
 	for agent := range self.agents {
 		agent.Start()
@@ -229,6 +230,11 @@ func (self *worker) stop() {
 			agent.Stop()
 		}
 	}
+
+	if istanbul, ok := self.engine.(consensus.Istanbul); ok {
+		istanbul.Stop()
+	}
+
 	atomic.StoreInt32(&self.mining, 0)
 	atomic.StoreInt32(&self.atWork, 0)
 }
@@ -258,6 +264,9 @@ func (self *worker) update() {
 		// Handle ChainHeadEvent
 		case <-self.chainHeadCh:
 			self.commitNewWork()
+			if h, ok := self.engine.(consensus.Handler); ok {
+				h.NewChainHead()
+			}
 
 		// Handle ChainSideEvent
 		case ev := <-self.chainSideCh:

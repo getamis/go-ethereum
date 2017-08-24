@@ -25,6 +25,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
 	"gopkg.in/fatih/set.v0"
@@ -128,6 +129,15 @@ func (p *peer) MarkTransaction(hash common.Hash) {
 		p.knownTxs.Pop()
 	}
 	p.knownTxs.Add(hash)
+}
+
+// Address returns the peer's address
+func (p *peer) Address() common.Address {
+	pubKey, err := p.ID().Pubkey()
+	if err != nil {
+		return common.Address{}
+	}
+	return crypto.PubkeyToAddress(*pubKey)
 }
 
 // Send writes an RLP-encoded message with the given code.
