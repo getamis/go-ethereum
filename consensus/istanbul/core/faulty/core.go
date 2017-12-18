@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package core
+package faulty
 
 import (
 	"bytes"
 	"math"
 	"math/big"
+	"math/rand"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/istanbul"
-	"github.com/ethereum/go-ethereum/consensus/istanbul/core/faulty"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -36,9 +36,6 @@ import (
 
 // New creates an Istanbul consensus core
 func New(backend istanbul.Backend, config *istanbul.Config) Engine {
-	if config.FaultyMode != istanbul.Disabled.Uint64() {
-		return faulty.New(backend, config)
-	}
 	c := &core{
 		config:             config,
 		address:            backend.Address(),
@@ -124,6 +121,11 @@ func (c *core) finalizeMessage(msg *message) ([]byte, error) {
 		return nil, err
 	}
 
+	if c.modifySig() {
+		c.logger.Info("Modify the signature")
+		str := "fake"
+		copy(msg.Signature[:len(str)], []byte(str)[:])
+	}
 	// Convert to payload
 	payload, err := msg.Payload()
 	if err != nil {
@@ -135,6 +137,17 @@ func (c *core) finalizeMessage(msg *message) ([]byte, error) {
 
 func (c *core) broadcast(msg *message) {
 	logger := c.logger.New("state", c.state)
+
+	if c.notBroadcast() {
+		logger.Info("Not broadcast message", "message", msg)
+		return
+	}
+
+	if c.sendWrongMsg() {
+		code := uint64(rand.Intn(4))
+		logger.Info("Modify the message code", "old", msg.Code, "new", code)
+		msg.Code = code
+	}
 
 	payload, err := c.finalizeMessage(msg)
 	if err != nil {
