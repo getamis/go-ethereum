@@ -185,6 +185,8 @@ matrix:
         - xctool -version
         - xcrun simctl list
 
+        # Workaround for https://github.com/golang/go/issues/23749
+        - export CGO_CFLAGS_ALLOW='-fmodules|-fblocks|-fobjc-arc'
         - go run build/ci.go xcode -signer IOS_SIGNING_KEY -deploy trunk -upload gethstore/builds
 
     # This builder does the Azure archive purges to avoid accumulating junk
@@ -202,6 +204,6 @@ matrix:
 notifications:
   webhooks:
     urls:
-      - https://webhooks.gitter.im/e/e09ccdce1048c5e03445
+      - https://webhooks.gitter.im/e/a513fc5759b168761b82
     on_success: change
     on_failure: always

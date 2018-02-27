@@ -169,10 +169,9 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 
 	// Check whether the genesis block is already written.
 	if genesis != nil {
-		block, _ := genesis.ToBlock()
-		hash := block.Hash()
+		hash := genesis.ToBlock(nil).Hash()
 		if hash != stored {
-			return genesis.Config, block.Hash(), &GenesisMismatchError{stored, hash}
+			return genesis.Config, hash, &GenesisMismatchError{stored, hash}
 		}
 	}
 
@@ -220,9 +219,12 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 	}
 }
 
-// ToBlock creates the block and state of a genesis specification.
-func (g *Genesis) ToBlock() (*types.Block, *state.StateDB) {
-	db, _ := ethdb.NewMemDatabase()
+// ToBlock creates the genesis block and writes state of a genesis specification
+// to the given database (or discards it if nil).
+func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
+	if db == nil {
+		db, _ = ethdb.NewMemDatabase()
+	}
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 	for addr, account := range g.Alloc {
 		statedb.AddBalance(addr, account.Balance)
@@ -252,18 +254,18 @@ func (g *Genesis) ToBlock() (*types.Block, *state.StateDB) {
 	if g.Difficulty == nil {
 		head.Difficulty = params.GenesisDifficulty
 	}
-	return types.NewBlock(head, nil, nil, nil), statedb
+	statedb.Commit(false)
+	statedb.Database().TrieDB().Commit(root, true)
+
+	return types.NewBlock(head, nil, nil, nil)
 }
 
 // Commit writes the block and state of a genesis specification to the database.
 // The block is committed as the canonical head block.
 func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
-	block, statedb := g.ToBlock()
+	block := g.ToBlock(db)
 	if block.Number().Sign() != 0 {
 		return nil, fmt.Errorf("can't commit genesis block with number > 0")
-	}
-	if _, err := statedb.CommitTo(db, false); err != nil {
-		return nil, fmt.Errorf("cannot write state: %v", err)
 	}
 	if err := WriteTd(db, block.Hash(), block.NumberU64(), g.Difficulty); err != nil {
 		return nil, err
@@ -339,6 +341,19 @@ func DefaultRinkebyGenesisBlock() *Genesis {
 		GasLimit:   4700000,
 		Difficulty: big.NewInt(1),
 		Alloc:      decodePrealloc(rinkebyAllocData),
+	}
+}
+
+// DefaultOttomanGenesisBlock returns the Ottoman network genesis block.
+func DefaultOttomanGenesisBlock() *Genesis {
+	return &Genesis{
+		Config:     params.OttomanChainConfig,
+		Timestamp:  1496993285,
+		ExtraData:  hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000f89af85494475cc98b5521ab2a1335683e7567c8048bfe79ed9407d8299de61faed3686ba4c4e6c3b9083d7e2371944fe035ce99af680d89e2c4d73aca01dbfc1bd2fd94dc421209441a754f79c4a4ecd2b49c935aad0312b8410000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c0"),
+		GasLimit:   4700000,
+		Difficulty: big.NewInt(1),
+		Mixhash:    common.HexToHash("0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365"),
+		Alloc:      decodePrealloc(ottomanAllocData),
 	}
 }
 

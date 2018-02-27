@@ -22,10 +22,11 @@ import (
 	"io"
 	"sort"
 
+	"strings"
+
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/internal/debug"
 	"gopkg.in/urfave/cli.v1"
-	"strings"
 )
 
 // AppHelpTemplate is the test template for the default, global app help topic.
@@ -73,7 +74,9 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.NetworkIdFlag,
 			utils.TestnetFlag,
 			utils.RinkebyFlag,
+			utils.OttomanFlag,
 			utils.SyncModeFlag,
+			utils.GCModeFlag,
 			utils.EthStatsURLFlag,
 			utils.IdentityFlag,
 			utils.LightServFlag,
@@ -127,6 +130,8 @@ var AppHelpFlagGroups = []flagGroup{
 		Name: "PERFORMANCE TUNING",
 		Flags: []cli.Flag{
 			utils.CacheFlag,
+			utils.CacheDatabaseFlag,
+			utils.CacheGCFlag,
 			utils.TrieCacheGenFlag,
 		},
 	},
@@ -152,6 +157,7 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.IPCDisabledFlag,
 			utils.IPCPathFlag,
 			utils.RPCCORSDomainFlag,
+			utils.RPCVirtualHostsFlag,
 			utils.JSpathFlag,
 			utils.ExecFlag,
 			utils.PreloadJSFlag,
@@ -219,6 +225,14 @@ var AppHelpFlagGroups = []flagGroup{
 	},
 	{
 		Name: "MISC",
+	},
+	{
+		Name: "ISTANBUL",
+		Flags: []cli.Flag{
+			utils.IstanbulRequestTimeoutFlag,
+			utils.IstanbulBlockPeriodFlag,
+			utils.IstanbulBlockPauseTimeFlag,
+		},
 	},
 }
 

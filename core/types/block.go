@@ -25,6 +25,7 @@ import (
 	"sort"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -99,6 +100,14 @@ type headerMarshaling struct {
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its
 // RLP encoding.
 func (h *Header) Hash() common.Hash {
+	// If the mix digest is equivalent to the predefined Istanbul digest, use Istanbul
+	// specific hash calculation.
+	if h.MixDigest == IstanbulDigest {
+		// Seal is reserved in extra-data. To prove block is signed by the proposer.
+		if istanbulHeader := IstanbulFilteredHeader(h, true); istanbulHeader != nil {
+			return rlpHash(istanbulHeader)
+		}
+	}
 	return rlpHash(h)
 }
 
@@ -119,6 +128,12 @@ func (h *Header) HashNoNonce() common.Hash {
 		h.Time,
 		h.Extra,
 	})
+}
+
+// Size returns the approximate memory used by all internal contents. It is used
+// to approximate and limit the memory consumption of various caches.
+func (h *Header) Size() common.StorageSize {
+	return common.StorageSize(unsafe.Sizeof(*h)) + common.StorageSize(len(h.Extra)+(h.Difficulty.BitLen()+h.Number.BitLen()+h.Time.BitLen())/8)
 }
 
 func rlpHash(x interface{}) (h common.Hash) {
@@ -322,6 +337,8 @@ func (b *Block) HashNoNonce() common.Hash {
 	return b.header.HashNoNonce()
 }
 
+// Size returns the true RLP encoded storage size of the block, either by encoding
+// and returning it, or returning a previsouly cached value.
 func (b *Block) Size() common.StorageSize {
 	if size := b.size.Load(); size != nil {
 		return size.(common.StorageSize)

@@ -22,10 +22,12 @@ import (
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
+	"github.com/ethereum/go-ethereum/consensus/istanbul"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/gasprice"
@@ -43,8 +45,10 @@ var DefaultConfig = Config{
 		DatasetsOnDisk: 2,
 	},
 	NetworkId:     1,
-	LightPeers:    20,
-	DatabaseCache: 128,
+	LightPeers:    100,
+	DatabaseCache: 768,
+	TrieCache:     256,
+	TrieTimeout:   5 * time.Minute,
 	GasPrice:      big.NewInt(18 * params.Shannon),
 
 	TxPool: core.DefaultTxPoolConfig,
@@ -52,6 +56,8 @@ var DefaultConfig = Config{
 		Blocks:     20,
 		Percentile: 60,
 	},
+
+	Istanbul: *istanbul.DefaultConfig,
 }
 
 func init() {
@@ -78,6 +84,7 @@ type Config struct {
 	// Protocol options
 	NetworkId uint64 // Network ID to use for selecting peers to connect to
 	SyncMode  downloader.SyncMode
+	NoPruning bool
 
 	// Light client options
 	LightServ  int `toml:",omitempty"` // Maximum percentage of time allowed for serving LES requests
@@ -87,6 +94,8 @@ type Config struct {
 	SkipBcVersionCheck bool `toml:"-"`
 	DatabaseHandles    int  `toml:"-"`
 	DatabaseCache      int
+	TrieCache          int
+	TrieTimeout        time.Duration
 
 	// Mining-related options
 	Etherbase    common.Address `toml:",omitempty"`
@@ -105,6 +114,9 @@ type Config struct {
 
 	// Enables tracking of SHA3 preimages in the VM
 	EnablePreimageRecording bool
+
+	// Istanbul options
+	Istanbul istanbul.Config
 
 	// Miscellaneous options
 	DocRoot string `toml:"-"`
