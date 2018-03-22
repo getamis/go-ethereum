@@ -28,21 +28,20 @@ type Message struct {
 	Logs    *LogsMessage    `json:"logs,omitempty"`
 }
 
+type ChartEntries []*ChartEntry
+
+type ChartEntry struct {
+	Time  time.Time `json:"time,omitempty"`
+	Value float64   `json:"value,omitempty"`
+}
+
 type GeneralMessage struct {
 	Version string `json:"version,omitempty"`
 	Commit  string `json:"commit,omitempty"`
 }
 
 type HomeMessage struct {
-	Memory  ChartEntries `json:"memory,omitempty"`
-	Traffic ChartEntries `json:"traffic,omitempty"`
-}
-
-type ChartEntries []*ChartEntry
-
-type ChartEntry struct {
-	Time  time.Time `json:"time,omitempty"`
-	Value float64   `json:"value,omitempty"`
+	/* TODO (kurkomisi) */
 }
 
 type ChainMessage struct {
@@ -58,7 +57,14 @@ type NetworkMessage struct {
 }
 
 type SystemMessage struct {
-	/* TODO (kurkomisi) */
+	ActiveMemory   ChartEntries `json:"activeMemory,omitempty"`
+	VirtualMemory  ChartEntries `json:"virtualMemory,omitempty"`
+	NetworkIngress ChartEntries `json:"networkIngress,omitempty"`
+	NetworkEgress  ChartEntries `json:"networkEgress,omitempty"`
+	ProcessCPU     ChartEntries `json:"processCPU,omitempty"`
+	SystemCPU      ChartEntries `json:"systemCPU,omitempty"`
+	DiskRead       ChartEntries `json:"diskRead,omitempty"`
+	DiskWrite      ChartEntries `json:"diskWrite,omitempty"`
 }
 
 type LogsMessage struct {

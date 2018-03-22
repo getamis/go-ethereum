@@ -19,62 +19,161 @@
 import React, {Component} from 'react';
 
 import withStyles from 'material-ui/styles/withStyles';
-import AppBar from 'material-ui/AppBar';
-import Toolbar from 'material-ui/Toolbar';
 import Typography from 'material-ui/Typography';
+import Grid from 'material-ui/Grid';
+import {ResponsiveContainer, AreaChart, Area, Tooltip} from 'recharts';
 
-import type {General} from '../types/content';
+import ChartRow from './ChartRow';
+import CustomTooltip, {bytePlotter, bytePerSecPlotter, percentPlotter, multiplier} from './CustomTooltip';
+import {styles as commonStyles} from '../common';
+import type {General, System} from '../types/content';
 
-// styles contains styles for the Header component.
-const styles = theme => ({
+const FOOTER_SYNC_ID = 'footerSyncId';
+
+const CPU     = 'cpu';
+const MEMORY  = 'memory';
+const DISK    = 'disk';
+const TRAFFIC = 'traffic';
+
+const TOP = 'Top';
+const BOTTOM = 'Bottom';
+
+// styles contains the constant styles of the component.
+const styles = {
 	footer: {
-		backgroundColor: theme.palette.background.appBar,
-		color:           theme.palette.getContrastText(theme.palette.background.appBar),
+		maxWidth: '100%',
+		flexWrap: 'nowrap',
+		margin:   0,
+	},
+	chartRowWrapper: {
+		height:  '100%',
+		padding: 0,
+	},
+	doubleChartWrapper: {
+		height: '100%',
+		width:  '99%',
+	},
+};
+
+// themeStyles returns the styles generated from the theme for the component.
+const themeStyles: Object = (theme: Object) => ({
+	footer: {
+		backgroundColor: theme.palette.grey[900],
+		color:           theme.palette.getContrastText(theme.palette.grey[900]),
 		zIndex:          theme.zIndex.appBar,
-	},
-	toolbar: {
-		paddingLeft:    theme.spacing.unit,
-		paddingRight:   theme.spacing.unit,
-		display:        'flex',
-		justifyContent: 'flex-end',
-	},
-	light: {
-		color: 'rgba(255, 255, 255, 0.54)',
+		height:          theme.spacing.unit * 10,
 	},
 });
+
 export type Props = {
+	classes: Object, // injected by withStyles()
+	theme: Object,
 	general: General,
-	classes: Object,
+	system: System,
+	shouldUpdate: Object,
 };
-// TODO (kurkomisi): If the structure is appropriate, make an abstraction of the common parts with the Header.
-// Footer renders the header of the dashboard.
+
+// Footer renders the footer of the dashboard.
 class Footer extends Component<Props> {
 	shouldComponentUpdate(nextProps) {
-		return typeof nextProps.shouldUpdate.logs !== 'undefined';
+		return typeof nextProps.shouldUpdate.general !== 'undefined' || typeof nextProps.shouldUpdate.system !== 'undefined';
 	}
 
-	info = (about: string, data: string) => (
-		<Typography type="caption" color="inherit">
-			<span className={this.props.classes.light}>{about}</span> {data}
-		</Typography>
+	// halfHeightChart renders an area chart with half of the height of its parent.
+	halfHeightChart = (chartProps, tooltip, areaProps) => (
+		<ResponsiveContainer width='100%' height='50%'>
+			<AreaChart {...chartProps} >
+				{!tooltip || (<Tooltip cursor={false} content={<CustomTooltip tooltip={tooltip} />} />)}
+				<Area isAnimationActive={false} type='monotone' {...areaProps} />
+			</AreaChart>
+		</ResponsiveContainer>
 	);
 
-	render() {
-		const {classes, general} = this.props; // The classes property is injected by withStyles().
-		const geth = general.version ? this.info('Geth', general.version) : null;
-		const commit = general.commit ? this.info('Commit', general.commit.substring(0, 7)) : null;
+	// doubleChart renders a pair of charts separated by the baseline.
+	doubleChart = (syncId, chartKey, topChart, bottomChart) => {
+		if (!Array.isArray(topChart.data) || !Array.isArray(bottomChart.data)) {
+			return null;
+		}
+		const topDefault = topChart.default || 0;
+		const bottomDefault = bottomChart.default || 0;
+		const topKey = `${chartKey}${TOP}`;
+		const bottomKey = `${chartKey}${BOTTOM}`;
+		const topColor = '#8884d8';
+		const bottomColor = '#82ca9d';
 
 		return (
-			<AppBar position="static" className={classes.footer}>
-				<Toolbar className={classes.toolbar}>
-					<div>
-						{geth}
-						{commit}
-					</div>
-				</Toolbar>
-			</AppBar>
+			<div style={styles.doubleChartWrapper}>
+				{this.halfHeightChart(
+					{
+						syncId,
+						data:   topChart.data.map(({value}) => ({[topKey]: value || topDefault})),
+						margin: {top: 5, right: 5, bottom: 0, left: 5},
+					},
+					topChart.tooltip,
+					{dataKey: topKey, stroke: topColor, fill: topColor},
+				)}
+				{this.halfHeightChart(
+					{
+						syncId,
+						data:   bottomChart.data.map(({value}) => ({[bottomKey]: -value || -bottomDefault})),
+						margin: {top: 0, right: 5, bottom: 5, left: 5},
+					},
+					bottomChart.tooltip,
+					{dataKey: bottomKey, stroke: bottomColor, fill: bottomColor},
+				)}
+			</div>
+		);
+	};
+
+	render() {
+		const {general, system} = this.props;
+
+		return (
+			<Grid container className={this.props.classes.footer} direction='row' alignItems='center' style={styles.footer}>
+				<Grid item xs style={styles.chartRowWrapper}>
+					<ChartRow>
+						{this.doubleChart(
+							FOOTER_SYNC_ID,
+							CPU,
+							{data: system.processCPU, tooltip: percentPlotter('Process load')},
+							{data: system.systemCPU, tooltip: percentPlotter('System load', multiplier(-1))},
+						)}
+						{this.doubleChart(
+							FOOTER_SYNC_ID,
+							MEMORY,
+							{data: system.activeMemory, tooltip: bytePlotter('Active memory')},
+							{data: system.virtualMemory, tooltip: bytePlotter('Virtual memory', multiplier(-1))},
+						)}
+						{this.doubleChart(
+							FOOTER_SYNC_ID,
+							DISK,
+							{data: system.diskRead, tooltip: bytePerSecPlotter('Disk read')},
+							{data: system.diskWrite, tooltip: bytePerSecPlotter('Disk write', multiplier(-1))},
+						)}
+						{this.doubleChart(
+							FOOTER_SYNC_ID,
+							TRAFFIC,
+							{data: system.networkIngress, tooltip: bytePerSecPlotter('Download')},
+							{data: system.networkEgress, tooltip: bytePerSecPlotter('Upload', multiplier(-1))},
+						)}
+					</ChartRow>
+				</Grid>
+				<Grid item >
+					<Typography type='caption' color='inherit'>
+						<span style={commonStyles.light}>Geth</span> {general.version}
+					</Typography>
+					{general.commit && (
+						<Typography type='caption' color='inherit'>
+							<span style={commonStyles.light}>{'Commit '}</span>
+							<a href={`https://github.com/ethereum/go-ethereum/commit/${general.commit}`} target='_blank' style={{color: 'inherit', textDecoration: 'none'}} >
+								{general.commit.substring(0, 8)}
+							</a>
+						</Typography>
+					)}
+				</Grid>
+			</Grid>
 		);
 	}
 }
 
-export default withStyles(styles)(Footer);
+export default withStyles(themeStyles)(Footer);
