@@ -200,7 +200,7 @@ func (c *ChainConfig) IsConstantinople(num *big.Int) bool {
 }
 
 func (c *ChainConfig) IsCasper(num *big.Int) bool {
-	return isForked(c.CasperBlock, num)
+	return c.CasperBlock != nil && isForked(c.CasperBlock, num)
 }
 
 // GasTable returns the gas table corresponding to the current phase (homestead or homestead reprice).
