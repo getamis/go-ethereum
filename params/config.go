@@ -187,7 +187,7 @@ func (c *ChainConfig) IsHomestead(num *big.Int) bool {
 	return isForked(c.HomesteadBlock, num)
 }
 
-// IsDAO returns whether num is either equal to the DAO fork block or greater.
+// IsDAOFork returns whether num is either equal to the DAO fork block or greater.
 func (c *ChainConfig) IsDAOFork(num *big.Int) bool {
 	return isForked(c.DAOForkBlock, num)
 }

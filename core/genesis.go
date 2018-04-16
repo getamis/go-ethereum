@@ -28,8 +28,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/contracts"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
@@ -235,7 +237,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		}
 	}
 	root := statedb.IntermediateRoot(false)
-	head := &types.Header{
+	header := &types.Header{
 		Number:     new(big.Int).SetUint64(g.Number),
 		Nonce:      types.EncodeNonce(g.Nonce),
 		Time:       new(big.Int).SetUint64(g.Timestamp),
@@ -249,15 +251,36 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		Root:       root,
 	}
 	if g.GasLimit == 0 {
-		head.GasLimit = params.GenesisGasLimit
+		header.GasLimit = params.GenesisGasLimit
 	}
 	if g.Difficulty == nil {
-		head.Difficulty = params.GenesisDifficulty
+		header.Difficulty = params.GenesisDifficulty
+	}
+
+	if g.Config != nil && g.Config.IsCasper(header.Number) {
+		// TODO: need to put in chain config, but how to ensure it's secure
+		casperPrivateKey := "a27df3e4f46e7792ea951d7abf853b5a5ac3226bacd57286b9df98324386532f"
+
+		// Init casper transactions
+		txs, _, _ := contracts.CasperInitializers(0, casperPrivateKey)
+		// Add init balance to null sender address
+		nullSenderAddr := common.HexToAddress("56f8fa946c92a225444170f59fba81707c755161")
+		statedb.AddBalance(nullSenderAddr, new(big.Int).Exp(big.NewInt(10), big.NewInt(25), nil))
+
+		for _, tx := range txs {
+			_, used, err := ApplyTransaction(g.Config, nil, &g.Coinbase, new(GasPool).AddGas(g.GasLimit), statedb, header, tx, new(uint64), vm.Config{})
+			if err != nil {
+				log.Info("Failed to apply transaction", "hash", tx.Hash().Hex(), "err", err)
+			}
+
+			log.Info("Apply Casper tx", "hash", tx.Hash().Hex(), "used", used, "root", statedb.IntermediateRoot(false).Hex())
+		}
+		header.Root = statedb.IntermediateRoot(false)
 	}
 	statedb.Commit(false)
-	statedb.Database().TrieDB().Commit(root, true)
+	statedb.Database().TrieDB().Commit(header.Root, true)
 
-	return types.NewBlock(head, nil, nil, nil)
+	return types.NewBlock(header, nil, nil, nil)
 }
 
 // Commit writes the block and state of a genesis specification to the database.
