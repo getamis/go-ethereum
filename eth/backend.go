@@ -326,11 +326,12 @@ func (s *Ethereum) Etherbase() (eb common.Address, err error) {
 
 // set in js console via admin interface or wrapper from cli flags
 func (self *Ethereum) SetEtherbase(etherbase common.Address) {
-	self.lock.Lock()
 	if _, ok := self.engine.(consensus.Istanbul); ok {
 		log.Error("Cannot set etherbase in Istanbul consensus")
 		return
 	}
+	
+	self.lock.Lock()
 	self.etherbase = etherbase
 	self.lock.Unlock()
 
