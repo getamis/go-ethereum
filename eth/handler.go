@@ -57,6 +57,10 @@ const (
 	// All transactions with a higher size will be announced and need to be fetched
 	// by the peer.
 	txMaxBroadcastSize = 4096
+
+	// pendingLocalTxChanSize is the size of channel listening to NewTxsEvent.
+	// The number is referenced from the size of tx pool.
+	pendingLocalTxChanSize = 4096
 )
 
 var syncChallengeTimeout = 15 * time.Second // Time allowance for a node to reply to the sync progress challenge
@@ -91,6 +95,10 @@ type txPool interface {
 	// can decide whether to receive notifications only for newly seen transactions
 	// or also for reorged out ones.
 	SubscribeTransactions(ch chan<- core.NewTxsEvent, reorgs bool) event.Subscription
+
+	// SubscribePendingLocalTxsEvent should return an event subscription of
+	// NewTxsEvent and send events to the given channel.
+	SubscribePendingLocalTxsEvent(chan<- core.PendingLocalTxsEvent) event.Subscription
 }
 
 // handlerConfig is the collection of initialization parameters to create a full
@@ -123,10 +131,12 @@ type handler struct {
 	txFetcher  *fetcher.TxFetcher
 	peers      *peerSet
 
-	eventMux   *event.TypeMux
-	txsCh      chan core.NewTxsEvent
-	txsSub     event.Subscription
-	blockRange *blockRangeState
+	eventMux           *event.TypeMux
+	txsCh              chan core.NewTxsEvent
+	txsSub             event.Subscription
+	blockRange         *blockRangeState
+	pendingLocalTxsCh  chan core.PendingLocalTxsEvent
+	pendingLocalTxsSub event.Subscription
 
 	requiredBlocks map[uint64]common.Hash
 
@@ -429,7 +439,10 @@ func (h *handler) Start(maxPeers int) {
 	h.wg.Add(1)
 	h.txsCh = make(chan core.NewTxsEvent, txChanSize)
 	h.txsSub = h.txpool.SubscribeTransactions(h.txsCh, false)
+	h.pendingLocalTxsCh = make(chan core.PendingLocalTxsEvent, pendingLocalTxChanSize)
+	h.pendingLocalTxsSub = h.txpool.SubscribePendingLocalTxsEvent(h.pendingLocalTxsCh)
 	go h.txBroadcastLoop()
+	go h.pendingLocalTxBroadcastLoop()
 
 	// broadcast block range
 	h.wg.Add(1)
@@ -449,6 +462,7 @@ func (h *handler) Stop() {
 	h.blockRange.stop()
 	h.txFetcher.Stop()
 	h.downloader.Terminate()
+	h.pendingLocalTxsSub.Unsubscribe()
 
 	// Quit chainSync and txsync64.
 	// After this is done, no new peers will be accepted.
@@ -542,6 +556,20 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 		"bcastpeers", len(txset), "bcastcount", directCount, "annpeers", len(annos), "anncount", annCount)
 }
 
+// BroadcastPendingLocalTxs will propagate a batch of transactions to all peers
+func (h *handler) BroadcastPendingLocalTxs(txs types.Transactions) {
+	peers := h.peers.Clone()
+	// Build tx hashes
+	txHashes := make([]common.Hash, len(txs))
+	for i, tx := range txs {
+		txHashes[i] = tx.Hash()
+	}
+	for _, peer := range peers {
+		peer.AsyncSendTransactions(txHashes)
+	}
+	log.Info("Broadcast pending local transaction to all peers", "recipients", len(peers))
+}
+
 // txBroadcastLoop announces new transactions to connected peers.
 func (h *handler) txBroadcastLoop() {
 	defer h.wg.Done()
@@ -613,6 +641,19 @@ func (h *handler) blockRangeLoop(st *blockRangeState) {
 				h.broadcastBlockRange(st)
 			}
 		case <-st.headSub.Err():
+			return
+		}
+	}
+}
+
+func (h *handler) pendingLocalTxBroadcastLoop() {
+	for {
+		select {
+		case event := <-h.pendingLocalTxsCh:
+			h.BroadcastPendingLocalTxs(event.Txs)
+
+		// Err() channel will be closed when unsubscribing.
+		case <-h.pendingLocalTxsSub.Err():
 			return
 		}
 	}
