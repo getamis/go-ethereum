@@ -24,6 +24,9 @@ import (
 // NewTxsEvent is posted when a batch of transactions enter the transaction pool.
 type NewTxsEvent struct{ Txs []*types.Transaction }
 
+// PendingLocalTxsEvent is posted when there are pending local transactions in the transaction pool.
+type PendingLocalTxsEvent struct{ Txs []*types.Transaction }
+
 // NewQueuedTxsEvent is posted when a batch of transactions enter the transaction pool.
 type NewQueuedTxsEvent struct{ Txs []*types.Transaction }
 
