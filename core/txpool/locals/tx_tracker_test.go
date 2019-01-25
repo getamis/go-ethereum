@@ -84,7 +84,7 @@ func newTestEnv(t *testing.T, n int, gasTip uint64, journal string) *testEnv {
 	return &testEnv{
 		chain:   chain,
 		pool:    pool,
-		tracker: New(journal, time.Minute, gspec.Config, pool),
+		tracker: New(journal, time.Minute, gspec.Config, pool, time.Minute),
 		genDb:   genDb,
 	}
 }
@@ -192,7 +192,7 @@ func TestJournal(t *testing.T) {
 	env.tracker.recheck(true) // manually rejournal the tracker
 
 	// Make sure all the transactions are properly journalled
-	trackerB := New(journalPath, time.Minute, gspec.Config, env.pool)
+	trackerB := New(journalPath, time.Minute, gspec.Config, env.pool, time.Minute)
 	trackerB.journal.load(func(transactions []*types.Transaction) []error {
 		trackerB.TrackAll(transactions)
 		return nil
