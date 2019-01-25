@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/holiman/uint256"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
@@ -37,7 +39,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/holiman/uint256"
 )
 
 var (
@@ -75,7 +76,7 @@ func initBackend(withLocal bool) *EthAPIBackend {
 		txPool:     txpool,
 	}
 	if withLocal {
-		eth.localTxTracker = locals.New("", time.Minute, gspec.Config, txpool)
+		eth.localTxTracker = locals.New("", time.Minute, gspec.Config, txpool, time.Minute)
 	}
 	return &EthAPIBackend{
 		eth: eth,
