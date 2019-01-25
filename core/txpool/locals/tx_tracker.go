@@ -23,9 +23,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/txpool/legacypool"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
@@ -46,10 +48,13 @@ type TxTracker struct {
 	all    map[common.Hash]*types.Transaction       // All tracked transactions
 	byAddr map[common.Address]*legacypool.SortedMap // Transactions by address
 
-	journal   *journal       // Journal of local transaction to back up to disk
-	rejournal time.Duration  // How often to rotate journal
-	pool      *txpool.TxPool // The tx pool to interact with
-	signer    types.Signer
+	journal                 *journal       // Journal of local transaction to back up to disk
+	rejournal               time.Duration  // How often to rotate journal
+	broadcastPendingLocalTx time.Duration  // Time interval to broadcast the local transaction
+	pool                    *txpool.TxPool // The tx pool to interact with
+	signer                  types.Signer
+
+	pendingLocalTxFeed event.Feed
 
 	shutdownCh chan struct{}
 	mu         sync.Mutex
@@ -57,7 +62,8 @@ type TxTracker struct {
 }
 
 // New creates a new TxTracker
-func New(journalPath string, journalTime time.Duration, chainConfig *params.ChainConfig, next *txpool.TxPool) *TxTracker {
+func New(journalPath string, journalTime time.Duration, chainConfig *params.ChainConfig, next *txpool.TxPool,
+	broadcastPendingLocalTxTime time.Duration) *TxTracker {
 	pool := &TxTracker{
 		all:        make(map[common.Hash]*types.Transaction),
 		byAddr:     make(map[common.Address]*legacypool.SortedMap),
@@ -69,6 +75,7 @@ func New(journalPath string, journalTime time.Duration, chainConfig *params.Chai
 		pool.journal = newTxJournal(journalPath)
 		pool.rejournal = journalTime
 	}
+	pool.broadcastPendingLocalTx = broadcastPendingLocalTxTime
 	return pool
 }
 
@@ -205,6 +212,10 @@ func (tracker *TxTracker) loop() {
 		lastJournal = time.Now()
 		timer       = time.NewTimer(10 * time.Second) // Do initial check after 10 seconds, do rechecks more seldom.
 	)
+
+	pendingLocalTxs := time.NewTicker(tracker.broadcastPendingLocalTx)
+	defer pendingLocalTxs.Stop()
+
 	for {
 		select {
 		case <-tracker.shutdownCh:
@@ -225,6 +236,25 @@ func (tracker *TxTracker) loop() {
 				tracker.mu.Unlock()
 			}
 			timer.Reset(recheckInterval)
+		case <-pendingLocalTxs.C:
+			lTxs := types.Transactions{}
+			for addr, lazyTxs := range tracker.pool.Pending(txpool.PendingFilter{OnlyPlainTxs: true}) {
+				if _, ok := tracker.byAddr[addr]; !ok {
+					continue
+				}
+				for _, lazyTx := range lazyTxs {
+					lTxs = append(lTxs, lazyTx.Tx)
+				}
+			}
+
+			if len(lTxs) > 0 {
+				go tracker.pendingLocalTxFeed.Send(core.PendingLocalTxsEvent{Txs: lTxs})
+			}
 		}
 	}
+}
+
+// SubscribePendingLocalTransactions subscribes to pending local transaction events.
+func (tracker *TxTracker) SubscribePendingLocalTransactions(ch chan<- core.PendingLocalTxsEvent) event.Subscription {
+	return tracker.pendingLocalTxFeed.Subscribe(ch)
 }

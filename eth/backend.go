@@ -270,8 +270,14 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 			log.Warn("Sanitizing invalid txpool journal time", "provided", rejournal, "updated", time.Second)
 			rejournal = time.Second
 		}
-		eth.localTxTracker = locals.New(config.TxPool.Journal, rejournal, eth.blockchain.Config(), eth.txPool)
+		broadcastPendingLocalTx := config.TxPool.BroadcastPendingLocalTx
+		if broadcastPendingLocalTx < time.Second {
+			log.Warn("Sanitizing invalid txpool broadcast local tx time", "provided", broadcastPendingLocalTx, "updated", time.Second)
+			broadcastPendingLocalTx = time.Second
+		}
+		eth.localTxTracker = locals.New(config.TxPool.Journal, rejournal, eth.blockchain.Config(), eth.txPool, broadcastPendingLocalTx)
 		stack.RegisterLifecycle(eth.localTxTracker)
+		eth.txPool.PendingLocalTxsPublisher = eth.localTxTracker
 	}
 	// Permit the downloader to use the trie cache allowance during fast sync
 	cacheLimit := cacheConfig.TrieCleanLimit + cacheConfig.TrieDirtyLimit + cacheConfig.SnapshotLimit
