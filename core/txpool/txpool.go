@@ -316,6 +316,16 @@ func (p *TxPool) Pending(enforceTips bool) map[common.Address][]*LazyTransaction
 	return txs
 }
 
+// SubscribePendingLocalTxsEvent registers a subscription of PendingLocalTxsEvent and
+// starts sending event to the given channel.
+func (p *TxPool) SubscribePendingLocalTxsEvent(ch chan<- core.PendingLocalTxsEvent) event.Subscription {
+	subs := make([]event.Subscription, len(p.subpools))
+	for i, subpool := range p.subpools {
+		subs[i] = subpool.SubscribePendingLocalTransactions(ch)
+	}
+	return p.subs.Track(event.JoinSubscriptions(subs...))
+}
+
 // SubscribeNewQueuedTxsEvent registers a subscription of NewQueuedTxsEvent and
 func (p *TxPool) SubscribeNewQueuedTxsEvent(ch chan<- core.NewQueuedTxsEvent) event.Subscription {
 	subs := make([]event.Subscription, len(p.subpools))
