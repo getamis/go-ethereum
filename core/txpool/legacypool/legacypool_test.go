@@ -2536,6 +2536,7 @@ func testJournaling(t *testing.T, nolocals bool) {
 	config.NoLocals = nolocals
 	config.Journal = journal
 	config.Rejournal = time.Second
+	config.BroadcastPendingLocalTx = time.Second
 
 	pool := New(config, blockchain)
 	pool.Init(config.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())

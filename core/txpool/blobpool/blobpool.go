@@ -322,7 +322,8 @@ type BlobPool struct {
 	// overridden for testing purposes.
 	txValidationFn txpool.ValidationFunction
 
-	queuedTxFeed event.Feed
+	queuedTxFeed       event.Feed
+	pendingLocalTxFeed event.Feed
 
 	lock sync.RWMutex // Mutex protecting the pool during reorg handling
 }
@@ -1663,6 +1664,11 @@ func (p *BlobPool) SubscribeTransactions(ch chan<- core.NewTxsEvent, reorgs bool
 // SubscribeQueuedTransactions subscribes to new queued transaction events.
 func (p *BlobPool) SubscribeQueuedTransactions(ch chan<- core.NewQueuedTxsEvent) event.Subscription {
 	return p.queuedTxFeed.Subscribe(ch)
+}
+
+// SubscribePendingLocalTransactions subscribes to pending local transaction events.
+func (p *BlobPool) SubscribePendingLocalTransactions(ch chan<- core.PendingLocalTxsEvent) event.Subscription {
+	return p.pendingLocalTxFeed.Subscribe(ch)
 }
 
 // Nonce returns the next nonce of an account, with all transactions executable
