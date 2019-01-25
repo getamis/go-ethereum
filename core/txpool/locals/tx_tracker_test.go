@@ -82,7 +82,7 @@ func newTestEnv(t *testing.T, n int, gasTip uint64, journal string) *testEnv {
 	return &testEnv{
 		chain:   chain,
 		pool:    pool,
-		tracker: New(journal, time.Minute, gspec.Config, pool),
+		tracker: New(journal, time.Minute, gspec.Config, pool, time.Minute),
 		genDb:   genDb,
 	}
 }
