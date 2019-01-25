@@ -60,6 +60,10 @@ type BlockChain interface {
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 }
 
+type PendingLocalTxsPublisher interface {
+	SubscribePendingLocalTransactions(ch chan<- core.PendingLocalTxsEvent) event.Subscription
+}
+
 // TxPool is an aggregator for various transaction specific pools, collectively
 // tracking all the transactions deemed interesting by the node. Transactions
 // enter the pool when they are received from the network or submitted locally.
@@ -76,6 +80,8 @@ type TxPool struct {
 	term chan struct{}           // Termination channel to detect a closed pool
 
 	sync chan chan error // Testing / simulator channel to block until internal reset is done
+
+	PendingLocalTxsPublisher PendingLocalTxsPublisher // Publisher for pending local transactions
 }
 
 // New creates a new transaction pool to gather, sort and filter inbound
@@ -384,6 +390,16 @@ func (p *TxPool) Pending(filter PendingFilter) map[common.Address][]*LazyTransac
 		}
 	}
 	return txs
+}
+
+// SubscribePendingLocalTxsEvent registers a subscription of PendingLocalTxsEvent and
+// starts sending event to the given channel.
+func (p *TxPool) SubscribePendingLocalTxsEvent(ch chan<- core.PendingLocalTxsEvent) event.Subscription {
+	var subs []event.Subscription
+	if p.PendingLocalTxsPublisher != nil {
+		subs = append(subs, p.PendingLocalTxsPublisher.SubscribePendingLocalTransactions(ch))
+	}
+	return p.subs.Track(event.JoinSubscriptions(subs...))
 }
 
 // SubscribeNewQueuedTxsEvent registers a subscription of NewQueuedTxsEvent and
