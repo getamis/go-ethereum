@@ -2178,6 +2178,8 @@ func (bc *BlockChain) ProcessBlock(parentRoot common.Hash, block *types.Block, s
 	mgasps := float64(res.GasUsed) * 1000 / float64(elapsed)
 	chainMgaspsMeter.Update(time.Duration(mgasps))
 
+	bc.WriteTransferLogs(block.Hash(), block.NumberU64(), statedb.TransferLogs())
+
 	return &blockProcessingResult{
 		usedGas:  res.GasUsed,
 		procTime: proctime,
@@ -2837,4 +2839,9 @@ func (bc *BlockChain) GetTrieFlushInterval() time.Duration {
 // StateSizer returns the state size tracker, or nil if it's not initialized
 func (bc *BlockChain) StateSizer() *state.SizeTracker {
 	return bc.stateSizer
+}
+
+// WriteTransferLogs writes all the transfer logs belonging to a block.
+func (bc *BlockChain) WriteTransferLogs(hash common.Hash, number uint64, transferLogs []*types.TransferLog) {
+	rawdb.WriteTransferLogs(bc.db, hash, number, transferLogs)
 }
