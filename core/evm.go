@@ -128,4 +128,11 @@ func CanTransfer(db vm.StateDB, addr common.Address, amount *big.Int) bool {
 func Transfer(db vm.StateDB, sender, recipient common.Address, amount *big.Int) {
 	db.SubBalance(sender, amount)
 	db.AddBalance(recipient, amount)
+	if amount.Cmp(common.Big0) > 0 {
+		db.AddTransferLog(&types.TransferLog{
+			From:  sender,
+			To:    recipient,
+			Value: new(big.Int).Set(amount),
+		})
+	}
 }
