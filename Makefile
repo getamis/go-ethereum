@@ -4,6 +4,7 @@
 
 .PHONY: geth all test lint fmt clean devtools help
 
+include main.mk
 GOBIN = ./build/bin
 GO ?= latest
 GORUN = go run
@@ -55,3 +56,12 @@ help: Makefile
 	@echo ''
 	@echo 'Targets:'
 	@sed -n 's/^#?//p' $< | column -t -s ':' |  sort | sed -e 's/^/ /'
+.PHONY: help
+
+docker:
+	@docker build -f ./Dockerfile -t $(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG) .
+	@docker tag $(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG) $(DOCKER_IMAGE):latest
+
+docker.push:
+	@docker push $(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)
+	@docker push $(DOCKER_IMAGE):latest
