@@ -2130,6 +2130,8 @@ func (bc *BlockChain) processBlock(parentRoot common.Hash, block *types.Block, s
 	mgasps := float64(res.GasUsed) * 1000 / float64(elapsed)
 	chainMgaspsMeter.Update(time.Duration(mgasps))
 
+	bc.WriteTransferLogs(block.Hash(), block.NumberU64(), statedb.TransferLogs())
+
 	return &blockProcessingResult{
 		usedGas:  res.GasUsed,
 		procTime: proctime,
@@ -2773,4 +2775,9 @@ func (bc *BlockChain) SetTrieFlushInterval(interval time.Duration) {
 // GetTrieFlushInterval gets the in-memory tries flushAlloc interval
 func (bc *BlockChain) GetTrieFlushInterval() time.Duration {
 	return time.Duration(bc.flushInterval.Load())
+}
+
+// WriteTransferLogs writes all the transfer logs belonging to a block.
+func (bc *BlockChain) WriteTransferLogs(hash common.Hash, number uint64, transferLogs []*types.TransferLog) {
+	rawdb.WriteTransferLogs(bc.db, hash, number, transferLogs)
 }
