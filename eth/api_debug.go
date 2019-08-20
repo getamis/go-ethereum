@@ -443,3 +443,20 @@ func (api *DebugAPI) GetTrieFlushInterval() (string, error) {
 	}
 	return api.eth.blockchain.GetTrieFlushInterval().String(), nil
 }
+
+// GetTransferLogs is a debug API function that returns the transfer logs for a block hash, if known.
+func (api *DebugAPI) GetTransferLogs(ctx context.Context, hash common.Hash) ([]*types.TransferLog, error) {
+	number := rawdb.ReadHeaderNumber(api.eth.ChainDb(), hash)
+	if number == nil {
+		return nil, errors.New("unknown transfer logs")
+	}
+	if transferLogs := rawdb.ReadTransferLogs(api.eth.ChainDb(), hash, *number); transferLogs != nil {
+		return transferLogs, nil
+	}
+	return nil, errors.New("unknown transfer logs")
+}
+
+// GetBlockReceipts returns all transaction receipts of the specified block.
+func (api *DebugAPI) GetBlockReceipts(blockHash common.Hash) types.Receipts {
+	return api.eth.blockchain.GetReceiptsByHash(blockHash)
+}
