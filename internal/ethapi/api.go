@@ -333,6 +333,15 @@ func (api *BlockChainAPI) GetBalance(ctx context.Context, address common.Address
 	return (*hexutil.Big)(b), state.Error()
 }
 
+// GetBalanceByHash returns the amount of wei for the given address in the state of the
+// given block hash. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
+// block numbers are also allowed.
+// Deprecated: can be replaced by GetBalance
+func (api *BlockChainAPI) GetBalanceByHash(ctx context.Context, address common.Address, blockHash common.Hash) (*hexutil.Big, error) {
+	hash := rpc.BlockNumberOrHashWithHash(blockHash, false)
+	return api.GetBalance(ctx, address, hash)
+}
+
 // AccountResult structs for GetProof
 type AccountResult struct {
 	Address      common.Address  `json:"address"`

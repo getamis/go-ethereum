@@ -532,3 +532,20 @@ func (api *DebugAPI) ExecutionWitnessByHash(hash common.Hash) (*stateless.ExtWit
 
 	return result.Witness().ToExtWitness(), nil
 }
+
+// GetTransferLogs is a debug API function that returns the transfer logs for a block hash, if known.
+func (api *DebugAPI) GetTransferLogs(ctx context.Context, hash common.Hash) ([]*types.TransferLog, error) {
+	number, ok := rawdb.ReadHeaderNumber(api.eth.ChainDb(), hash)
+	if !ok {
+		return nil, errors.New("unknown transfer logs")
+	}
+	if transferLogs := rawdb.ReadTransferLogs(api.eth.ChainDb(), hash, number); transferLogs != nil {
+		return transferLogs, nil
+	}
+	return nil, errors.New("unknown transfer logs")
+}
+
+// GetBlockReceipts returns all transaction receipts of the specified block.
+func (api *DebugAPI) GetBlockReceipts(blockHash common.Hash) types.Receipts {
+	return api.eth.blockchain.GetReceiptsByHash(blockHash)
+}
