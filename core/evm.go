@@ -143,4 +143,11 @@ func CanTransfer(db vm.StateDB, addr common.Address, amount *uint256.Int) bool {
 func Transfer(db vm.StateDB, sender, recipient common.Address, amount *uint256.Int) {
 	db.SubBalance(sender, amount, tracing.BalanceChangeTransfer)
 	db.AddBalance(recipient, amount, tracing.BalanceChangeTransfer)
+	if amount.Cmp(common.U2560) > 0 {
+		db.AddTransferLog(&types.TransferLog{
+			From:  sender,
+			To:    recipient,
+			Value: amount.ToBig(),
+		})
+	}
 }
