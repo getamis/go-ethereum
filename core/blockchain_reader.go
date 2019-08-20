@@ -417,3 +417,12 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscript
 func (bc *BlockChain) SubscribeBlockProcessingEvent(ch chan<- bool) event.Subscription {
 	return bc.scope.Track(bc.blockProcFeed.Subscribe(ch))
 }
+
+// GetTransferLogs retrieves the transfer logs for all transactions in a given block.
+func (bc *BlockChain) GetTransferLogs(hash common.Hash) []*types.TransferLog {
+	number := rawdb.ReadHeaderNumber(bc.db, hash)
+	if number == nil {
+		return nil
+	}
+	return rawdb.ReadTransferLogs(bc.db, hash, *number)
+}
