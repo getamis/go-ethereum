@@ -98,6 +98,8 @@ type StateDB interface {
 
 	// Finalise must be invoked at the end of a transaction
 	Finalise(bool)
+
+	AddTransferLog(*types.TransferLog)
 }
 
 // CallContext provides a basic interface for the EVM calling conventions. The EVM
