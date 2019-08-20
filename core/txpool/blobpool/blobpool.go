@@ -314,6 +314,8 @@ type BlobPool struct {
 	discoverFeed event.Feed // Event feed to send out new tx events on pool discovery (reorg excluded)
 	insertFeed   event.Feed // Event feed to send out new tx events on pool inclusion (reorg included)
 
+	queuedTxFeed event.Feed
+
 	lock sync.RWMutex // Mutex protecting the pool during reorg handling
 }
 
@@ -1200,6 +1202,9 @@ func (p *BlobPool) add(tx *types.Transaction) (err error) {
 		log.Trace("Transaction validation failed", "hash", tx.Hash(), "err", err)
 		return err
 	}
+
+	go p.queuedTxFeed.Send(core.NewQueuedTxsEvent{Txs: types.Transactions{tx}})
+
 	// If the address is not yet known, request exclusivity to track the account
 	// only by this subpool until all transactions are evicted
 	from, _ := types.Sender(p.signer, tx) // already validated above
@@ -1497,6 +1502,11 @@ func (p *BlobPool) SubscribeTransactions(ch chan<- core.NewTxsEvent, reorgs bool
 	} else {
 		return p.discoverFeed.Subscribe(ch)
 	}
+}
+
+// SubscribeQueuedTransactions subscribes to new queued transaction events.
+func (p *BlobPool) SubscribeQueuedTransactions(ch chan<- core.NewQueuedTxsEvent) event.Subscription {
+	return p.queuedTxFeed.Subscribe(ch)
 }
 
 // Nonce returns the next nonce of an account, with all transactions executable

@@ -233,6 +233,34 @@ func validateEvents(events chan core.NewTxsEvent, count int) error {
 	return nil
 }
 
+// validateQueuedEvents checks that the correct number of transaction addition events
+// were fired on the pool's event feed.
+func validateQueuedEvents(events chan core.NewQueuedTxsEvent, count int) error {
+	var received []*types.Transaction
+
+	for len(received) < count {
+		select {
+		case ev := <-events:
+			received = append(received, ev.Txs...)
+		case <-time.After(time.Second):
+			return fmt.Errorf("event #%d not fired", len(received))
+		}
+	}
+	if len(received) > count {
+		return fmt.Errorf("more than %d events fired: %v", count, received[count:])
+	}
+	select {
+	case ev := <-events:
+		return fmt.Errorf("more than %d events fired: %v", count, ev.Txs)
+
+	case <-time.After(50 * time.Millisecond):
+		// This branch should be "default", but it's a data race between goroutines,
+		// reading the event channel and pushing into it, so better wait a bit ensuring
+		// really nothing gets injected.
+	}
+	return nil
+}
+
 func deriveSender(tx *types.Transaction) (common.Address, error) {
 	return types.Sender(types.HomesteadSigner{}, tx)
 }
@@ -354,6 +382,145 @@ func TestInvalidTransactions(t *testing.T) {
 	}
 	if err := pool.addLocal(tx); err != nil {
 		t.Error("expected", nil, "got", err)
+	}
+}
+
+func TestSubscribePendingAndQueuedTransactions(t *testing.T) {
+	t.Parallel()
+
+	// Create the pool to test the pricing enforcement with
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+	blockchain := newTestBlockChain(params.TestChainConfig, 1000000, statedb, new(event.Feed))
+
+	pool := New(testTxPoolConfig, blockchain)
+	pool.Init(new(big.Int).SetUint64(testTxPoolConfig.PriceLimit), blockchain.CurrentBlock(), makeAddressReserver())
+	defer pool.Close()
+
+	// Keep listening for authenticated transactions.
+	events := make(chan core.NewQueuedTxsEvent, 32)
+	sub := pool.SubscribeQueuedTransactions(events)
+	defer sub.Unsubscribe()
+
+	createAccounts := func(numbers int, txpool *LegacyPool) []*ecdsa.PrivateKey {
+		keys := []*ecdsa.PrivateKey{}
+		for i := 0; i < numbers; i++ {
+			key, _ := crypto.GenerateKey()
+			txpool.currentState.AddBalance(crypto.PubkeyToAddress(key.PublicKey), big.NewInt(1000000))
+
+			keys = append(keys, key)
+		}
+		return keys
+	}
+
+	tests := []struct {
+		name        string
+		setup       func(txPool *LegacyPool)
+		validEvents int
+	}{
+		{
+			name:        "valid transaction",
+			validEvents: 10,
+			setup: func(txPool *LegacyPool) {
+				keys := createAccounts(4, txPool)
+				txs := types.Transactions{}
+
+				txs = append(txs, pricedTransaction(0, 100000, big.NewInt(2), keys[0]))
+				txs = append(txs, pricedTransaction(1, 100000, big.NewInt(1), keys[0]))
+				txs = append(txs, pricedTransaction(2, 100000, big.NewInt(2), keys[0]))
+
+				txs = append(txs, pricedTransaction(0, 100000, big.NewInt(1), keys[1]))
+				txs = append(txs, pricedTransaction(1, 100000, big.NewInt(2), keys[1]))
+				txs = append(txs, pricedTransaction(2, 100000, big.NewInt(2), keys[1]))
+
+				txs = append(txs, pricedTransaction(0, 100000, big.NewInt(2), keys[2]))
+				txs = append(txs, pricedTransaction(1, 100000, big.NewInt(1), keys[2]))
+				txs = append(txs, pricedTransaction(2, 100000, big.NewInt(2), keys[2]))
+
+				ltx := pricedTransaction(0, 100000, big.NewInt(1), keys[3])
+
+				pool.addRemotes(txs)
+				pool.addLocal(ltx)
+			},
+		},
+
+		{
+			name:        "duplicate transaction",
+			validEvents: 1,
+			setup: func(txPool *LegacyPool) {
+				keys := createAccounts(1, txPool)
+				txs := types.Transactions{}
+
+				txs = append(txs, pricedTransaction(0, 100000, big.NewInt(1), keys[0]))
+				txs = append(txs, pricedTransaction(0, 100000, big.NewInt(1), keys[0]))
+
+				pool.addLocals(txs)
+			},
+		},
+		{
+			name:        "bump gas price",
+			validEvents: 2,
+			setup: func(txPool *LegacyPool) {
+				keys := createAccounts(1, txPool)
+				txs := types.Transactions{}
+
+				txs = append(txs, pricedTransaction(0, 100000, big.NewInt(1), keys[0]))
+				txs = append(txs, pricedTransaction(0, 100000, big.NewInt(2), keys[0]))
+
+				pool.addLocals(txs)
+			},
+		},
+		{
+			name:        "duplicate nonce with different gas price",
+			validEvents: 2,
+			setup: func(txPool *LegacyPool) {
+				keys := createAccounts(1, txPool)
+				txs := types.Transactions{}
+
+				txs = append(txs, pricedTransaction(0, 100000, big.NewInt(1), keys[0]))
+				txs = append(txs, pricedTransaction(0, 100000, big.NewInt(2), keys[0]))
+
+				pool.addLocals(txs)
+			},
+		},
+		{
+			name:        "duplicate nonce with different gas limit",
+			validEvents: 2,
+			setup: func(txPool *LegacyPool) {
+				keys := createAccounts(1, txPool)
+				txs := types.Transactions{}
+
+				txs = append(txs, pricedTransaction(0, 100000, big.NewInt(1), keys[0]))
+				txs = append(txs, pricedTransaction(0, 80000, big.NewInt(1), keys[0]))
+
+				pool.addLocals(txs)
+			},
+		},
+		{
+			name:        "discontinuous nonce",
+			validEvents: 2,
+			setup: func(txPool *LegacyPool) {
+				keys := createAccounts(1, txPool)
+				txs := types.Transactions{}
+
+				txs = append(txs, pricedTransaction(0, 100000, big.NewInt(1), keys[0]))
+				txs = append(txs, pricedTransaction(10000, 80000, big.NewInt(1), keys[0]))
+
+				pool.addLocals(txs)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup(pool)
+
+			if err := validateQueuedEvents(events, tt.validEvents); err != nil {
+				t.Fatalf("event firing failed: %v", err)
+			}
+			if err := validatePoolInternals(pool); err != nil {
+				t.Fatalf("pool internal state corrupted: %v", err)
+			}
+		})
 	}
 }
 
