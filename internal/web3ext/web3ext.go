@@ -474,6 +474,18 @@ web3._extend({
 			params: 1,
 			inputFormatter: [null],
 		}),
+		new web3._extend.Method({
+			name: 'getTransferLogs',
+			call: 'debug_getTransferLogs',
+			params: 1,
+			inputFormatter: [null],
+		}),
+		new web3._extend.Method({
+			name: 'getBlockReceipts',
+			call: 'debug_getBlockReceipts',
+			params: 1,
+			inputFormatter: [null],
+		}),
 	],
 	properties: []
 });
