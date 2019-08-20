@@ -54,6 +54,7 @@ type TxPool struct {
 	signer       types.Signer
 	quit         chan bool
 	txFeed       event.Feed
+	queuedTxFeed event.Feed
 	scope        event.SubscriptionScope
 	chainHeadCh  chan core.ChainHeadEvent
 	chainHeadSub event.Subscription
@@ -337,6 +338,12 @@ func (pool *TxPool) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subsc
 	return pool.scope.Track(pool.txFeed.Subscribe(ch))
 }
 
+// SubscribeNewQueuedTxsEvent registers a subscription of core.NewQueuedTxsEvent and
+// starts sending event to the given channel.
+func (pool *TxPool) SubscribeNewQueuedTxsEvent(ch chan<- core.NewQueuedTxsEvent) event.Subscription {
+	return pool.scope.Track(pool.queuedTxFeed.Subscribe(ch))
+}
+
 // Stats returns the number of currently pending (locally created) transactions
 func (pool *TxPool) Stats() (pending int) {
 	pool.mu.RLock()
@@ -408,6 +415,8 @@ func (pool *TxPool) add(ctx context.Context, tx *types.Transaction) error {
 	if err != nil {
 		return err
 	}
+
+	go pool.queuedTxFeed.Send(core.NewQueuedTxsEvent{Txs: types.Transactions{tx}})
 
 	if _, ok := pool.pending[hash]; !ok {
 		pool.pending[hash] = tx
