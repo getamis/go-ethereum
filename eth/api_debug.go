@@ -532,3 +532,8 @@ func (api *DebugAPI) ExecutionWitnessByHash(hash common.Hash) (*stateless.ExtWit
 
 	return result.Witness().ToExtWitness(), nil
 }
+
+// GetTransferLogs is a debug API function that returns the transfer logs for a block hash, if known.
+func (api *DebugAPI) GetTransferLogs(ctx context.Context, hash common.Hash) ([]*types.TransferLog, error) {
+	return api.eth.blockchain.GetTransferLogs(hash)
+}
