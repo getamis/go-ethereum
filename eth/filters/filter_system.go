@@ -68,6 +68,7 @@ type Backend interface {
 	CurrentHeader() *types.Header
 	ChainConfig() *params.ChainConfig
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
+	SubscribeNewQueuedTxsEvent(chan<- core.NewQueuedTxsEvent) event.Subscription
 	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
 	SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription
 	SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription
@@ -160,6 +161,9 @@ const (
 	// PendingTransactionsSubscription queries for pending transactions entering
 	// the pending state
 	PendingTransactionsSubscription
+	// QueuedTransactionsSubscription queries tx hashes for queued
+	// transactions entering the queued state
+	QueuedTransactionsSubscription
 	// BlocksSubscription queries hashes for blocks that are imported
 	BlocksSubscription
 	// LastIndexSubscription keeps track of the last index
@@ -170,6 +174,9 @@ const (
 	// txChanSize is the size of channel listening to NewTxsEvent.
 	// The number is referenced from the size of tx pool.
 	txChanSize = 4096
+	// queuedTxChanSize is the size of channel listening to NewQueuedTxsEvent.
+	// The number is referenced from the size of tx pool.
+	queuedTxChanSize = 4096
 	// rmLogsChanSize is the size of channel listening to RemovedLogsEvent.
 	rmLogsChanSize = 10
 	// logsChanSize is the size of channel listening to LogsEvent.
@@ -185,6 +192,8 @@ type subscription struct {
 	logsCrit  ethereum.FilterQuery
 	logs      chan []*types.Log
 	txs       chan []*types.Transaction
+	hashes    chan []common.Hash
+	queuedTxs chan []*types.Transaction
 	headers   chan *types.Header
 	installed chan struct{} // closed when the filter is installed
 	err       chan error    // closed when the filter is uninstalled
@@ -200,19 +209,21 @@ type EventSystem struct {
 
 	// Subscriptions
 	txsSub         event.Subscription // Subscription for new transaction event
+	queuedTxsSub   event.Subscription // Subscription for new queued transaction event
 	logsSub        event.Subscription // Subscription for new log event
 	rmLogsSub      event.Subscription // Subscription for removed log event
 	pendingLogsSub event.Subscription // Subscription for pending log event
 	chainSub       event.Subscription // Subscription for new chain event
 
 	// Channels
-	install       chan *subscription         // install filter for event notification
-	uninstall     chan *subscription         // remove filter for event notification
-	txsCh         chan core.NewTxsEvent      // Channel to receive new transactions event
-	logsCh        chan []*types.Log          // Channel to receive new log event
-	pendingLogsCh chan []*types.Log          // Channel to receive new log event
-	rmLogsCh      chan core.RemovedLogsEvent // Channel to receive removed log event
-	chainCh       chan core.ChainEvent       // Channel to receive new chain event
+	install       chan *subscription          // install filter for event notification
+	uninstall     chan *subscription          // remove filter for event notification
+	txsCh         chan core.NewTxsEvent       // Channel to receive new transactions event
+	queuedTxsCh   chan core.NewQueuedTxsEvent // Channel to receive new queued transactions event
+	logsCh        chan []*types.Log           // Channel to receive new log event
+	pendingLogsCh chan []*types.Log           // Channel to receive new log event
+	rmLogsCh      chan core.RemovedLogsEvent  // Channel to receive removed log event
+	chainCh       chan core.ChainEvent        // Channel to receive new chain event
 }
 
 // NewEventSystem creates a new manager that listens for event on the given mux,
@@ -229,6 +240,7 @@ func NewEventSystem(sys *FilterSystem, lightMode bool) *EventSystem {
 		install:       make(chan *subscription),
 		uninstall:     make(chan *subscription),
 		txsCh:         make(chan core.NewTxsEvent, txChanSize),
+		queuedTxsCh:   make(chan core.NewQueuedTxsEvent, queuedTxChanSize),
 		logsCh:        make(chan []*types.Log, logsChanSize),
 		rmLogsCh:      make(chan core.RemovedLogsEvent, rmLogsChanSize),
 		pendingLogsCh: make(chan []*types.Log, logsChanSize),
@@ -237,13 +249,14 @@ func NewEventSystem(sys *FilterSystem, lightMode bool) *EventSystem {
 
 	// Subscribe events
 	m.txsSub = m.backend.SubscribeNewTxsEvent(m.txsCh)
+	m.queuedTxsSub = m.backend.SubscribeNewQueuedTxsEvent(m.queuedTxsCh)
 	m.logsSub = m.backend.SubscribeLogsEvent(m.logsCh)
 	m.rmLogsSub = m.backend.SubscribeRemovedLogsEvent(m.rmLogsCh)
 	m.chainSub = m.backend.SubscribeChainEvent(m.chainCh)
 	m.pendingLogsSub = m.backend.SubscribePendingLogsEvent(m.pendingLogsCh)
 
 	// Make sure none of the subscriptions are empty
-	if m.txsSub == nil || m.logsSub == nil || m.rmLogsSub == nil || m.chainSub == nil || m.pendingLogsSub == nil {
+	if m.txsSub == nil || m.queuedTxsSub == nil || m.logsSub == nil || m.rmLogsSub == nil || m.chainSub == nil || m.pendingLogsSub == nil {
 		log.Crit("Subscribe for event system failed")
 	}
 
@@ -278,6 +291,8 @@ func (sub *Subscription) Unsubscribe() {
 				break uninstallLoop
 			case <-sub.f.logs:
 			case <-sub.f.txs:
+			case <-sub.f.hashes:
+			case <-sub.f.queuedTxs:
 			case <-sub.f.headers:
 			}
 		}
@@ -345,6 +360,8 @@ func (es *EventSystem) subscribeMinedPendingLogs(crit ethereum.FilterQuery, logs
 		created:   time.Now(),
 		logs:      logs,
 		txs:       make(chan []*types.Transaction),
+		hashes:    make(chan []common.Hash),
+		queuedTxs: make(chan []*types.Transaction),
 		headers:   make(chan *types.Header),
 		installed: make(chan struct{}),
 		err:       make(chan error),
@@ -362,6 +379,8 @@ func (es *EventSystem) subscribeLogs(crit ethereum.FilterQuery, logs chan []*typ
 		created:   time.Now(),
 		logs:      logs,
 		txs:       make(chan []*types.Transaction),
+		hashes:    make(chan []common.Hash),
+		queuedTxs: make(chan []*types.Transaction),
 		headers:   make(chan *types.Header),
 		installed: make(chan struct{}),
 		err:       make(chan error),
@@ -379,6 +398,8 @@ func (es *EventSystem) subscribePendingLogs(crit ethereum.FilterQuery, logs chan
 		created:   time.Now(),
 		logs:      logs,
 		txs:       make(chan []*types.Transaction),
+		hashes:    make(chan []common.Hash),
+		queuedTxs: make(chan []*types.Transaction),
 		headers:   make(chan *types.Header),
 		installed: make(chan struct{}),
 		err:       make(chan error),
@@ -395,6 +416,8 @@ func (es *EventSystem) SubscribeNewHeads(headers chan *types.Header) *Subscripti
 		created:   time.Now(),
 		logs:      make(chan []*types.Log),
 		txs:       make(chan []*types.Transaction),
+		hashes:    make(chan []common.Hash),
+		queuedTxs: make(chan []*types.Transaction),
 		headers:   headers,
 		installed: make(chan struct{}),
 		err:       make(chan error),
@@ -411,6 +434,24 @@ func (es *EventSystem) SubscribePendingTxs(txs chan []*types.Transaction) *Subsc
 		created:   time.Now(),
 		logs:      make(chan []*types.Log),
 		txs:       txs,
+		queuedTxs: make(chan []*types.Transaction),
+		headers:   make(chan *types.Header),
+		installed: make(chan struct{}),
+		err:       make(chan error),
+	}
+	return es.subscribe(sub)
+}
+
+// SubscribeQueuedTxs creates a subscription that writes transaction hashes for
+// transactions that enter the transaction pool.
+func (es *EventSystem) SubscribeQueuedTxs(queuedTxs chan []*types.Transaction) *Subscription {
+	sub := &subscription{
+		id:        rpc.NewID(),
+		typ:       QueuedTransactionsSubscription,
+		created:   time.Now(),
+		logs:      make(chan []*types.Log),
+		hashes:    make(chan []common.Hash),
+		queuedTxs: queuedTxs,
 		headers:   make(chan *types.Header),
 		installed: make(chan struct{}),
 		err:       make(chan error),
@@ -468,6 +509,14 @@ func (es *EventSystem) handleChainEvent(filters filterIndex, ev core.ChainEvent)
 				}
 			}
 		})
+	}
+}
+
+func (es *EventSystem) handleQueuedTxsEvent(filters filterIndex, ev core.NewQueuedTxsEvent) {
+	txs := make([]*types.Transaction, 0, len(ev.Txs))
+	txs = append(txs, ev.Txs...)
+	for _, f := range filters[QueuedTransactionsSubscription] {
+		f.queuedTxs <- txs
 	}
 }
 
@@ -546,6 +595,7 @@ func (es *EventSystem) eventLoop() {
 	// Ensure all subscriptions get cleaned up
 	defer func() {
 		es.txsSub.Unsubscribe()
+		es.queuedTxsSub.Unsubscribe()
 		es.logsSub.Unsubscribe()
 		es.rmLogsSub.Unsubscribe()
 		es.pendingLogsSub.Unsubscribe()
@@ -561,6 +611,8 @@ func (es *EventSystem) eventLoop() {
 		select {
 		case ev := <-es.txsCh:
 			es.handleTxsEvent(index, ev)
+		case ev := <-es.queuedTxsCh:
+			es.handleQueuedTxsEvent(index, ev)
 		case ev := <-es.logsCh:
 			es.handleLogs(index, ev)
 		case ev := <-es.rmLogsCh:
@@ -592,6 +644,8 @@ func (es *EventSystem) eventLoop() {
 
 		// System stopped
 		case <-es.txsSub.Err():
+			return
+		case <-es.queuedTxsSub.Err():
 			return
 		case <-es.logsSub.Err():
 			return
