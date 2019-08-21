@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"math/big"
 	"math/rand"
 	"reflect"
 	"slices"
@@ -460,6 +461,14 @@ func newTestAction(addr common.Address, r *rand.Rand) testAction {
 				binary.BigEndian.PutUint16(key[:], uint16(a.args[0]))
 				binary.BigEndian.PutUint16(val[:], uint16(a.args[1]))
 				s.SetTransientState(addr, key, val)
+			},
+			args: make([]int64, 2),
+		},
+		{
+			name: "AddTransferLog",
+			fn: func(a testAction, s *StateDB) {
+				to := common.BytesToAddress([]byte{byte(a.args[0])})
+				s.AddTransferLog(&types.TransferLog{From: addr, To: to, Value: big.NewInt(a.args[1])})
 			},
 			args: make([]int64, 2),
 		},
