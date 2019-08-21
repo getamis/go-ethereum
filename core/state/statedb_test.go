@@ -366,6 +366,14 @@ func newTestAction(addr common.Address, r *rand.Rand) testAction {
 			},
 			args: make([]int64, 2),
 		},
+		{
+			name: "AddTransferLog",
+			fn: func(a testAction, s *StateDB) {
+				to := common.BytesToAddress([]byte{byte(a.args[0])})
+				s.AddTransferLog(&types.TransferLog{From: addr, To: to, Value: big.NewInt(a.args[1])})
+			},
+			args: make([]int64, 2),
+		},
 	}
 	action := actions[r.Intn(len(actions))]
 	var nameargs []string
