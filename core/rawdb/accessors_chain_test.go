@@ -444,9 +444,12 @@ func TestAncientStorage(t *testing.T) {
 	if blob := ReadCanonicalReceiptsRLP(db, number, &hash); len(blob) > 0 {
 		t.Fatalf("non existent receipts returned")
 	}
+	if blob := ReadTransferLogsRLP(db, hash, number); len(blob) > 0 {
+		t.Fatalf("non existent transfer logs returned")
+	}
 
 	// Write and verify the header in the database
-	WriteAncientBlocks(db, []*types.Block{block}, types.EncodeBlockReceiptLists([]types.Receipts{nil}))
+	WriteAncientBlocks(db, []*types.Block{block}, types.EncodeBlockReceiptLists([]types.Receipts{nil}), nil)
 
 	if blob := ReadHeaderRLP(db, hash, number); len(blob) == 0 {
 		t.Fatalf("no header returned")
@@ -460,6 +463,9 @@ func TestAncientStorage(t *testing.T) {
 	if blob := ReadCanonicalReceiptsRLP(db, number, &hash); len(blob) == 0 {
 		t.Fatalf("no receipts returned")
 	}
+	if blob := ReadTransferLogsRLP(db, hash, number); len(blob) == 0 {
+		t.Fatalf("no transfer logs returned")
+	}
 
 	// Use a fake hash for data retrieval, nothing should be returned.
 	fakeHash := common.BytesToHash([]byte{0x01, 0x02, 0x03})
@@ -471,6 +477,48 @@ func TestAncientStorage(t *testing.T) {
 	}
 	if blob := ReadReceiptsRLP(db, fakeHash, number); len(blob) != 0 {
 		t.Fatalf("invalid receipts returned")
+	}
+	if blob := ReadTransferLogsRLP(db, fakeHash, number); len(blob) != 0 {
+		t.Fatalf("invalid transfer logs returned")
+	}
+}
+
+func TestAncientTransferLogStorageTransferLog(t *testing.T) {
+	// Freezer style fast import the chain.
+	frdir := t.TempDir()
+
+	db, err := NewDatabaseWithFreezer(NewMemoryDatabase(), frdir, "", false)
+	if err != nil {
+		t.Fatalf("failed to create database with ancient backend")
+	}
+	// Create a test block
+	block := types.NewBlockWithHeader(&types.Header{
+		Number:      big.NewInt(0),
+		Extra:       []byte("test block"),
+		UncleHash:   types.EmptyUncleHash,
+		TxHash:      types.EmptyRootHash,
+		ReceiptHash: types.EmptyRootHash,
+	})
+	hash, number := block.Hash(), block.NumberU64()
+	// Write with nil transfer logs, should get nil transfer logs.
+	WriteAncientBlocks(db, []*types.Block{block}, types.EncodeBlockReceiptLists([]types.Receipts{nil}), nil)
+	if tlogs := ReadTransferLogs(db, hash, number); tlogs != nil {
+		t.Fatalf("should return nil transfer logs")
+	}
+
+	// Create a test block
+	block2 := types.NewBlockWithHeader(&types.Header{
+		Number:      big.NewInt(1),
+		Extra:       []byte("test block"),
+		UncleHash:   types.EmptyUncleHash,
+		TxHash:      types.EmptyRootHash,
+		ReceiptHash: types.EmptyRootHash,
+	})
+	hash, number = block2.Hash(), block2.NumberU64()
+	// Write with nil transfer logs, should get nil transfer logs.
+	WriteAncientBlocks(db, []*types.Block{block2}, types.EncodeBlockReceiptLists([]types.Receipts{nil}), []*types.TransferLog{})
+	if tlogs := ReadTransferLogs(db, hash, number); tlogs == nil {
+		t.Fatalf("invalid transfer logs returned")
 	}
 }
 
@@ -619,7 +667,7 @@ func BenchmarkWriteAncientBlocks(b *testing.B) {
 
 		blocks := allBlocks[i : i+length]
 		receipts := batchReceipts[:length]
-		writeSize, err := WriteAncientBlocks(db, blocks, types.EncodeBlockReceiptLists(receipts))
+		writeSize, err := WriteAncientBlocks(db, blocks, types.EncodeBlockReceiptLists(receipts), nil)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -924,7 +972,7 @@ func TestHeadersRLPStorage(t *testing.T) {
 	}
 	receipts := make([]types.Receipts, 100)
 	// Write first half to ancients
-	WriteAncientBlocks(db, chain[:50], types.EncodeBlockReceiptLists(receipts[:50]))
+	WriteAncientBlocks(db, chain[:50], types.EncodeBlockReceiptLists(receipts[:50]), nil)
 	// Write second half to db
 	for i := 50; i < 100; i++ {
 		WriteCanonicalHash(db, chain[i].Hash(), chain[i].NumberU64())
