@@ -139,7 +139,7 @@ type StateDB struct {
 	// Testing hooks
 	onCommit func(states *triestate.Set) // Hook invoked when commit is performed
 
-	// transferLogs records trasfer logs for each transaction.
+	// transferLogs records transfer logs for each transaction.
 	transferLogs map[common.Hash][]*types.TransferLog
 }
 
