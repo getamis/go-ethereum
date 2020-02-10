@@ -426,6 +426,7 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		filterMapRows      stat
 		filterMapLastBlock stat
 		filterMapBlockLV   stat
+		transferLog        stat
 
 		// Path-mode archive data
 		stateIndex stat
@@ -491,6 +492,8 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 				storageTries.add(size)
 			case bytes.HasPrefix(key, CodePrefix) && len(key) == len(CodePrefix)+common.HashLength:
 				codes.add(size)
+			case bytes.HasPrefix(key, blockTranferLogsPrefix) && len(key) == (len(blockTranferLogsPrefix)+8+common.HashLength):
+				transferLog.add(size)
 			case bytes.HasPrefix(key, txLookupPrefix) && len(key) == (len(txLookupPrefix)+common.HashLength):
 				txLookups.add(size)
 			case bytes.HasPrefix(key, SnapshotAccountPrefix) && len(key) == (len(SnapshotAccountPrefix)+common.HashLength):
@@ -609,6 +612,7 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		{"Key-Value store", "Bodies", bodies.sizeString(), bodies.countString()},
 		{"Key-Value store", "Receipt lists", receipts.sizeString(), receipts.countString()},
 		{"Key-Value store", "Difficulties (deprecated)", tds.sizeString(), tds.countString()},
+		{"Key-Value store", "Transfer logs", transferLog.sizeString(), transferLog.sizeString()},
 		{"Key-Value store", "Block number->hash", numHashPairings.sizeString(), numHashPairings.countString()},
 		{"Key-Value store", "Block hash->number", hashNumPairings.sizeString(), hashNumPairings.countString()},
 		{"Key-Value store", "Transaction index", txLookups.sizeString(), txLookups.countString()},
