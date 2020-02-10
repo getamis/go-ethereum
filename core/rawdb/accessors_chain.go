@@ -668,16 +668,47 @@ func ReadLogs(db ethdb.Reader, hash common.Hash, number uint64) [][]*types.Log {
 	return logs
 }
 
+// ReadTransferLogsRLP retrieves all the transfer logs belonging to a block in RLP encoding.
+func ReadTransferLogsRLP(db ethdb.Reader, hash common.Hash, number uint64) rlp.RawValue {
+	// First try to look up the data in ancient database. Extra hash
+	// comparison is necessary since ancient database only maintains
+	// the canonical data.
+	data, _ := db.Ancient(ChainFreezerTransferLogTable, number)
+	if len(data) > 0 {
+		h, _ := db.Ancient(ChainFreezerHashTable, number)
+		if common.BytesToHash(h) == hash {
+			return data
+		}
+	}
+	// Then try to look up the data in leveldb.
+	data, _ = db.Get(blockTransferLogsKey(number, hash))
+	if len(data) > 0 {
+		return data
+	}
+	// In the background freezer is moving data from leveldb to flatten files.
+	// So during the first check for ancient db, the data is not yet in there,
+	// but when we reach into leveldb, the data was already moved. That would
+	// result in a not found error.
+	data, _ = db.Ancient(ChainFreezerTransferLogTable, number)
+	if len(data) > 0 {
+		h, _ := db.Ancient(ChainFreezerHashTable, number)
+		if common.BytesToHash(h) == hash {
+			return data
+		}
+	}
+	return nil // Can't find the data anywhere.
+}
+
 // ReadTransferLogs retrieves all the transfer logs belonging to a block.
-func ReadTransferLogs(db ethdb.KeyValueReader, hash common.Hash, number uint64) []*types.TransferLog {
+func ReadTransferLogs(db ethdb.Reader, hash common.Hash, number uint64) []*types.TransferLog {
 	// Retrieve the flattened transfer log slice
-	data, _ := db.Get(append(append(blockTranferLogsPrefix, encodeBlockNumber(number)...), hash.Bytes()...))
+	data := ReadTransferLogsRLP(db, hash, number)
 	if len(data) == 0 {
 		return nil
 	}
 	transferLogs := []*types.TransferLog{}
 	if err := rlp.DecodeBytes(data, &transferLogs); err != nil {
-		log.Error("Invalid transfer log array RLP", "hash", hash, "err", err)
+		log.Error("Invalid transfer log array RLP", "hash", hash, "number", number, "err", err)
 		return nil
 	}
 	return transferLogs
@@ -687,19 +718,27 @@ func ReadTransferLogs(db ethdb.KeyValueReader, hash common.Hash, number uint64) 
 func WriteTransferLogs(db ethdb.KeyValueWriter, hash common.Hash, number uint64, transferLogs []*types.TransferLog) {
 	bytes, err := rlp.EncodeToBytes(transferLogs)
 	if err != nil {
-		log.Crit("Failed to encode block transfer logs", "err", err)
+		log.Crit("Failed to encode block transfer logs", "hash", hash, "number", number, "err", err)
 	}
 	// Store the flattened transfer log slice
-	key := append(append(blockTranferLogsPrefix, encodeBlockNumber(number)...), hash.Bytes()...)
-	if err := db.Put(key, bytes); err != nil {
-		log.Crit("Failed to store block transfer logs", "err", err)
+	if err := db.Put(blockTransferLogsKey(number, hash), bytes); err != nil {
+		log.Crit("Failed to store block transfer logs", "hash", hash, "number", number, "err", err)
+	}
+}
+
+// WriteMissingTransferLogs stores missing transfer logs message for a block.
+func WriteMissingTransferLogs(db ethdb.KeyValueWriter, hash common.Hash, number uint64) {
+	bytes := []byte("missing transfer logs")
+	// Store the flattened transfer log slice
+	if err := db.Put(blockTransferLogsKey(number, hash), bytes); err != nil {
+		log.Crit("Failed to store block transfer logs", "hash", hash, "number", number, "err", err)
 	}
 }
 
 // DeleteTransferLogs removes all transfer logs associated with a block hash.
 func DeleteTransferLogs(db ethdb.KeyValueWriter, hash common.Hash, number uint64) {
-	if err := db.Delete(append(append(blockTranferLogsPrefix, encodeBlockNumber(number)...), hash.Bytes()...)); err != nil {
-		log.Crit("Failed to delete block transfer logs", "err", err)
+	if err := db.Delete(blockTransferLogsKey(number, hash)); err != nil {
+		log.Crit("Failed to delete block transfer logs", "hash", hash, "number", number, "err", err)
 	}
 }
 
@@ -728,7 +767,7 @@ func WriteBlock(db ethdb.KeyValueWriter, block *types.Block) {
 }
 
 // WriteAncientBlocks writes entire block data into ancient store and returns the total written size.
-func WriteAncientBlocks(db ethdb.AncientWriter, blocks []*types.Block, receipts []types.Receipts) (int64, error) {
+func WriteAncientBlocks(db ethdb.AncientWriter, blocks []*types.Block, receipts []types.Receipts, transferLogs []*types.TransferLog) (int64, error) {
 	var stReceipts []*types.ReceiptForStorage
 
 	return db.ModifyAncients(func(op ethdb.AncientWriteOp) error {
@@ -739,7 +778,7 @@ func WriteAncientBlocks(db ethdb.AncientWriter, blocks []*types.Block, receipts 
 				stReceipts = append(stReceipts, (*types.ReceiptForStorage)(receipt))
 			}
 			header := block.Header()
-			if err := writeAncientBlock(op, block, header, stReceipts); err != nil {
+			if err := writeAncientBlock(op, block, header, stReceipts, transferLogs); err != nil {
 				return err
 			}
 		}
@@ -747,7 +786,7 @@ func WriteAncientBlocks(db ethdb.AncientWriter, blocks []*types.Block, receipts 
 	})
 }
 
-func writeAncientBlock(op ethdb.AncientWriteOp, block *types.Block, header *types.Header, receipts []*types.ReceiptForStorage) error {
+func writeAncientBlock(op ethdb.AncientWriteOp, block *types.Block, header *types.Header, receipts []*types.ReceiptForStorage, transferLogs []*types.TransferLog) error {
 	num := block.NumberU64()
 	if err := op.AppendRaw(ChainFreezerHashTable, num, block.Hash().Bytes()); err != nil {
 		return fmt.Errorf("can't add block %d hash: %v", num, err)
@@ -760,6 +799,21 @@ func writeAncientBlock(op ethdb.AncientWriteOp, block *types.Block, header *type
 	}
 	if err := op.Append(ChainFreezerReceiptTable, num, receipts); err != nil {
 		return fmt.Errorf("can't append block %d receipts: %v", num, err)
+	}
+	// Transfer logs might be nil when fast sync.
+	// To keep complete ancient table, we append the specific string to indicate nil transfer logs.
+	var transferLogBlob []byte
+	if transferLogs != nil {
+		var err error
+		transferLogBlob, err = rlp.EncodeToBytes(transferLogs)
+		if err != nil {
+			log.Crit("Failed to RLP encode block transfer logs", "err", err)
+		}
+	} else {
+		transferLogBlob = []byte("missing transfer logs")
+	}
+	if err := op.AppendRaw(ChainFreezerTransferLogTable, num, transferLogBlob); err != nil {
+		return fmt.Errorf("can't append block %d transfer logs: %v", num, err)
 	}
 	return nil
 }
