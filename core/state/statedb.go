@@ -156,7 +156,7 @@ type StateDB struct {
 	StorageUpdated atomic.Int64 // Number of storage slots updated during the state transition
 	StorageDeleted atomic.Int64 // Number of storage slots deleted during the state transition
 
-	// transferLogs records trasfer logs for each transaction.
+	// transferLogs records transfer logs for each transaction.
 	transferLogs map[common.Hash][]*types.TransferLog
 }
 
