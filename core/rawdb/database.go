@@ -479,6 +479,15 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		bloomBits       stat
 		beaconHeaders   stat
 		cliqueSnaps     stat
+		transferLog     stat
+
+		// Ancient store statistics
+		ancientHeadersSize      common.StorageSize
+		ancientBodiesSize       common.StorageSize
+		ancientReceiptsSize     common.StorageSize
+		ancientTdsSize          common.StorageSize
+		ancientHashesSize       common.StorageSize
+		ancientTransferLogsSize common.StorageSize
 
 		// Les statistic
 		chtTrieNodes   stat
@@ -521,6 +530,8 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 			storageTries.Add(size)
 		case bytes.HasPrefix(key, CodePrefix) && len(key) == len(CodePrefix)+common.HashLength:
 			codes.Add(size)
+		case bytes.HasPrefix(key, blockTranferLogsPrefix) && len(key) == (len(blockTranferLogsPrefix)+8+common.HashLength):
+			transferLog.Add(size)
 		case bytes.HasPrefix(key, txLookupPrefix) && len(key) == (len(txLookupPrefix)+common.HashLength):
 			txLookups.Add(size)
 		case bytes.HasPrefix(key, SnapshotAccountPrefix) && len(key) == (len(SnapshotAccountPrefix)+common.HashLength):
@@ -574,11 +585,25 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 			logged = time.Now()
 		}
 	}
+	// Inspect append-only file store then.
+	ancientSizes := []*common.StorageSize{&ancientHeadersSize, &ancientBodiesSize, &ancientReceiptsSize, &ancientHashesSize, &ancientTdsSize, &ancientTransferLogsSize}
+	for i, category := range []string{ChainFreezerHeaderTable, ChainFreezerBodiesTable, ChainFreezerReceiptTable, ChainFreezerHashTable, ChainFreezerDifficultyTable, ChainFreezerTransferLogTable} {
+		if size, err := db.AncientSize(category); err == nil {
+			*ancientSizes[i] += common.StorageSize(size)
+			total += common.StorageSize(size)
+		}
+	}
+	// Get number of ancient rows inside the freezer
+	ancientsCount := counter(0)
+	if count, err := db.Ancients(); err == nil {
+		ancientsCount = counter(count)
+	}
 	// Display the database statistic of key-value store.
 	stats := [][]string{
 		{"Key-Value store", "Headers", headers.Size(), headers.Count()},
 		{"Key-Value store", "Bodies", bodies.Size(), bodies.Count()},
 		{"Key-Value store", "Receipt lists", receipts.Size(), receipts.Count()},
+		{"Key-Value store", "Transfer logs", transferLog.Size(), transferLog.Count()},
 		{"Key-Value store", "Difficulties", tds.Size(), tds.Count()},
 		{"Key-Value store", "Block number->hash", numHashPairings.Size(), numHashPairings.Count()},
 		{"Key-Value store", "Block hash->number", hashNumPairings.Size(), hashNumPairings.Count()},
@@ -595,6 +620,12 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		{"Key-Value store", "Beacon sync headers", beaconHeaders.Size(), beaconHeaders.Count()},
 		{"Key-Value store", "Clique snapshots", cliqueSnaps.Size(), cliqueSnaps.Count()},
 		{"Key-Value store", "Singleton metadata", metadata.Size(), metadata.Count()},
+		{"Ancient store", "Headers", ancientHeadersSize.String(), ancientsCount.String()},
+		{"Ancient store", "Bodies", ancientBodiesSize.String(), ancientsCount.String()},
+		{"Ancient store", "Receipt lists", ancientReceiptsSize.String(), ancientsCount.String()},
+		{"Ancient store", "Transfer logs", ancientTransferLogsSize.String(), ancientsCount.String()},
+		{"Ancient store", "Difficulties", ancientTdsSize.String(), ancientsCount.String()},
+		{"Ancient store", "Block number->hash", ancientHashesSize.String(), ancientsCount.String()},
 		{"Light client", "CHT trie nodes", chtTrieNodes.Size(), chtTrieNodes.Count()},
 		{"Light client", "Bloom trie nodes", bloomTrieNodes.Size(), bloomTrieNodes.Count()},
 	}
