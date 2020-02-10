@@ -1133,11 +1133,12 @@ func (d *Downloader) reportSnapSyncProgress(force bool) {
 	}
 	// Don't report anything until we have a meaningful progress
 	var (
-		headerBytes, _  = d.stateDB.AncientSize(rawdb.ChainFreezerHeaderTable)
-		bodyBytes, _    = d.stateDB.AncientSize(rawdb.ChainFreezerBodiesTable)
-		receiptBytes, _ = d.stateDB.AncientSize(rawdb.ChainFreezerReceiptTable)
+		headerBytes, _      = d.stateDB.AncientSize(rawdb.ChainFreezerHeaderTable)
+		bodyBytes, _        = d.stateDB.AncientSize(rawdb.ChainFreezerBodiesTable)
+		receiptBytes, _     = d.stateDB.AncientSize(rawdb.ChainFreezerReceiptTable)
+		transferLogBytes, _ = d.stateDB.AncientSize(rawdb.ChainFreezerTransferLogTable)
 	)
-	syncedBytes := common.StorageSize(headerBytes + bodyBytes + receiptBytes)
+	syncedBytes := common.StorageSize(headerBytes + bodyBytes + receiptBytes + transferLogBytes)
 	if syncedBytes == 0 {
 		return
 	}
@@ -1175,11 +1176,12 @@ func (d *Downloader) reportSnapSyncProgress(force bool) {
 		left = latest.Number.Uint64() - block.Number.Uint64()
 		eta  = time.Since(d.syncStartTime) / time.Duration(fetchedBlocks) * time.Duration(left)
 
-		progress = fmt.Sprintf("%.2f%%", float64(block.Number.Uint64())*100/float64(latest.Number.Uint64()))
-		headers  = fmt.Sprintf("%v@%v", log.FormatLogfmtUint64(header.Number.Uint64()), common.StorageSize(headerBytes).TerminalString())
-		bodies   = fmt.Sprintf("%v@%v", log.FormatLogfmtUint64(block.Number.Uint64()), common.StorageSize(bodyBytes).TerminalString())
-		receipts = fmt.Sprintf("%v@%v", log.FormatLogfmtUint64(block.Number.Uint64()), common.StorageSize(receiptBytes).TerminalString())
+		progress     = fmt.Sprintf("%.2f%%", float64(block.Number.Uint64())*100/float64(latest.Number.Uint64()))
+		headers      = fmt.Sprintf("%v@%v", log.FormatLogfmtUint64(header.Number.Uint64()), common.StorageSize(headerBytes).TerminalString())
+		bodies       = fmt.Sprintf("%v@%v", log.FormatLogfmtUint64(block.Number.Uint64()), common.StorageSize(bodyBytes).TerminalString())
+		receipts     = fmt.Sprintf("%v@%v", log.FormatLogfmtUint64(block.Number.Uint64()), common.StorageSize(receiptBytes).TerminalString())
+		transferLogs = fmt.Sprintf("%v@%v", log.FormatLogfmtUint64(block.Number.Uint64()), common.StorageSize(transferLogBytes).TerminalString())
 	)
-	log.Info("Syncing: chain download in progress", "synced", progress, "chain", syncedBytes, "headers", headers, "bodies", bodies, "receipts", receipts, "eta", common.PrettyDuration(eta))
+	log.Info("Syncing: chain download in progress", "synced", progress, "chain", syncedBytes, "headers", headers, "bodies", bodies, "receipts", receipts, "transferLogs", transferLogs, "eta", common.PrettyDuration(eta))
 	d.syncLogTime = time.Now()
 }
