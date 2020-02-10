@@ -34,16 +34,20 @@ const (
 
 	// ChainFreezerDifficultyTable indicates the name of the freezer total difficulty table.
 	ChainFreezerDifficultyTable = "diffs"
+
+	// chainFreezerTransferLogTable indicates the name of the freezer transfer logs table.
+	ChainFreezerTransferLogTable = "transfers"
 )
 
 // chainFreezerNoSnappy configures whether compression is disabled for the ancient-tables.
 // Hashes and difficulties don't compress well.
 var chainFreezerNoSnappy = map[string]bool{
-	ChainFreezerHeaderTable:     false,
-	ChainFreezerHashTable:       true,
-	ChainFreezerBodiesTable:     false,
-	ChainFreezerReceiptTable:    false,
-	ChainFreezerDifficultyTable: true,
+	ChainFreezerHeaderTable:      false,
+	ChainFreezerHashTable:        true,
+	ChainFreezerBodiesTable:      false,
+	ChainFreezerReceiptTable:     false,
+	ChainFreezerDifficultyTable:  true,
+	ChainFreezerTransferLogTable: false,
 }
 
 const (
