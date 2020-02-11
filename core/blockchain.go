@@ -118,10 +118,11 @@ var (
 )
 
 const (
-	bodyCacheLimit     = 256
-	blockCacheLimit    = 256
-	receiptsCacheLimit = 32
-	txLookupCacheLimit = 1024
+	bodyCacheLimit         = 256
+	blockCacheLimit        = 256
+	receiptsCacheLimit     = 32
+	transferLogsCacheLimit = 32
+	txLookupCacheLimit     = 1024
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	//
@@ -319,10 +320,11 @@ type BlockChain struct {
 	currentSafeBlock  atomic.Pointer[types.Header] // Latest (consensus) safe block
 	historyPrunePoint atomic.Pointer[history.PrunePoint]
 
-	bodyCache     *lru.Cache[common.Hash, *types.Body]
-	bodyRLPCache  *lru.Cache[common.Hash, rlp.RawValue]
-	receiptsCache *lru.Cache[common.Hash, []*types.Receipt] // Receipts cache with all fields derived
-	blockCache    *lru.Cache[common.Hash, *types.Block]
+	bodyCache         *lru.Cache[common.Hash, *types.Body]
+	bodyRLPCache      *lru.Cache[common.Hash, rlp.RawValue]
+	receiptsCache     *lru.Cache[common.Hash, []*types.Receipt]     // Receipts cache with all fields derived
+	transferLogsCache *lru.Cache[common.Hash, []*types.TransferLog] // Cache for the most recent receipts per block
+	blockCache        *lru.Cache[common.Hash, *types.Block]
 
 	txLookupLock  sync.RWMutex
 	txLookupCache *lru.Cache[common.Hash, txLookup]
@@ -372,19 +374,20 @@ func NewBlockChain(db ethdb.Database, genesis *Genesis, engine consensus.Engine,
 	log.Info("")
 
 	bc := &BlockChain{
-		chainConfig:   chainConfig,
-		cfg:           cfg,
-		db:            db,
-		triedb:        triedb,
-		triegc:        prque.New[int64, common.Hash](nil),
-		chainmu:       syncx.NewClosableMutex(),
-		bodyCache:     lru.NewCache[common.Hash, *types.Body](bodyCacheLimit),
-		bodyRLPCache:  lru.NewCache[common.Hash, rlp.RawValue](bodyCacheLimit),
-		receiptsCache: lru.NewCache[common.Hash, []*types.Receipt](receiptsCacheLimit),
-		blockCache:    lru.NewCache[common.Hash, *types.Block](blockCacheLimit),
-		txLookupCache: lru.NewCache[common.Hash, txLookup](txLookupCacheLimit),
-		engine:        engine,
-		logger:        cfg.VmConfig.Tracer,
+		chainConfig:       chainConfig,
+		cfg:               cfg,
+		db:                db,
+		triedb:            triedb,
+		triegc:            prque.New[int64, common.Hash](nil),
+		chainmu:           syncx.NewClosableMutex(),
+		bodyCache:         lru.NewCache[common.Hash, *types.Body](bodyCacheLimit),
+		bodyRLPCache:      lru.NewCache[common.Hash, rlp.RawValue](bodyCacheLimit),
+		receiptsCache:     lru.NewCache[common.Hash, []*types.Receipt](receiptsCacheLimit),
+		blockCache:        lru.NewCache[common.Hash, *types.Block](blockCacheLimit),
+		txLookupCache:     lru.NewCache[common.Hash, txLookup](txLookupCacheLimit),
+		transferLogsCache: lru.NewCache[common.Hash, []*types.TransferLog](transferLogsCacheLimit),
+		engine:            engine,
+		logger:            cfg.VmConfig.Tracer,
 	}
 	bc.hc, err = NewHeaderChain(db, chainConfig, engine, bc.insertStopped)
 	if err != nil {
@@ -1068,6 +1071,7 @@ func (bc *BlockChain) setHeadBeyondRoot(head uint64, time uint64, root common.Ha
 			// removed by the hc.SetHead function.
 			rawdb.DeleteBody(db, hash, num)
 			rawdb.DeleteReceipts(db, hash, num)
+			rawdb.DeleteTransferLogs(db, hash, num)
 		}
 		// Todo(rjl493456442) txlookup, log index, etc
 	}
@@ -1092,6 +1096,7 @@ func (bc *BlockChain) setHeadBeyondRoot(head uint64, time uint64, root common.Ha
 	bc.bodyCache.Purge()
 	bc.bodyRLPCache.Purge()
 	bc.receiptsCache.Purge()
+	bc.transferLogsCache.Purge()
 	bc.blockCache.Purge()
 	bc.txLookupCache.Purge()
 
@@ -1497,6 +1502,9 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 			rawdb.WriteBlock(batch, block)
 			rawdb.WriteRawReceipts(batch, block.Hash(), block.NumberU64(), receiptChain[i])
 
+			// We don't have transfer logs for fast sync blocks
+			rawdb.WriteMissingTransferLogs(batch, block.Hash(), block.NumberU64())
+
 			// Write everything belongs to the blocks into the database. So that
 			// we can ensure all components of body is completed(body, receipts)
 			// except transaction indexes(will be created once sync is finished).
@@ -1601,6 +1609,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	blockBatch := bc.db.NewBatch()
 	rawdb.WriteBlock(blockBatch, block)
 	rawdb.WriteReceipts(blockBatch, block.Hash(), block.NumberU64(), receipts)
+	rawdb.WriteTransferLogs(blockBatch, block.Hash(), block.NumberU64(), statedb.TransferLogs())
 	rawdb.WritePreimages(blockBatch, statedb.Preimages())
 	if err := blockBatch.Write(); err != nil {
 		log.Crit("Failed to write block into disk", "err", err)
