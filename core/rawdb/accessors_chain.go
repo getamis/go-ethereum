@@ -34,6 +34,11 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+var (
+	errNotFound            = errors.New("not found")
+	errMissingTransferLogs = errors.New("missing transfer logs")
+)
+
 // ReadCanonicalHash retrieves the hash assigned to a canonical block number.
 func ReadCanonicalHash(db ethdb.Reader, number uint64) common.Hash {
 	var data []byte
@@ -787,18 +792,21 @@ func ReadTransferLogsRLP(db ethdb.Reader, hash common.Hash, number uint64) rlp.R
 }
 
 // ReadTransferLogs retrieves all the transfer logs belonging to a block.
-func ReadTransferLogs(db ethdb.Reader, hash common.Hash, number uint64) []*types.TransferLog {
+func ReadTransferLogs(db ethdb.Reader, hash common.Hash, number uint64) ([]*types.TransferLog, error) {
 	// Retrieve the flattened transfer log slice
 	data := ReadTransferLogsRLP(db, hash, number)
 	if len(data) == 0 {
-		return nil
+		return nil, errNotFound
 	}
 	transferLogs := []*types.TransferLog{}
 	if err := rlp.DecodeBytes(data, &transferLogs); err != nil {
+		if string(data) == errMissingTransferLogs.Error() {
+			return nil, errMissingTransferLogs
+		}
 		log.Error("Invalid transfer log array RLP", "hash", hash, "number", number, "err", err)
-		return nil
+		return nil, err
 	}
-	return transferLogs
+	return transferLogs, nil
 }
 
 // WriteTransferLogs stores all the transfer logs belonging to a block.
@@ -815,7 +823,7 @@ func WriteTransferLogs(db ethdb.KeyValueWriter, hash common.Hash, number uint64,
 
 // WriteMissingTransferLogs stores missing transfer logs message for a block.
 func WriteMissingTransferLogs(db ethdb.KeyValueWriter, hash common.Hash, number uint64) {
-	bytes := []byte("missing transfer logs")
+	bytes := []byte(errMissingTransferLogs.Error())
 	// Store the flattened transfer log slice
 	if err := db.Put(blockTransferLogsKey(number, hash), bytes); err != nil {
 		log.Crit("Failed to store block transfer logs", "hash", hash, "number", number, "err", err)
@@ -905,7 +913,7 @@ func writeAncientBlock(op ethdb.AncientWriteOp, block *types.Block, header *type
 			log.Crit("Failed to RLP encode block transfer logs", "err", err)
 		}
 	} else {
-		transferLogBlob = []byte("missing transfer logs")
+		transferLogBlob = []byte(errMissingTransferLogs.Error())
 	}
 	if err := op.AppendRaw(ChainFreezerTransferLogTable, num, transferLogBlob); err != nil {
 		return fmt.Errorf("can't append block %d transfer logs: %v", num, err)
