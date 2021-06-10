@@ -456,9 +456,7 @@ func (api *DebugAPI) GetTotalDifficulty(blockHash common.Hash) *big.Int {
 }
 
 // GetBlockReceipts returns all transaction receipts of the specified block.
-func (api *DebugAPI) GetBlockReceipts(blockHash common.Hash) (types.Receipts, error) {
-	if receipts := api.eth.blockchain.GetReceiptsByHash(blockHash); receipts != nil {
-		return receipts, nil
-	}
-	return nil, errors.New("unknown receipts")
+func (api *DebugAPI) GetBlockReceipts(ctx context.Context, blockHash common.Hash) ([]map[string]interface{}, error) {
+	bc := ethapi.NewBlockChainAPI(api.eth.APIBackend)
+	return bc.GetBlockReceipts(ctx, rpc.BlockNumberOrHashWithHash(blockHash, true))
 }
