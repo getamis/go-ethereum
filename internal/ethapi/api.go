@@ -1718,7 +1718,6 @@ func (s *TransactionAPI) GetTransactionReceipt(ctx context.Context, hash common.
 // marshalReceipt marshals a transaction receipt into a JSON object.
 func marshalReceipt(receipt *types.Receipt, blockHash common.Hash, blockNumber uint64, signer types.Signer, tx *types.Transaction, txIndex int) map[string]interface{} {
 	from, _ := types.Sender(signer, tx)
-
 	fields := map[string]interface{}{
 		"blockHash":         blockHash,
 		"blockNumber":       hexutil.Uint64(blockNumber),
