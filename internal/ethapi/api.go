@@ -2334,6 +2334,19 @@ func (s *BundleAPI) CallBundle(ctx context.Context, args CallBundleArgs) (map[st
 		timeoutMilliSeconds = *args.Timeout
 	}
 	timeout := time.Millisecond * time.Duration(timeoutMilliSeconds)
+
+	// Setup context so it may be cancelled the call has completed
+	// or, in case of unmetered gas, setup a context with a timeout.
+	var cancel context.CancelFunc
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
+	}
+	// Make sure the context is cancelled when the call has completed
+	// this makes sure resources are cleaned up.
+	defer cancel()
+
 	state, parent, err := s.b.StateAndHeaderByNumberOrHash(ctx, args.StateBlockNumberOrHash)
 	if state == nil || err != nil {
 		return nil, err
@@ -2372,18 +2385,6 @@ func (s *BundleAPI) CallBundle(ctx context.Context, args CallBundleArgs) (map[st
 		BaseFee:    baseFee,
 	}
 
-	// Setup context so it may be cancelled the call has completed
-	// or, in case of unmetered gas, setup a context with a timeout.
-	var cancel context.CancelFunc
-	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-	} else {
-		ctx, cancel = context.WithCancel(ctx)
-	}
-	// Make sure the context is cancelled when the call has completed
-	// this makes sure resources are cleaned up.
-	defer cancel()
-
 	vmconfig := vm.Config{}
 
 	// Setup the gas pool (also for unmetered requests)
@@ -2398,6 +2399,11 @@ func (s *BundleAPI) CallBundle(ctx context.Context, args CallBundleArgs) (map[st
 	var totalGasUsed uint64
 	gasFees := new(big.Int)
 	for i, tx := range txs {
+		// Check if the context was cancelled (eg. timed-out)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
 		coinbaseBalanceBeforeTx := state.GetBalance(coinbase)
 		state.Prepare(tx.Hash(), i)
 
@@ -2487,6 +2493,20 @@ func (s *BundleAPI) EstimateGasBundle(ctx context.Context, args EstimateGasBundl
 	}
 	timeout := time.Millisecond * time.Duration(timeoutMS)
 
+	// Setup context so it may be cancelled when the call
+	// has completed or, in case of unmetered gas, setup
+	// a context with a timeout
+	var cancel context.CancelFunc
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
+	}
+
+	// Make sure the context is cancelled when the call has completed
+	// This makes sure resources are cleaned up
+	defer cancel()
+
 	state, parent, err := s.b.StateAndHeaderByNumberOrHash(ctx, args.StateBlockNumberOrHash)
 	if state == nil || err != nil {
 		return nil, err
@@ -2511,20 +2531,6 @@ func (s *BundleAPI) EstimateGasBundle(ctx context.Context, args EstimateGasBundl
 		BaseFee:    parent.BaseFee,
 	}
 
-	// Setup context so it may be cancelled when the call
-	// has completed or, in case of unmetered gas, setup
-	// a context with a timeout
-	var cancel context.CancelFunc
-	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-	} else {
-		ctx, cancel = context.WithCancel(ctx)
-	}
-
-	// Make sure the context is cancelled when the call has completed
-	// This makes sure resources are cleaned up
-	defer cancel()
-
 	// RPC Call gas cap
 	globalGasCap := s.b.RPCGasCap()
 
@@ -2543,6 +2549,11 @@ func (s *BundleAPI) EstimateGasBundle(ctx context.Context, args EstimateGasBundl
 	// Feed each of the transactions into the VM ctx
 	// And try and estimate the gas used
 	for i, txArgs := range args.Txs {
+		// Check if the context was cancelled (eg. timed-out)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
 		// Since its a txCall we'll just prepare the
 		// state with a random hash
 		var randomHash common.Hash
