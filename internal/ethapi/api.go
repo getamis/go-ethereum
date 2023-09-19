@@ -2285,9 +2285,9 @@ func (s *BundleAPI) CallBundle(ctx context.Context, args CallBundleArgs) (map[st
 	// or, in case of unmetered gas, setup a context with a timeout.
 	var cancel context.CancelFunc
 	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(ctx, timeout)
+		_, cancel = context.WithTimeout(ctx, timeout)
 	} else {
-		ctx, cancel = context.WithCancel(ctx)
+		_, cancel = context.WithCancel(ctx)
 	}
 	// Make sure the context is cancelled when the call has completed
 	// this makes sure resources are cleaned up.
@@ -2425,9 +2425,9 @@ func (s *BundleAPI) EstimateGasBundle(ctx context.Context, args EstimateGasBundl
 	// a context with a timeout
 	var cancel context.CancelFunc
 	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(ctx, timeout)
+		_, cancel = context.WithTimeout(ctx, timeout)
 	} else {
-		ctx, cancel = context.WithCancel(ctx)
+		_, cancel = context.WithCancel(ctx)
 	}
 
 	// Make sure the context is cancelled when the call has completed
