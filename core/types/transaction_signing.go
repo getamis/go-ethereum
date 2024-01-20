@@ -64,7 +64,7 @@ func MakeSigner(config *params.ChainConfig, blockNumber *big.Int, blockTime uint
 // Use this in transaction-handling code where the current block number is unknown. If you
 // have the current block number available, use MakeSigner instead.
 func LatestSigner(config *params.ChainConfig) Signer {
-	if config.ChainID != nil {
+	if config != nil && config.ChainID != nil {
 		if config.CancunTime != nil {
 			return NewCancunSigner(config.ChainID)
 		}
