@@ -168,6 +168,9 @@ type (
 
 	// LogHook is called when a log is emitted.
 	LogHook = func(log *types.Log)
+
+	// TransferLogHook is called when a transfer log is emitted.
+	TransferLogHook = func(log *types.TransferLog)
 )
 
 type Hooks struct {
@@ -194,6 +197,7 @@ type Hooks struct {
 	OnCodeChange    CodeChangeHook
 	OnStorageChange StorageChangeHook
 	OnLog           LogHook
+	OnTransferLog   TransferLogHook
 }
 
 // BalanceChangeReason is used to indicate the reason for a balance change, useful

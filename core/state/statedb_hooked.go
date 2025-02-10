@@ -249,6 +249,14 @@ func (s *hookedStateDB) AddLog(log *types.Log) {
 	}
 }
 
+func (s *hookedStateDB) AddTransferLog(log *types.TransferLog) {
+	// The inner will modify the log (add fields), so invoke that first
+	s.inner.AddTransferLog(log)
+	if s.hooks.OnTransferLog != nil {
+		s.hooks.OnTransferLog(log)
+	}
+}
+
 func (s *hookedStateDB) Finalise(deleteEmptyObjects bool) {
 	defer s.inner.Finalise(deleteEmptyObjects)
 	if s.hooks.OnBalanceChange == nil {
