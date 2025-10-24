@@ -738,6 +738,41 @@ func ReadLogs(db ethdb.Reader, hash common.Hash, number uint64) [][]*types.Log {
 	return logs
 }
 
+// ReadTransferLogs retrieves all the transfer logs belonging to a block.
+func ReadTransferLogs(db ethdb.KeyValueReader, hash common.Hash, number uint64) []*types.TransferLog {
+	// Retrieve the flattened transfer log slice
+	data, _ := db.Get(append(append(blockTranferLogsPrefix, encodeBlockNumber(number)...), hash.Bytes()...))
+	if len(data) == 0 {
+		return nil
+	}
+	transferLogs := []*types.TransferLog{}
+	if err := rlp.DecodeBytes(data, &transferLogs); err != nil {
+		log.Error("Invalid transfer log array RLP", "hash", hash, "err", err)
+		return nil
+	}
+	return transferLogs
+}
+
+// WriteTransferLogs stores all the transfer logs belonging to a block.
+func WriteTransferLogs(db ethdb.KeyValueWriter, hash common.Hash, number uint64, transferLogs []*types.TransferLog) {
+	bytes, err := rlp.EncodeToBytes(transferLogs)
+	if err != nil {
+		log.Crit("Failed to encode block transfer logs", "err", err)
+	}
+	// Store the flattened transfer log slice
+	key := append(append(blockTranferLogsPrefix, encodeBlockNumber(number)...), hash.Bytes()...)
+	if err := db.Put(key, bytes); err != nil {
+		log.Crit("Failed to store block transfer logs", "err", err)
+	}
+}
+
+// DeleteTransferLogs removes all transfer logs associated with a block hash.
+func DeleteTransferLogs(db ethdb.KeyValueWriter, hash common.Hash, number uint64) {
+	if err := db.Delete(append(append(blockTranferLogsPrefix, encodeBlockNumber(number)...), hash.Bytes()...)); err != nil {
+		log.Crit("Failed to delete block transfer logs", "err", err)
+	}
+}
+
 // ReadBlock retrieves an entire block corresponding to the hash, assembling it
 // back from the stored header and body. If either the header or body could not
 // be retrieved nil is returned.
@@ -809,6 +844,7 @@ func writeAncientBlock(op ethdb.AncientWriteOp, block *types.Block, header *type
 
 // DeleteBlock removes all block data associated with a hash.
 func DeleteBlock(db ethdb.KeyValueWriter, hash common.Hash, number uint64) {
+	DeleteTransferLogs(db, hash, number)
 	DeleteReceipts(db, hash, number)
 	DeleteHeader(db, hash, number)
 	DeleteBody(db, hash, number)
@@ -818,6 +854,7 @@ func DeleteBlock(db ethdb.KeyValueWriter, hash common.Hash, number uint64) {
 // DeleteBlockWithoutNumber removes all block data associated with a hash, except
 // the hash to number mapping.
 func DeleteBlockWithoutNumber(db ethdb.KeyValueWriter, hash common.Hash, number uint64) {
+	DeleteTransferLogs(db, hash, number)
 	DeleteReceipts(db, hash, number)
 	deleteHeaderWithoutNumber(db, hash, number)
 	DeleteBody(db, hash, number)
