@@ -952,12 +952,12 @@ func TestTransferLogStorage(t *testing.T) {
 
 	// Check that no transfer logs entries are in a pristine database
 	hash := common.BytesToHash([]byte{0x03, 0x14})
-	if ls := ReadTransferLogs(db, hash, 0); len(ls) != 0 {
+	if ls, err := ReadTransferLogs(db, hash, 0); len(ls) != 0 || err != errNotFound {
 		t.Fatalf("non existent transfer logs returned: %v", ls)
 	}
 	// Insert the transfer log slice into the database and check presence
 	WriteTransferLogs(db, hash, 0, transferLogs)
-	if ls := ReadTransferLogs(db, hash, 0); len(ls) == 0 {
+	if ls, err := ReadTransferLogs(db, hash, 0); len(ls) == 0 || err != nil {
 		t.Fatalf("no transfer logs returned")
 	} else {
 		for i := 0; i < len(transferLogs); i++ {
@@ -971,7 +971,13 @@ func TestTransferLogStorage(t *testing.T) {
 	}
 	// Delete the transfer log slice and check purge
 	DeleteTransferLogs(db, hash, 0)
-	if ls := ReadTransferLogs(db, hash, 0); len(ls) != 0 {
+	if ls, err := ReadTransferLogs(db, hash, 0); len(ls) != 0 || err != errNotFound {
 		t.Fatalf("deleted transfer logs returned: %v", ls)
+	}
+	// Insert missing transfer logs into the database and check error
+	hash2 := common.BytesToHash([]byte{0x07, 0x15})
+	WriteMissingTransferLogs(db, hash2, 1)
+	if ls, err := ReadTransferLogs(db, hash2, 1); len(ls) != 0 || err != errMissingTransferLogs {
+		t.Fatalf("no transfer logs returned and should return missing transfer logs error")
 	}
 }
