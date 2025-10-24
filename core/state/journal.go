@@ -149,6 +149,10 @@ type (
 		account       *common.Address
 		key, prevalue common.Hash
 	}
+
+	addTransferLogChange struct {
+		txhash common.Hash
+	}
 )
 
 func (ch createObjectChange) revert(s *StateDB) {
@@ -296,5 +300,18 @@ func (ch accessListAddSlotChange) revert(s *StateDB) {
 }
 
 func (ch accessListAddSlotChange) dirtied() *common.Address {
+	return nil
+}
+
+func (ch addTransferLogChange) revert(s *StateDB) {
+	transferLogs := s.transferLogs[ch.txhash]
+	if len(transferLogs) == 1 {
+		delete(s.transferLogs, ch.txhash)
+	} else {
+		s.transferLogs[ch.txhash] = transferLogs[:len(transferLogs)-1]
+	}
+}
+
+func (ch addTransferLogChange) dirtied() *common.Address {
 	return nil
 }
