@@ -126,6 +126,7 @@ func ExampleInspectDatabase() {
 	// | Key-Value store       | Singleton metadata      | 41.00 B |     2 |
 	// | Key-Value store       | Storage snapshot        | 0.00 B  |     0 |
 	// | Key-Value store       | Transaction index       | 0.00 B  |     0 |
+	// | Key-Value store       | Transfer logs           | 0.00 B  |     0 |
 	// | Key-Value store       | Trie preimages          | 0.00 B  |     0 |
 	// | Light client          | Bloom trie nodes        | 0.00 B  |     0 |
 	// | Light client          | CHT trie nodes          | 0.00 B  |     0 |
