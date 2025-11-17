@@ -403,11 +403,11 @@ func (pool *LegacyPool) SubscribeTransactions(ch chan<- core.NewTxsEvent, reorgs
 	// hard to separate newly discovered transaction from resurrected ones. This
 	// is because the new txs are added to the queue, resurrected ones too and
 	// reorgs run lazily, so separating the two would need a marker.
-	return pool.txFeed.Subscribe(ch)
+	return pool.queuedTxFeed.Subscribe(ch)
 }
 
 // SubscribeQueuedTransactions subscribes to new queued transaction events.
-func (pool *LegacyPool) SubscribeQueuedTransactions(ch chan<- core.NewQueuedTxsEvent) event.Subscription {
+func (pool *LegacyPool) SubscribeQueuedTransactions(ch chan<- core.NewTxsEvent) event.Subscription {
 	return pool.queuedTxFeed.Subscribe(ch)
 }
 
@@ -678,7 +678,7 @@ func (pool *LegacyPool) add(tx *types.Transaction) (replaced bool, err error) {
 	from, _ := types.Sender(pool.signer, tx)
 
 	// Broadcast a new tx anyway if it's valid
-	go pool.queuedTxFeed.Send(core.NewQueuedTxsEvent{Txs: types.Transactions{tx}})
+	go pool.queuedTxFeed.Send(core.NewTxsEvent{Txs: types.Transactions{tx}})
 
 	// If the address is not yet known, request exclusivity to track the account
 	// only by this subpool until all transactions are evicted

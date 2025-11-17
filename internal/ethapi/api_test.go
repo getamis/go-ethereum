@@ -679,7 +679,7 @@ func (b testBackend) TxPoolContentFrom(addr common.Address) ([]*types.Transactio
 func (b testBackend) SubscribeNewTxsEvent(events chan<- core.NewTxsEvent) event.Subscription {
 	panic("implement me")
 }
-func (b *testBackend) SubscribeNewQueuedTxsEvent(ch chan<- core.NewQueuedTxsEvent) event.Subscription {
+func (b *testBackend) SubscribeNewQueuedTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
 	panic("implement me")
 }
 func (b testBackend) ChainConfig() *params.ChainConfig { return b.chain.Config() }

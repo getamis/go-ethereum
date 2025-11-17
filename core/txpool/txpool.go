@@ -385,8 +385,9 @@ func (p *TxPool) SubscribePendingLocalTxsEvent(ch chan<- core.PendingLocalTxsEve
 	return p.subs.Track(event.JoinSubscriptions(subs...))
 }
 
-// SubscribeNewQueuedTxsEvent registers a subscription of NewQueuedTxsEvent and
-func (p *TxPool) SubscribeNewQueuedTxsEvent(ch chan<- core.NewQueuedTxsEvent) event.Subscription {
+// SubscribeNewQueuedTxsEvent registers a subscription of NewTxsEvent and
+// starts sending event to the given channel.
+func (p *TxPool) SubscribeNewQueuedTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
 	subs := make([]event.Subscription, len(p.subpools))
 	for i, subpool := range p.subpools {
 		subs[i] = subpool.SubscribeQueuedTransactions(ch)

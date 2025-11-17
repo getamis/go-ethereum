@@ -322,7 +322,7 @@ func validateEvents(events chan core.NewTxsEvent, count int) error {
 
 // validateQueuedEvents checks that the correct number of transaction addition events
 // were fired on the pool's event feed.
-func validateQueuedEvents(events chan core.NewQueuedTxsEvent, count int) error {
+func validateQueuedEvents(events chan core.NewTxsEvent, count int) error {
 	var received []*types.Transaction
 
 	for len(received) < count {
@@ -481,8 +481,8 @@ func TestSubscribePendingAndQueuedTransactions(t *testing.T) {
 	defer pool.Close()
 
 	// Keep listening for authenticated transactions.
-	events := make(chan core.NewQueuedTxsEvent, 32)
-	sub := pool.SubscribeQueuedTransactions(events)
+	events := make(chan core.NewTxsEvent, 32)
+	sub := pool.SubscribeTransactions(events, false)
 	defer sub.Unsubscribe()
 
 	createAccounts := func(numbers int, txpool *LegacyPool) []*ecdsa.PrivateKey {

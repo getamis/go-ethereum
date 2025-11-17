@@ -382,7 +382,7 @@ func (b *backendMock) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subsc
 func (b *backendMock) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
 	return nil
 }
-func (b *backendMock) SubscribeNewQueuedTxsEvent(ch chan<- core.NewQueuedTxsEvent) event.Subscription {
+func (b *backendMock) SubscribeNewQueuedTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
 	return nil
 }
 func (b *backendMock) SendTx(ctx context.Context, signedTx *types.Transaction) error { return nil }

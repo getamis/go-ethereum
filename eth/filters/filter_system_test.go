@@ -149,7 +149,7 @@ func (b *testBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Sub
 	return b.txFeed.Subscribe(ch)
 }
 
-func (b *testBackend) SubscribeNewQueuedTxsEvent(ch chan<- core.NewQueuedTxsEvent) event.Subscription {
+func (b *testBackend) SubscribeNewQueuedTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
 	return b.queuedTxFeed.Subscribe(ch)
 }
 
@@ -402,7 +402,7 @@ func TestQueuedTxFilter(t *testing.T) {
 	fid0 := api.NewQueuedTransactionFilter()
 
 	time.Sleep(1 * time.Second)
-	backend.queuedTxFeed.Send(core.NewQueuedTxsEvent{Txs: transactions})
+	backend.queuedTxFeed.Send(core.NewTxsEvent{Txs: transactions})
 
 	timeout := time.Now().Add(1 * time.Second)
 	for {

@@ -1744,7 +1744,7 @@ func (p *BlobPool) add(tx *types.Transaction) (err error) {
 		return err
 	}
 
-	go p.queuedTxFeed.Send(core.NewQueuedTxsEvent{Txs: types.Transactions{tx}})
+	go p.queuedTxFeed.Send(core.NewTxsEvent{Txs: types.Transactions{tx}})
 
 	// If the address is not yet known, request exclusivity to track the account
 	// only by this subpool until all transactions are evicted
@@ -2083,15 +2083,11 @@ func (p *BlobPool) updateLimboMetrics() {
 // SubscribeTransactions registers a subscription for new transaction events,
 // supporting feeding only newly seen or also resurrected transactions.
 func (p *BlobPool) SubscribeTransactions(ch chan<- core.NewTxsEvent, reorgs bool) event.Subscription {
-	if reorgs {
-		return p.insertFeed.Subscribe(ch)
-	} else {
-		return p.discoverFeed.Subscribe(ch)
-	}
+	return p.queuedTxFeed.Subscribe(ch)
 }
 
 // SubscribeQueuedTransactions subscribes to new queued transaction events.
-func (p *BlobPool) SubscribeQueuedTransactions(ch chan<- core.NewQueuedTxsEvent) event.Subscription {
+func (p *BlobPool) SubscribeQueuedTransactions(ch chan<- core.NewTxsEvent) event.Subscription {
 	return p.queuedTxFeed.Subscribe(ch)
 }
 

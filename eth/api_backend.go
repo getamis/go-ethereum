@@ -403,7 +403,7 @@ func (b *EthAPIBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.S
 	return b.eth.txPool.SubscribeTransactions(ch, true)
 }
 
-func (b *EthAPIBackend) SubscribeNewQueuedTxsEvent(ch chan<- core.NewQueuedTxsEvent) event.Subscription {
+func (b *EthAPIBackend) SubscribeNewQueuedTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
 	return b.eth.txPool.SubscribeNewQueuedTxsEvent(ch)
 }
 

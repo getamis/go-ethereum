@@ -68,7 +68,7 @@ type Backend interface {
 	ChainConfig() *params.ChainConfig
 	HistoryPruningCutoff() uint64
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
-	SubscribeNewQueuedTxsEvent(chan<- core.NewQueuedTxsEvent) event.Subscription
+	SubscribeNewQueuedTxsEvent(chan<- core.NewTxsEvent) event.Subscription
 	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
 	SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription
 	SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription
@@ -213,13 +213,13 @@ type EventSystem struct {
 	chainSub     event.Subscription // Subscription for new chain event
 
 	// Channels
-	install     chan *subscription          // install filter for event notification
-	uninstall   chan *subscription          // remove filter for event notification
-	txsCh       chan core.NewTxsEvent       // Channel to receive new transactions event
-	queuedTxsCh chan core.NewQueuedTxsEvent // Channel to receive new queued transactions event
-	logsCh      chan []*types.Log           // Channel to receive new log event
-	rmLogsCh    chan core.RemovedLogsEvent  // Channel to receive removed log event
-	chainCh     chan core.ChainEvent        // Channel to receive new chain event
+	install     chan *subscription         // install filter for event notification
+	uninstall   chan *subscription         // remove filter for event notification
+	txsCh       chan core.NewTxsEvent      // Channel to receive new transactions event
+	queuedTxsCh chan core.NewTxsEvent      // Channel to receive new queued transactions event
+	logsCh      chan []*types.Log          // Channel to receive new log event
+	rmLogsCh    chan core.RemovedLogsEvent // Channel to receive removed log event
+	chainCh     chan core.ChainEvent       // Channel to receive new chain event
 }
 
 // NewEventSystem creates a new manager that listens for event on the given mux,
@@ -235,7 +235,7 @@ func NewEventSystem(sys *FilterSystem) *EventSystem {
 		install:     make(chan *subscription),
 		uninstall:   make(chan *subscription),
 		txsCh:       make(chan core.NewTxsEvent, txChanSize),
-		queuedTxsCh: make(chan core.NewQueuedTxsEvent, queuedTxChanSize),
+		queuedTxsCh: make(chan core.NewTxsEvent, queuedTxChanSize),
 		logsCh:      make(chan []*types.Log, logsChanSize),
 		rmLogsCh:    make(chan core.RemovedLogsEvent, rmLogsChanSize),
 		chainCh:     make(chan core.ChainEvent, chainEvChanSize),
@@ -493,7 +493,7 @@ func (es *EventSystem) handleChainEvent(filters filterIndex, ev core.ChainEvent)
 	}
 }
 
-func (es *EventSystem) handleQueuedTxsEvent(filters filterIndex, ev core.NewQueuedTxsEvent) {
+func (es *EventSystem) handleQueuedTxsEvent(filters filterIndex, ev core.NewTxsEvent) {
 	txs := make([]*types.Transaction, 0, len(ev.Txs))
 	txs = append(txs, ev.Txs...)
 	for _, f := range filters[QueuedTransactionsSubscription] {
