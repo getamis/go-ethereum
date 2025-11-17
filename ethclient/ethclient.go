@@ -397,7 +397,7 @@ func (ec *Client) SubscribePendingTransactions(ctx context.Context, ch chan<- co
 }
 
 func (ec *Client) SubscribeQueuedTransactions(ctx context.Context, ch chan<- *types.Transaction) (ethereum.Subscription, error) {
-	return ec.c.EthSubscribe(ctx, ch, "newQueuedTransactions")
+	return ec.c.EthSubscribe(ctx, ch, "newPendingTransactions", true)
 }
 
 // State Access
