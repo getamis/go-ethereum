@@ -188,6 +188,9 @@ type (
 
 	// BlockHashReadHook is called when EVM reads the blockhash of a block.
 	BlockHashReadHook = func(blockNumber uint64, hash common.Hash)
+
+	// TransferLogHook is called when a transfer log is emitted.
+	TransferLogHook = func(log *types.TransferLog)
 )
 
 type Hooks struct {
@@ -219,6 +222,8 @@ type Hooks struct {
 	OnLog           LogHook
 	// Block hash read
 	OnBlockHashRead BlockHashReadHook
+
+	OnTransferLog TransferLogHook
 }
 
 // BalanceChangeReason is used to indicate the reason for a balance change, useful
