@@ -957,3 +957,53 @@ func TestHeadersRLPStorage(t *testing.T) {
 	checkSequence(1, 1)    // Only block 1
 	checkSequence(1, 2)    // Genesis + block 1
 }
+
+// Tests that transfer logs associated with a single block can be stored and retrieved.
+func TestTransferLogStorage(t *testing.T) {
+	db := NewMemoryDatabase()
+
+	log1 := &types.TransferLog{
+		From:   common.BytesToAddress([]byte{0x11}),
+		To:     common.BytesToAddress([]byte{0x22}),
+		Value:  big.NewInt(10),
+		TxHash: common.BytesToHash([]byte{0x11, 0x11}),
+	}
+	log2 := &types.TransferLog{
+		From:   common.BytesToAddress([]byte{0x33}),
+		To:     common.BytesToAddress([]byte{0x44}),
+		Value:  big.NewInt(20),
+		TxHash: common.BytesToHash([]byte{0x22, 0x22}),
+	}
+	transferLogs := []*types.TransferLog{log1, log2}
+
+	// Check that no transfer logs entries are in a pristine database
+	hash := common.BytesToHash([]byte{0x03, 0x14})
+	if ls, err := ReadTransferLogs(db, hash, 0); len(ls) != 0 || err != errNotFound {
+		t.Fatalf("non existent transfer logs returned: %v", ls)
+	}
+	// Insert the transfer log slice into the database and check presence
+	WriteTransferLogs(db, hash, 0, transferLogs)
+	if ls, err := ReadTransferLogs(db, hash, 0); len(ls) == 0 || err != nil {
+		t.Fatalf("no transfer logs returned")
+	} else {
+		for i := 0; i < len(transferLogs); i++ {
+			rlpHave, _ := rlp.EncodeToBytes(ls[i])
+			rlpWant, _ := rlp.EncodeToBytes(transferLogs[i])
+
+			if !bytes.Equal(rlpHave, rlpWant) {
+				t.Fatalf("transferLog #%d: transferLog mismatch: have %v, want %v", i, ls[i], transferLogs[i])
+			}
+		}
+	}
+	// Delete the transfer log slice and check purge
+	DeleteTransferLogs(db, hash, 0)
+	if ls, err := ReadTransferLogs(db, hash, 0); len(ls) != 0 || err != errNotFound {
+		t.Fatalf("deleted transfer logs returned: %v", ls)
+	}
+	// Insert missing transfer logs into the database and check error
+	hash2 := common.BytesToHash([]byte{0x07, 0x15})
+	WriteMissingTransferLogs(db, hash2, 1)
+	if ls, err := ReadTransferLogs(db, hash2, 1); len(ls) != 0 || err != errMissingTransferLogs {
+		t.Fatalf("no transfer logs returned and should return missing transfer logs error")
+	}
+}
